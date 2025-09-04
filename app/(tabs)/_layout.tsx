@@ -28,6 +28,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="account"
+        options={{
+          title: 'Account',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="user" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="chats"
         options={{
           title: 'Chats',
@@ -37,15 +44,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="saved"
         options={{
-          title: 'Saved',
+          title: 'Interest',
           tabBarIcon: ({ color }) => <FontAwesome size={28} name="heart" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{
-          title: 'Account',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="user" color={color} />,
         }}
       />
     </Tabs>

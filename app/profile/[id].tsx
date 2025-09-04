@@ -11,7 +11,7 @@ interface DetailItemProps {
 }
 
 const DetailItem: React.FC<DetailItemProps> = ({ label, value }) => (
-  <View style={styles.detailItemContainer}>
+  <View style={styles.detailItem}>
     <Text style={styles.detailLabel}>{label}</Text>
     <Text style={styles.detailValue}>{value}</Text>
   </View>
@@ -24,9 +24,9 @@ interface TagProps {
 }
 
 const Tag: React.FC<TagProps> = ({ icon, text, highlight }) => (
-  <View style={[styles.tag, highlight && styles.highlightTag]}>
-    {icon && <Feather name={icon} size={14} color="#6B7280" style={{ marginRight: 6 }} />}
-    <Text style={[styles.tagText, highlight && styles.highlightTagText]}>{text}</Text>
+  <View style={[styles.tag, highlight && styles.tagHighlight]}>
+    {icon && <Feather name={icon} size={14} color={highlight ? 'white' : Colors.light.tint} />}
+    <Text style={[styles.tagText, highlight && styles.tagTextHighlight]}>{text}</Text>
   </View>
 );
 
@@ -43,8 +43,7 @@ export default function ProfileDetailScreen() {
     }
   }).current;
 
-    const allProfiles = [...mockProfiles.all, ...mockProfiles.newlyJoined];
-  const profile = allProfiles.find(p => p.id === id);
+    const profile = mockProfiles.all.find(p => p.id === id);
 
   if (profile && !profile.images) {
     profile.images = [profile.image];
@@ -104,55 +103,62 @@ export default function ProfileDetailScreen() {
             </View>
           </View>
 
-          <View style={styles.tagsContainer}>
-            <Tag icon="briefcase" text={profile.job} highlight />
-            <Tag icon="map-pin" text={profile.location} />
-            <Tag icon="user" text={profile.maritalStatus} />
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>About me</Text>
+            <View style={styles.tagsContainer}>
+              <Tag icon="user" text={profile.height} />
+              <Tag icon="calendar" text={profile.dob} />
+              <Tag icon="book" text={profile.education} />
+              <Tag icon="info" text={profile.born} />
+              <Tag icon="star" text={profile.star} />
+              <Tag icon="moon" text={profile.rassi} />
+              <Tag icon="droplet" text={profile.bloodGroup} />
+            </View>
           </View>
 
-          <View style={styles.detailCard}>
-            <Text style={styles.cardTitle}>Basic Details</Text>
-            <DetailItem label="Height" value={profile.height} />
-            <DetailItem label="Date of Birth" value={profile.dob} />
-            <DetailItem label="Education" value={profile.education} />
-            <DetailItem label="Born" value={profile.born} />
-          </View>
-
-          <View style={styles.detailCard}>
-            <Text style={styles.cardTitle}>Horoscope Details</Text>
-            <DetailItem label="Star" value={profile.star} />
-            <DetailItem label="Raasi" value={profile.rassi} />
-            <DetailItem label="Blood Group" value={profile.bloodGroup} />
-            <DetailItem label="Marital status" value={profile.maritalStatus} />
-          </View>
-
-          <View style={styles.detailCard}>
+          <View style={styles.card}>
             <Text style={styles.cardTitle}>Professional Details</Text>
-            <DetailItem label="Job" value={profile.job} />
-            <DetailItem label="Salary" value={profile.salary} />
-            <DetailItem label="Location" value={profile.location} />
-            <DetailItem label="Birth place" value={profile.birthPlace} />
-            <DetailItem label="Birth time" value={profile.birthTime} />
+            <View style={styles.tagsContainer}>
+              <Tag icon="briefcase" text={profile.job} />
+              <Tag icon="dollar-sign" text={profile.salary} />
+              <Tag icon="map-pin" text={`Job Location - ${profile.location}`} />
+            </View>
           </View>
 
-          <View style={styles.detailCard}>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Horoscope Details</Text>
+            <DetailItem label="Place of Birth" value={profile.birthPlace} />
+            <DetailItem label="Time of Birth" value={profile.birthTime} />
+            <DetailItem label="Raasi" value={profile.rassi} />
+            <DetailItem label="Star" value={profile.star} />
+            <DetailItem label="Patham" value={profile.patham} />
+            <DetailItem label="Lagnam" value={profile.lagnam} />
+            <DetailItem label="Horoscope type" value={profile.horoscopeType} />
+            <DetailItem label="Dosham type" value={profile.doshamType} />
+          </View>
+
+          <View style={styles.card}>
             <Text style={styles.cardTitle}>Family Details</Text>
-            <DetailItem label="Father's name" value={profile.fatherName} />
-            <DetailItem label="Father's occupation" value={profile.fatherOccupation} />
-            <DetailItem label="Mother's name" value={profile.motherName} />
-            <DetailItem label="Mother's occupation" value={profile.motherOccupation} />
+            <DetailItem label="Father Name" value={profile.fatherName} />
+            <DetailItem label="Father Occupation" value={profile.fatherOccupation} />
+            <DetailItem label="Mother Name" value={profile.motherName} />
+            <DetailItem label="Mother Occupation" value={profile.motherOccupation} />
             <DetailItem label="Siblings" value={profile.siblings} />
           </View>
 
-          <View style={styles.detailCard}>
+          <View style={styles.card}>
             <Text style={styles.cardTitle}>Other Details</Text>
-            <DetailItem label="Own house" value={profile.ownHouse} />
-            <DetailItem label="Own plot" value={profile.ownPlot} />
-            <DetailItem label="Family status" value={profile.familyStatus} />
-            <DetailItem label="Family type" value={profile.familyType} />
-            <DetailItem label="Diet" value={profile.diet} />
+            <DetailItem label="Married" value={profile.married} />
+            <DetailItem label="Own House" value={profile.ownHouse} />
+            <DetailItem label="Own Plot" value={profile.ownPlot} />
+            <DetailItem label="Family Status" value={profile.familyStatus} />
           </View>
-        </View>
+
+          
+          
+          
+          
+                  </View>
       </ScrollView>
       <TouchableOpacity style={styles.sendInterestButton}>
         <Feather name="send" size={20} color="white" />
@@ -163,9 +169,18 @@ export default function ProfileDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'white' },
-    imageContainer: { height: 500 },
-  profileImage: { height: '100%', justifyContent: 'flex-end' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f0f2f5',
+  },
+  imageContainer: {
+    width: '100%',
+    height: 400,
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -180,7 +195,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButton: {},
-    shortlistButton: { 
+  shortlistButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     padding: 8,
     borderRadius: 25,
@@ -193,27 +208,127 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 15,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
   },
-    paginationText: { color: 'white', fontSize: 14, fontWeight: 'bold' },
-    contentContainer: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, marginTop: -20, paddingBottom: 120, paddingHorizontal: 20 },
-  headerSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, marginBottom: 10 },
-  profileName: { fontSize: 24, fontWeight: 'bold' },
-  actionButtons: { flexDirection: 'row' },
-  actionButton: { backgroundColor: 'black', borderRadius: 20, padding: 10, marginLeft: 10 },
-  card: { paddingHorizontal: 20, marginTop: 15 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap' },
-  tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginRight: 10, marginBottom: 10 },
-  tagText: { fontSize: 14, color: '#374151' },
-  highlightTag: { backgroundColor: '#E5E7EB' },
-  highlightTagText: { color: '#4B5563' },
-    detailItemContainer: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  detailLabel: { fontSize: 14, color: '#6B7280', marginBottom: 4 },
-  detailValue: { fontSize: 16, fontWeight: '600', color: '#111827' },
-    sendInterestButton: { flexDirection: 'row', backgroundColor: Colors.light.tint, padding: 20, alignItems: 'center', justifyContent: 'center', margin: 15, borderRadius: 12, position: 'absolute', bottom: 0, left: 15, right: 15 },
-  sendInterestButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
+  paginationText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  contentContainer: {
+    padding: 15,
+    marginTop: -50,
+  },
+  headerSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  profileName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+  },
+  actionButton: {
+    backgroundColor: Colors.light.tint,
+    padding: 8,
+    borderRadius: 20,
+    marginLeft: 10,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eef6ff',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  tagHighlight: {
+    backgroundColor: Colors.light.tint,
+  },
+  tagText: {
+    marginLeft: 8,
+    color: Colors.light.tint,
+    fontSize: 14,
+  },
+  tagTextHighlight: {
+    color: 'white',
+  },
+  detailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  detailLabel: {
+    fontSize: 15,
+    color: '#666',
+  },
+  detailValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  sendInterestButton: {
+    backgroundColor: Colors.light.tint,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    marginHorizontal: 15,
+    marginBottom: 15,
+    borderRadius: 10,
+  },
+  sendInterestButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  notFoundContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notFoundText: {
+    fontSize: 18,
+    color: '#666',
+  },
 });

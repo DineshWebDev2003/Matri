@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, FlatList, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Image, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
@@ -14,27 +14,51 @@ const newMatches = [
 ];
 
 const messages = [
-  { id: '1', name: 'Sophia', message: 'Start Conversation', time: '', unread: 2, image: 'https://randomuser.me/api/portraits/women/7.jpg', highlight: true },
-  { id: '2', name: 'Sushmitha', message: 'Let\'s talk', time: '5: 34', unread: 0, image: 'https://randomuser.me/api/portraits/women/8.jpg' },
-  { id: '3', name: 'Roshini', message: 'What is your age ?', time: '13/7/25', unread: 0, image: 'https://randomuser.me/api/portraits/women/9.jpg' },
+  { id: '1', name: 'Sophia', message: 'Start Conversation', time: '', unread: 2, image: 'https://randomuser.me/api/portraits/women/7.jpg', highlight: true, type: 'chat', isNewMatch: true },
+  { id: '2', name: 'Sushmitha', message: 'Let\'s talk', time: '5: 34', unread: 0, image: 'https://randomuser.me/api/portraits/women/8.jpg', type: 'chat', isNewMatch: false },
+  { id: '3', name: 'Roshini', message: 'What is your age ?', time: '13/7/25', unread: 0, image: 'https://randomuser.me/api/portraits/women/9.jpg', type: 'chat', isNewMatch: false },
+  { id: '4', name: 'Priya', message: 'Sent you an interest', time: '1 day ago', unread: 1, image: 'https://randomuser.me/api/portraits/women/10.jpg', type: 'interest', isNewMatch: false },
+  { id: '5', name: 'Anjali', message: 'Sent you an interest', time: '2 days ago', unread: 0, image: 'https://randomuser.me/api/portraits/women/11.jpg', type: 'interest', isNewMatch: false },
 ];
 
 export default function ChatsScreen() {
   const [activeTab, setActiveTab] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredMessages, setFilteredMessages] = useState(messages);
   const router = useRouter();
 
+  React.useEffect(() => {
+    let filtered = messages;
+
+    if (activeTab === 'New Matches') {
+      filtered = filtered.filter(m => m.isNewMatch);
+    } else if (activeTab === 'Unread') {
+      filtered = filtered.filter(m => m.unread > 0);
+    } else if (activeTab === 'Chats') {
+      filtered = filtered.filter(m => m.type === 'chat');
+    } else if (activeTab === 'Interest') {
+      filtered = filtered.filter(m => m.type === 'interest');
+    }
+
+    if (searchQuery) {
+      filtered = filtered.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+
+    setFilteredMessages(filtered);
+  }, [searchQuery, activeTab]);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}><Feather name="arrow-left" size={24} /></TouchableOpacity>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView key="chat-scroll-view">
+      <ScrollView key="chat-scroll-view" contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={styles.searchSection}>
           <View style={styles.searchInputContainer}>
-            <TextInput placeholder="Search..." style={styles.searchInput} />
+            <TextInput placeholder="Search..." style={styles.searchInput} value={searchQuery} onChangeText={setSearchQuery} />
             <TouchableOpacity style={styles.searchButton}>
               <Feather name="search" size={20} color={'white'} />
             </TouchableOpacity>
@@ -50,6 +74,12 @@ export default function ChatsScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={[styles.tab, activeTab === 'Unread' && styles.activeTab]} onPress={() => setActiveTab('Unread')}>
             <Text style={[styles.tabText, activeTab === 'Unread' && styles.activeTabText]}>Unread</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tab, activeTab === 'Chats' && styles.activeTab]} onPress={() => setActiveTab('Chats')}>
+            <Text style={[styles.tabText, activeTab === 'Chats' && styles.activeTabText]}>Chats</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tab, activeTab === 'Interest' && styles.activeTab]} onPress={() => setActiveTab('Interest')}>
+            <Text style={[styles.tabText, activeTab === 'Interest' && styles.activeTabText]}>Interest</Text>
           </TouchableOpacity>
         </View>
 
@@ -69,7 +99,7 @@ export default function ChatsScreen() {
         </View>
 
         <FlatList
-          data={messages}
+          data={filteredMessages}
           keyExtractor={item => item.id}
           scrollEnabled={false}
           renderItem={({ item }: { item: any }) => (
@@ -87,7 +117,7 @@ export default function ChatsScreen() {
           )}
         />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -1,58 +1,47 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-import { AuthProvider, useAuth } from '../context/AuthContext';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from '../context/AuthContext';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, View } from 'react-native';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const segments = useSegments();
-  const router = useRouter();
-  const { isAuthenticated } = useAuth();
-
-  useEffect(() => {
-    if (isAuthenticated === null) {
-      return; // Still loading
-    }
-
-    const inAuthGroup = segments[0] === '(auth)';
-    const isSplashScreen = segments.length === 0 || segments[0] === 'index';
-
-    if (isSplashScreen) {
-      // Let the splash screen handle its own navigation
-      return;
-    }
-
-    if (!isAuthenticated && !inAuthGroup) {
-      // If not authenticated and not in auth group, redirect to login.
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      // If authenticated and in auth group, redirect to the main app.
-      router.replace('/(tabs)');
-    }
-  }, [isAuthenticated, segments]);
+  const insets = useSafeAreaInsets();
 
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="shortlisted" options={{ headerShown: false }} />
-      <Stack.Screen name="viewed-profile" options={{ headerShown: false }} />
-      <Stack.Screen name="interest-sent" options={{ headerShown: false }} />
-      <Stack.Screen name="notifications" options={{ headerShown: false }} />
-      <Stack.Screen name="interest-received" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found" />
-    </Stack>
+    <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: '#C6222F' }}>
+      <StatusBar style="light" backgroundColor="transparent" translucent />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="chat/[id]" />
+        <Stack.Screen name="shortlisted" />
+        <Stack.Screen name="viewed-profile" />
+        <Stack.Screen name="interest-sent" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="interest-received" />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    marginBottom: 10,
+  },
+});
+
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
