@@ -9,9 +9,11 @@ export interface ProfileCardRef {
   flipCard: () => void;
 }
 
-interface ProfileCardProps {}
+interface ProfileCardProps {
+  userProfile?: any;
+}
 
-const ProfileCard = forwardRef<ProfileCardRef, ProfileCardProps>((props, ref) => {
+const ProfileCard = forwardRef<ProfileCardRef, ProfileCardProps>(({ userProfile }, ref) => {
   const router = useRouter();
   const auth = useAuth();
   const user = auth?.user;
@@ -19,11 +21,12 @@ const ProfileCard = forwardRef<ProfileCardRef, ProfileCardProps>((props, ref) =>
   const flipAnimation = useRef(new Animated.Value(0)).current;
   
   const profile = {
-    name: user?.name || 'Dinesh M',
-    id: `ID : ${user?.id || '54879108'}`,
-    profileImage: user?.profileImage || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=500&h=500&fit=crop',
+    name: userProfile ? `${userProfile.firstname} ${userProfile.lastname}` : (user?.name || 'Dinesh M'),
+    id: `ID : ${userProfile?.profile_id || user?.id || '54879108'}`,
+    profileImage: userProfile?.image || user?.profileImage || null,
     plan: 'Premium Plan',
     isPremium: true,
+    firstLetter: userProfile?.firstname?.charAt(0)?.toUpperCase() || user?.firstname?.charAt(0)?.toUpperCase() || 'U',
   };
 
   
@@ -63,7 +66,20 @@ const ProfileCard = forwardRef<ProfileCardRef, ProfileCardProps>((props, ref) =>
     <Animated.View style={[styles.card, frontAnimatedStyle]}>
       <View style={styles.profileSection}>
         <View style={styles.profileImageContainer}>
-          <Image source={{ uri: profile.profileImage }} style={styles.profileImage} />
+          {profile.profileImage ? (
+            <Image source={{ uri: profile.profileImage }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <LinearGradient
+                colors={['#FF6B6B', '#4ECDC4', '#45B7D1']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarGradient}
+              >
+                <Text style={styles.avatarText}>{profile.firstLetter}</Text>
+              </LinearGradient>
+            </View>
+          )}
           <TouchableOpacity style={styles.editIconContainer}>
             <Feather name="edit-2" size={16} color="white" />
           </TouchableOpacity>
@@ -147,6 +163,28 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     borderWidth: 3,
     borderColor: '#F0F0F0',
+  },
+  avatarFallback: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#F0F0F0',
+    overflow: 'hidden',
+  },
+  avatarGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: 'white',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   profileInfo: {
     flex: 1,

@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
+import { apiService } from '../services/api';
 
 interface AuthContextType {
   login: (username?: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (data: any) => Promise<void>;
+  clearAuth: () => Promise<void>;
   isAuthenticated: boolean;
   user: any;
   token: string | null;
@@ -19,75 +20,129 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>({ name: 'Test User', id: 1 }); // Mock user
-  const [token, setToken] = useState<string | null>('mock-token'); // Mock token
-  const isAuthenticated = true;
+  const [user, setUser] = useState<any>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    checkStoredAuth();
+  }, []);
+
+  const checkStoredAuth = async () => {
+    try {
+      const storedUser = await SecureStore.getItemAsync('user');
+      const storedToken = await SecureStore.getItemAsync('token');
+      
+      if (storedUser && storedToken) {
+        setUser(JSON.parse(storedUser));
+        setToken(storedToken);
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      console.error('Error checking stored auth:', error);
+    }
+  };
 
   const login = async (username?: string, password?: string) => {
-    // API call disabled for testing
-    console.log('Login function called, but API call is disabled.');
-    // try {
-    //   const response = await axios.post('http://192.168.0.104/Final%20Code/assets/core/public/api/login', {
-    //     username,
-    //     password,
-    //   });
+    try {
+      console.log('🔐 Attempting login with:', username);
+      const response = await apiService.login(username!, password!);
+      console.log('📡 Login API response:', response);
 
-    //   if (response.data.status === 'success') {
-    //     const { user, access_token } = response.data.data;
-    //     setUser(user);
-    //     setToken(access_token);
+      if (response.status === 'success') {
+        const { user, access_token } = response.data;
+        console.log('✅ Login successful! User:', user);
+        console.log('🔑 Access token:', access_token);
+        
+        setUser(user);
+        setToken(access_token);
+        setIsAuthenticated(true);
 
-    //     await SecureStore.setItemAsync('user', JSON.stringify(user));
-    //     await SecureStore.setItemAsync('token', access_token);
+        await SecureStore.setItemAsync('user', JSON.stringify(user));
+        await SecureStore.setItemAsync('token', access_token);
 
-    //     router.replace('/(tabs)');
-    //   } else {
-    //     throw new Error(response.data.message?.error?.join(', ') || 'Invalid credentials');
-    //   }
-    // } catch (error) {
-    //   console.error('Login error:', error);
-    //   const errorMessage = error.response?.data?.message?.error?.join(', ') || error.message || 'An unexpected error occurred.';
-    //   throw new Error(errorMessage);
-    // }
+        console.log('🚀 Redirecting to tabs...');
+        router.replace('/(tabs)');
+      } else {
+        console.log('❌ Login failed:', response);
+        throw new Error(response.message?.error?.join(', ') || 'Invalid credentials');
+      }
+    } catch (error: any) {
+      console.error('💥 Login error:', error);
+      const errorMessage = error.response?.data?.message?.error?.join(', ') || error.message || 'An unexpected error occurred.';
+      throw new Error(errorMessage);
+    }
+  };
+
+  const register = async (userData: {
+    email: string;
+    username: string;
+    password: string;
+    password_confirmation: string;
+    mobile: string;
+    mobile_code: string;
+    country_code: string;
+    country: string;
+    agree?: boolean;
+    reference?: string;
+  }) => {
+    try {
+      console.log('📝 Attempting registration with:', userData.email, userData.username);
+      const response = await apiService.register(userData);
+      console.log('📡 Registration API response:', response);
+      
+      if (response.status === 'success') {
+        const { user, access_token } = response.data;
+        setUser(user);
+        setToken(access_token);
+        setIsAuthenticated(true);
+        
+        // Store user data and token securely
+        await SecureStore.setItemAsync('user', JSON.stringify(user));
+        await SecureStore.setItemAsync('token', access_token);
+        
+        console.log('✅ Registration successful, navigating to tabs');
+        router.replace('/(tabs)');
+      } else {
+        throw new Error(response.message?.error?.join(', ') || 'Registration failed');
+      }
+    } catch (error: any) {
+      console.error('💥 Registration error:', error);
+      throw new Error(error.message || 'Registration failed');
+    }
   };
 
   const logout = async () => {
-    // API call disabled for testing
-    console.log('Logout function called, but API call is disabled.');
-    // if (token) {
-    //   try {
-    //     await axios.get('http://192.168.0.104/Final%20Code/assets/core/public/api/logout', {
-    //       headers: { Authorization: `Bearer ${token}` },
-    //     });
-    //   } catch (error) {
-    //     console.error('Logout failed:', error);
-    //   }
-    // }
-    // setUser(null);
-    // setToken(null);
-    // await SecureStore.deleteItemAsync('user');
-    // await SecureStore.deleteItemAsync('token');
-    // router.replace('/(auth)/login');
+    if (token) {
+      try {
+        await apiService.logout();
+      } catch (error) {
+        console.error('Logout failed:', error);
+      }
+    }
+    setUser(null);
+    setToken(null);
+    setIsAuthenticated(false);
+    await SecureStore.deleteItemAsync('user');
+    await SecureStore.deleteItemAsync('token');
+    router.replace('/(auth)/login');
   };
 
-  const register = async (data: any) => {
-    // API call disabled for testing
-    console.log('Register function called, but API call is disabled.');
-    // try {
-    //   const response = await axios.post('http://192.168.0.104/Final%20Code/assets/core/public/api/register', data);
 
-    //   if (response.data.status !== 'success') {
-    //     throw new Error(response.data.message?.error?.join(', ') || 'Registration failed');
-    //   }
-    // } catch (error) {
-    //   console.error('Registration error:', error);
-    //   const errorMessage = error.response?.data?.message?.error?.join(', ') || error.message || 'An unexpected error occurred.';
-    //   throw new Error(errorMessage);
-    // }
+  const clearAuth = async () => {
+    setUser(null);
+    setToken(null);
+    setIsAuthenticated(false);
+    try {
+      await SecureStore.deleteItemAsync('user');
+      await SecureStore.deleteItemAsync('token');
+    } catch (error) {
+      console.error('Error clearing auth:', error);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ login, logout, register, isAuthenticated, user, token }}>
+    <AuthContext.Provider value={{ login, logout, register, clearAuth, isAuthenticated, user, token }}>
       {children}
     </AuthContext.Provider>
   );

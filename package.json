@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
+    "@react-native-community/datetimepicker": "^8.4.4",
+    "@react-native-picker/picker": "^2.11.1",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/drawer": "^7.5.7",
     "@react-navigation/elements": "^2.3.8",
@@ -37,22 +39,21 @@
     "expo-video": "~2.2.2",
     "expo-web-browser": "~14.2.0",
     "lottie-react-native": "7.2.2",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "react-native": "0.79.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-native": "0.74.5",
     "react-native-circular-progress-indicator": "^4.4.2",
     "react-native-gesture-handler": "~2.24.0",
-    "react-native-reanimated": "~3.17.4",
+    "react-native-reanimated": "~3.10.1",
     "react-native-safe-area-context": "^5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "^15.11.2",
     "react-native-web": "~0.20.0",
-    "react-native-webview": "13.13.5",
-    "undefined": "c:\\xampp\\htdocs\\Final Code\\90skalyanam\""
+    "react-native-webview": "13.13.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@types/react": "~19.0.10",
+    "@types/react": "~18.2.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
     "typescript": "~5.8.3"

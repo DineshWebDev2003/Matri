@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { useRouter } from 'expo-router';
-import { mockProfiles } from './profiles';
+import { apiService } from '../../services/api';
 
 const banners = [
   { id: '1', title: 'Meet and Greet', location: 'Vadapalani, Chennai', image: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=2070&auto=format&fit=crop' },
@@ -20,10 +20,13 @@ const stats = [
   { label: 'Total Shortlist', value: '06', icon: 'heart', gradient: ['#EF4444', '#DC2626'], route: '/shortlisted' },
 ] as const;
 
-
 export default function HomeScreen() {
   const router = useRouter();
   const auth = useAuth();
+  const [selectedBanner, setSelectedBanner] = useState(0);
+  const [newlyJoinedProfiles, setNewlyJoinedProfiles] = useState([]);
+  const [newMatchesProfiles, setNewMatchesProfiles] = useState([]);
+  const scrollX = new Animated.Value(0);
   const [userInfo, setUserInfo] = useState<any>(null);
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
@@ -90,20 +93,49 @@ export default function HomeScreen() {
     const fetchUserInfo = async () => {
       if (auth?.token) {
         try {
-          const response = await axios.get('http://192.168.0.104/Final%20Code/assets/core/public/api/user-info', {
+          const response = await axios.get('https://app.90skalyanam.com/api/user-info', {
             headers: { Authorization: `Bearer ${auth.token}` },
           });
+          console.log('User info response:', response.data);
           if (response.data.status === 'success') {
             setUserInfo(response.data.data.user);
           }
         } catch (error) {
           console.error('Failed to fetch user info:', error);
+          // Fallback to auth user data if API fails
+          if (auth?.user) {
+            setUserInfo(auth.user);
+          }
         }
+      } else if (auth?.user) {
+        // Use auth context user data if no token but user exists
+        setUserInfo(auth.user);
+      }
+    };
+
+    const fetchProfiles = async () => {
+      try {
+        // Fetch newly joined profiles
+        const newlyJoinedResponse = await apiService.getProfiles({ type: 'newly_joined', limit: 3 });
+        if (newlyJoinedResponse.status === 'success') {
+          setNewlyJoinedProfiles(newlyJoinedResponse.data.profiles || []);
+        }
+
+        // Fetch new matches profiles
+        const newMatchesResponse = await apiService.getProfiles({ type: 'new_matches', limit: 3 });
+        if (newMatchesResponse.status === 'success') {
+          setNewMatchesProfiles(newMatchesResponse.data.profiles || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch profiles:', error);
+        setNewlyJoinedProfiles([]);
+        setNewMatchesProfiles([]);
       }
     };
 
     fetchUserInfo();
-  }, [auth?.token]);
+    fetchProfiles();
+  }, [auth?.token, auth?.user]);
 
   return (
     <View style={styles.container}>
@@ -131,7 +163,7 @@ export default function HomeScreen() {
             </Animated.View>
 
             <Animated.Image
-              source={{ uri: 'https://90skalyanam.com/assets/images/logoIcon/logo.png' }}
+              source={{ uri: 'https://app.90skalyanam.com/assets/images/logoIcon/logo.png' }}
               style={[
                 styles.logo,
                 {
@@ -141,7 +173,7 @@ export default function HomeScreen() {
                 },
               ]}
             />
-            <Image source={{ uri: 'https://90skalyanam.com/assets/images/logoIcon/logo.png' }} style={[styles.logo, { opacity: 0 }]} />
+            <Image source={{ uri: 'https://app.90skalyanam.com/assets/images/logoIcon/logo.png' }} style={[styles.logo, { opacity: 0 }]} />
           </View>
           <View style={styles.headerIcons}>
             <TouchableOpacity onPress={() => router.push('/notifications')}><Feather name="bell" size={24} /></TouchableOpacity>
@@ -188,13 +220,13 @@ export default function HomeScreen() {
         </View>
         <FlatList
           horizontal
-          data={mockProfiles.newlyJoined.slice(0, 3)}
-          keyExtractor={item => item.id}
+          data={newlyJoinedProfiles}
+          keyExtractor={(item, index) => item?.id?.toString() || index.toString()}
           renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => router.push(`/profile/${item.id}`)} style={styles.profileCard}>
-              <Image source={{ uri: item.images[0] }} style={styles.profileImage} />
-              <Text style={styles.profileName}>{item.name}</Text>
-              <Text style={styles.profileLocation}>{item.location}</Text>
+            <TouchableOpacity onPress={() => router.push(`/profile/${item?.id || '1'}`)} style={styles.profileCard}>
+              <Image source={{ uri: item?.images?.[0] || 'https://randomuser.me/api/portraits/women/1.jpg' }} style={styles.profileImage} />
+              <Text style={styles.profileName}>{item?.name || 'User'}</Text>
+              <Text style={styles.profileLocation}>{item?.location || 'Chennai'}</Text>
             </TouchableOpacity>
           )}
           showsHorizontalScrollIndicator={false}
@@ -207,13 +239,13 @@ export default function HomeScreen() {
         </View>
         <FlatList
           horizontal
-          data={mockProfiles.newMatches.slice(0, 3)}
-          keyExtractor={item => item.id}
+          data={newMatchesProfiles}
+          keyExtractor={(item, index) => item?.id?.toString() || index.toString()}
           renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => router.push(`/profile/${item.id}`)} style={styles.profileCard}>
-              <Image source={{ uri: item.images[0] }} style={styles.profileImage} />
-              <Text style={styles.profileName}>{item.name}</Text>
-              <Text style={styles.profileLocation}>{item.location}</Text>
+            <TouchableOpacity onPress={() => router.push(`/profile/${item?.id || '1'}`)} style={styles.profileCard}>
+              <Image source={{ uri: item?.images?.[0] || 'https://randomuser.me/api/portraits/women/1.jpg' }} style={styles.profileImage} />
+              <Text style={styles.profileName}>{item?.name || 'User'}</Text>
+              <Text style={styles.profileLocation}>{item?.location || 'Chennai'}</Text>
             </TouchableOpacity>
           )}
           showsHorizontalScrollIndicator={false}

@@ -1,139 +1,74 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/Colors';
+import { apiService } from '../../services/api';
+import ProfileImage from '../../components/ProfileImage';
 
-const allProfiles = [
-    { 
-      id: '1', name: 'Sofia', age: 25, height: "152cm", location: 'Madurai', idNo: 'NDR10101', images: ['https://randomuser.me/api/portraits/women/1.jpg', 'https://images.unsplash.com/photo-1548142813-c348350df52b?q=80&w=1889&auto=format&fit=crop', 'https://images.unsplash.com/photo-1594744806549-83db4a74a58b?q=80&w=1887&auto=format&fit=crop', 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1974&auto=format&fit=crop', 'https://images.unsplash.com/photo-1531058020387-3be344556be6?q=80&w=2070&auto=format&fit=crop'], premium: true,
-      dob: '15/05/1999', education: 'B.E. CSE', born: '1st Born', star: 'Rohini', rassi: 'Taurus', bloodGroup: 'O +ve', maritalStatus: 'Never Married',
-      job: 'Software Engineer', salary: '5-7 LPA', birthPlace: 'Madurai', birthTime: '10:00 AM',
-      fatherName: 'Rajan', fatherOccupation: 'Business',
-      motherName: 'Mala', motherOccupation: 'Teacher',
-      siblings: '1 Brother',
-      ownHouse: 'Yes', ownPlot: 'No', familyStatus: 'Upper Middle class', familyType: 'Nuclear family',
-      diet: 'Non-Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '2', name: 'Pooja', age: 25, height: "160cm", location: 'Chennai', idNo: 'NDR10102', images: ['https://randomuser.me/api/portraits/women/2.jpg', 'https://images.unsplash.com/photo-1619981943232-5643b5e4053a?q=80&w=1887&auto=format&fit=crop', 'https://randomuser.me/api/portraits/women/10.jpg', 'https://randomuser.me/api/portraits/women/11.jpg'], premium: false,
-      dob: '24/07/1997', education: 'MCA', born: '2nd Born', star: 'Vishaakam', rassi: 'Libra', bloodGroup: 'AB +ve', maritalStatus: 'Separated',
-      job: 'Technical Supporter', salary: 'Less than 1LPA', birthPlace: 'Trichy', birthTime: '6:40 AM',
-      fatherName: 'Arumugam (Late)', fatherOccupation: 'Engineer',
-      motherName: 'Janaki', motherOccupation: 'Home maker',
-      siblings: '2 Sisters',
-      ownHouse: 'Yes', ownPlot: 'Yes', familyStatus: 'Middle class', familyType: 'Joint family',
-      diet: 'Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '3', name: 'Suhashini', age: 24, height: "165cm", location: 'Trichy', idNo: 'NDR10103', images: ['https://randomuser.me/api/portraits/women/3.jpg', 'https://randomuser.me/api/portraits/women/12.jpg'], premium: false,
-      dob: '10/11/2000', education: 'M.Sc. Maths', born: '1st Born', star: 'Anusham', rassi: 'Scorpio', bloodGroup: 'B +ve', maritalStatus: 'Never Married',
-      job: 'Teacher', salary: '2-3 LPA', birthPlace: 'Trichy', birthTime: '01:20 PM',
-      fatherName: 'Subramanian', fatherOccupation: 'Government Employee',
-      motherName: 'Lakshmi', motherOccupation: 'Home maker',
-      siblings: '1 Sister',
-      ownHouse: 'Yes', ownPlot: 'Yes', familyStatus: 'Middle class', familyType: 'Nuclear family',
-      diet: 'Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '4', name: 'Divya', age: 26, height: "158cm", location: 'Kovaipudur', idNo: 'NDR10104', images: ['https://randomuser.me/api/portraits/women/4.jpg', 'https://randomuser.me/api/portraits/women/14.jpg', 'https://randomuser.me/api/portraits/women/15.jpg'], premium: false,
-      dob: '02/03/1998', education: 'B.Com', born: '2nd Born', star: 'Uthiraadam', rassi: 'Sagittarius', bloodGroup: 'A +ve', maritalStatus: 'Never Married',
-      job: 'Accountant', salary: '3-4 LPA', birthPlace: 'Coimbatore', birthTime: '11:45 PM',
-      fatherName: 'Krishnan', fatherOccupation: 'Bank Manager',
-      motherName: 'Saraswathi', motherOccupation: 'Home maker',
-      siblings: 'No Siblings',
-      ownHouse: 'Yes', ownPlot: 'No', familyStatus: 'Upper Middle class', familyType: 'Nuclear family',
-      diet: 'Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '5', name: 'Shree Devi', age: 24, height: "155cm", location: 'Thiruvallur', idNo: 'NDR10105', images: ['https://randomuser.me/api/portraits/women/5.jpg', 'https://randomuser.me/api/portraits/women/16.jpg'], premium: false,
-      dob: '20/08/2000', education: 'B.Tech IT', born: '1st Born', star: 'Kettai', rassi: 'Scorpio', bloodGroup: 'O -ve', maritalStatus: 'Never Married',
-      job: 'Data Analyst', salary: '4-5 LPA', birthPlace: 'Chennai', birthTime: '08:30 AM',
-      fatherName: 'Ganesan', fatherOccupation: 'Engineer',
-      motherName: 'Vani', motherOccupation: 'Professor',
-      siblings: '1 Brother',
-      ownHouse: 'No', ownPlot: 'No', familyStatus: 'Middle class', familyType: 'Nuclear family',
-      diet: 'Non-Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '6', name: 'Shivanya', age: 26, height: "162cm", location: 'Trichy', idNo: 'NDR10106', images: ['https://randomuser.me/api/portraits/women/1.jpg'], premium: true,
-      dob: '15/05/1998', education: 'B.E. ECE', born: '1st Born', star: 'Rohini', rassi: 'Taurus', bloodGroup: 'O +ve', maritalStatus: 'Never Married',
-      job: 'Hardware Engineer', salary: '5-7 LPA', birthPlace: 'Trichy', birthTime: '10:00 AM',
-      fatherName: 'Raman', fatherOccupation: 'Business', motherName: 'Sita', motherOccupation: 'Homemaker', siblings: '1 Brother',
-      ownHouse: 'Yes', ownPlot: 'No', familyStatus: 'Upper Middle class', familyType: 'Nuclear family', diet: 'Non-Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '7', name: 'Divya Dia', age: 27, height: "158cm", location: 'Chennai', idNo: 'NDR10107', images: ['https://randomuser.me/api/portraits/women/2.jpg'], premium: false,
-      dob: '24/07/1997', education: 'MCA', born: '2nd Born', star: 'Vishaakam', rassi: 'Libra', bloodGroup: 'AB +ve', maritalStatus: 'Never Married',
-      job: 'Technical Supporter', salary: 'Less than 1LPA', birthPlace: 'Chennai', birthTime: '6:40 AM',
-      fatherName: 'Arumugam (Late)', fatherOccupation: 'Engineer', motherName: 'Janaki', motherOccupation: 'Home maker', siblings: '2 Sisters',
-      ownHouse: 'Yes', ownPlot: 'Yes', familyStatus: 'Middle class', familyType: 'Joint family', diet: 'Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '8', name: 'Elsa Perry', age: 22, height: "165cm", location: 'Ooty', idNo: 'NDR10108', images: ['https://randomuser.me/api/portraits/women/3.jpg'], premium: false,
-      dob: '10/11/2002', education: 'M.Sc. Maths', born: '1st Born', star: 'Anusham', rassi: 'Scorpio', bloodGroup: 'B +ve', maritalStatus: 'Never Married',
-      job: 'Teacher', salary: '2-3 LPA', birthPlace: 'Ooty', birthTime: '01:20 PM',
-      fatherName: 'Subramanian', fatherOccupation: 'Government Employee', motherName: 'Lakshmi', motherOccupation: 'Home maker', siblings: '1 Sister',
-      ownHouse: 'Yes', ownPlot: 'Yes', familyStatus: 'Middle class', familyType: 'Nuclear family', diet: 'Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '9', name: 'Maghilini', age: 26, height: "162cm", location: 'Trichy', idNo: 'NDR10109', images: ['https://randomuser.me/api/portraits/women/4.jpg'], premium: true,
-      dob: '15/05/1998', education: 'B.E. IT', born: '1st Born', star: 'Rohini', rassi: 'Taurus', bloodGroup: 'A +ve', maritalStatus: 'Never Married',
-      job: 'Software Developer', salary: '7-10 LPA', birthPlace: 'Trichy', birthTime: '11:00 AM',
-      fatherName: 'Ravi', fatherOccupation: 'Doctor', motherName: 'Sunitha', motherOccupation: 'Professor', siblings: '1 Sister',
-      ownHouse: 'Yes', ownPlot: 'Yes', familyStatus: 'Upper Middle class', familyType: 'Nuclear family', diet: 'Non-Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '10', name: 'Smrithi Sri', age: 27, height: "158cm", location: 'Chennai', idNo: 'NDR10110', images: ['https://randomuser.me/api/portraits/women/5.jpg'], premium: false,
-      dob: '24/07/1997', education: 'B.Com', born: '2nd Born', star: 'Vishaakam', rassi: 'Libra', bloodGroup: 'B +ve', maritalStatus: 'Never Married',
-      job: 'Accountant', salary: '3-4 LPA', birthPlace: 'Chennai', birthTime: '7:00 AM',
-      fatherName: 'Kumar', fatherOccupation: 'Business', motherName: 'Jaya', motherOccupation: 'Home maker', siblings: '1 Brother',
-      ownHouse: 'Yes', ownPlot: 'No', familyStatus: 'Middle class', familyType: 'Joint family', diet: 'Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-    { 
-      id: '11', name: 'Vaishali', age: 22, height: "165cm", location: 'Ooty', idNo: 'NDR10111', images: ['https://randomuser.me/api/portraits/women/6.jpg'], premium: false,
-      dob: '10/11/2002', education: 'B.Sc. CS', born: '1st Born', star: 'Anusham', rassi: 'Scorpio', bloodGroup: 'O +ve', maritalStatus: 'Never Married',
-      job: 'System Analyst', salary: '4-5 LPA', birthPlace: 'Ooty', birthTime: '02:00 PM',
-      fatherName: 'Suresh', fatherOccupation: 'Bank Employee', motherName: 'Latha', motherOccupation: 'Home maker', siblings: 'No Siblings',
-      ownHouse: 'Yes', ownPlot: 'Yes', familyStatus: 'Middle class', familyType: 'Nuclear family', diet: 'Vegetarian',
-      patham: '****', lagnam: '****', horoscopeType: 'Dosham', doshamType: '****', married: '1',
-    },
-];
+// Removed hardcoded profiles - now using real API data
 
-export const mockProfiles = {
-  all: allProfiles,
-  newlyJoined: allProfiles.slice(5, 8),
-  newMatches: allProfiles.slice(8, 11),
-};
-
-const ProfileCard = ({ item, onPress }: { item: any, onPress: () => void }) => (
-  <TouchableOpacity style={[styles.profileCard, item.premium && styles.premiumCard]} onPress={onPress}>
-    <Image source={{ uri: item.images[0] }} style={styles.profileImage} />
-    <View style={styles.profileInfo}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={styles.profileName}>{item.name}</Text>
-        <Feather name="check-circle" size={16} color={Colors.light.tint} style={{ marginLeft: 5 }} />
+const ProfileCard = ({ item, onPress }: { item: any, onPress: () => void }) => {
+  // Safe access to profile properties
+  const profileName = item?.name || `${item?.firstname || 'Unknown'} ${item?.lastname || ''}`.trim();
+  const profileId = item?.idNo || `USR${item?.id?.toString().padStart(5, '0') || '00000'}`;
+  const profileImage = item?.images?.[0] || (item?.image ? `https://app.90skalyanam.com/assets/images/user/profile/${item.image}` : null);
+  const age = item?.age || 'N/A';
+  const height = item?.height || 'N/A';
+  const location = item?.location || item?.city || 'N/A';
+  const isVerified = item?.verified === 1 || item?.verified === true || item?.is_verified === 1 || item?.kycVerified || item?.emailVerified || item?.mobileVerified;
+  
+  // Determine membership tier
+  const getMembershipTier = () => {
+    if (item?.premium || item?.membership_type === 'premium') return 'premium';
+    if (item?.elite || item?.membership_type === 'elite') return 'elite';
+    return 'basic';
+  };
+  
+  const membershipTier = getMembershipTier();
+  
+  return (
+    <TouchableOpacity style={[styles.profileCard, item?.premium && styles.premiumCard]} onPress={onPress}>
+      <View style={styles.imageContainer}>
+        <ProfileImage 
+          imageUrl={profileImage}
+          name={profileName}
+          size={80}
+          isVerified={isVerified}
+          showBadge={true}
+        />
+        {/* Membership Tier Tag */}
+        <View style={[
+          styles.membershipTag,
+          membershipTier === 'premium' ? styles.premiumTag : 
+          membershipTier === 'elite' ? styles.eliteTag : styles.basicTag
+        ]}>
+          <Text style={[
+            styles.membershipTagText,
+            membershipTier === 'premium' ? styles.premiumTagText : styles.basicTagText
+          ]}>
+            {membershipTier.toUpperCase()}
+          </Text>
+        </View>
       </View>
-      <Text style={styles.profileDetail}>Age: {item.age}</Text>
-      <Text style={styles.profileDetail}>Height: {item.height}</Text>
-      <Text style={styles.profileDetail}>Location: {item.location}</Text>
-      <Text style={styles.profileDetail}>ID No: {item.idNo}</Text>
-    </View>
-    <TouchableOpacity style={styles.bookmarkIcon}>
-      <Feather name="bookmark" size={20} color={Colors.light.icon} />
+      <View style={styles.profileInfo}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.profileName}>{profileName}</Text>
+          {isVerified && (
+            <Feather name="check-circle" size={16} color="#007AFF" style={{ marginLeft: 5 }} />
+          )}
+        </View>
+        <Text style={styles.profileDetail}>Age: {age}</Text>
+        <Text style={styles.profileDetail}>Height: {height}</Text>
+        <Text style={styles.profileDetail}>Location: {location}</Text>
+        <Text style={styles.profileDetail}>ID: {profileId}</Text>
+      </View>
+      <TouchableOpacity style={styles.heartIcon}>
+        <Feather name="heart" size={20} color={Colors.light.icon} />
+      </TouchableOpacity>
     </TouchableOpacity>
-  </TouchableOpacity>
-);
+  );
+};
 
 export default function ProfilesScreen() {
   const router = useRouter();
@@ -141,12 +76,144 @@ export default function ProfilesScreen() {
   const { initialTab } = params;
 
   const [activeTab, setActiveTab] = useState(initialTab || 'New Matches');
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userInfo, setUserInfo] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab as string);
     }
-  }, [initialTab]);
+    fetchUserData();
+  }, [initialTab, activeTab]);
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      fetchUserData();
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      console.log('🔍 Searching for:', searchQuery);
+      
+      const searchResponse = await apiService.searchMembers({
+        query: searchQuery,
+        limit: 20
+      });
+      
+      if (searchResponse && searchResponse.status === 'success' && searchResponse.data?.profiles) {
+        setProfiles(searchResponse.data.profiles);
+      } else {
+        setProfiles([]);
+      }
+    } catch (error) {
+      console.error('💥 Search error:', error);
+      setProfiles([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserData = async () => {
+    try {
+      setLoading(true);
+      console.log('📊 Fetching profiles data...');
+      console.log('🎯 Active tab:', activeTab);
+      
+      // Determine the type and filters based on active tab
+      let profileType = 'all';
+      let filters = {};
+      
+      if (activeTab === 'New Matches') {
+        profileType = 'new_matches';
+        // Add account requirement matching logic
+        filters = {
+          match_preferences: true,
+          age_range: true,
+          location_preference: true
+        };
+      } else if (activeTab === 'Newly joined') {
+        profileType = 'newly_joined';
+        // Show users created within last week
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        filters = {
+          created_after: oneWeekAgo.toISOString().split('T')[0]
+        };
+      } else if (activeTab === 'All Profiles') {
+        profileType = 'all';
+        // Show users up to 60+ years
+        filters = {
+          max_age: 65
+        };
+      }
+      
+      console.log('🔄 Profile type determined:', profileType);
+      console.log('🎯 Filters applied:', filters);
+      
+      // Fetch profiles using real API
+      const profilesResponse = await apiService.getProfiles({
+        type: profileType,
+        limit: 20,
+        ...filters
+      });
+
+      console.log('👥 Profiles API response:', profilesResponse);
+
+      if (profilesResponse && profilesResponse.status === 'success' && profilesResponse.data && profilesResponse.data.profiles) {
+        const realProfiles = profilesResponse.data.profiles;
+        console.log('✅ Real profiles fetched:', realProfiles.length);
+        
+        // Process profiles to ensure proper data structure
+        const processedProfiles = realProfiles.map((profile: any) => {
+          return {
+            ...profile,
+            // Ensure name is properly constructed
+            name: profile.name || `${profile.firstname || ''} ${profile.lastname || ''}`.trim(),
+            // Ensure profile ID is formatted correctly
+            idNo: profile.idNo || `USR${profile.id?.toString().padStart(5, '0') || '00000'}`,
+            // Ensure image URL is complete
+            images: profile.images || (profile.image ? [`https://app.90skalyanam.com/assets/images/user/profile/${profile.image}`] : ['https://randomuser.me/api/portraits/women/1.jpg']),
+            // Ensure basic info is available
+            age: profile.age || 'N/A',
+            height: profile.height || 'N/A',
+            location: profile.location || profile.city || 'N/A'
+          };
+        });
+        
+        console.log('🔄 Processed profiles:', processedProfiles.length);
+        
+        setProfiles(processedProfiles);
+      } else {
+        console.log('⚠️ Profiles API returned invalid response structure');
+        console.log('📋 Response structure:', JSON.stringify(profilesResponse, null, 2));
+        setProfiles([]);
+      }
+    } catch (error) {
+      console.error('💥 Error fetching profiles:', error);
+      console.error('💥 Error details:', error.message);
+      console.error('💥 Error stack:', error.stack);
+      setProfiles([]);
+      console.log('🔄 No profiles available due to error');
+    } finally {
+      setLoading(false);
+      console.log('⏹️ Profiles loading complete');
+    }
+  };
+
+  const calculateAge = (dateString: string) => {
+    if (!dateString) return null;
+    const today = new Date();
+    const birthDate = new Date(dateString);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
 
   return (
     <View style={styles.container}>
@@ -157,8 +224,14 @@ export default function ProfilesScreen() {
 
       <View style={styles.searchSection}>
         <View style={styles.searchInputContainer}>
-          <TextInput placeholder="Search..." style={styles.searchInput} />
-          <TouchableOpacity style={styles.searchButton}>
+          <TextInput 
+            placeholder="Search by name, caste, or profile ID..." 
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+          />
+          <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
             <Feather name="search" size={20} color={'white'} />
           </TouchableOpacity>
         </View>
@@ -179,12 +252,28 @@ export default function ProfilesScreen() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={activeTab === 'New Matches' ? mockProfiles.newMatches : activeTab === 'Newly joined' ? mockProfiles.newlyJoined : mockProfiles.all}
-        renderItem={({ item }) => <ProfileCard item={item} onPress={() => router.push(`/profile/${item.id}`)} />}
-        keyExtractor={item => item.id}
-        contentContainerStyle={[styles.listContainer, { paddingBottom: 100 }]}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.light.tint} />
+          <Text style={styles.loadingText}>Loading profiles...</Text>
+        </View>
+      ) : profiles.length > 0 ? (
+        <FlatList
+          data={profiles}
+          renderItem={({ item }) => (
+            <ProfileCard 
+              item={item} 
+              onPress={() => router.push(`/profile/${item?.id || '1'}`)} 
+            />
+          )}
+          keyExtractor={(item, index) => item?.id?.toString() || index.toString()}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: 100 }]}
+        />
+      ) : (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>No profiles found</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -208,5 +297,30 @@ const styles = StyleSheet.create({
   profileInfo: { flex: 1, marginLeft: 15, alignSelf: 'flex-start' },
   profileName: { fontSize: 18, fontWeight: 'bold' },
   profileDetail: { color: Colors.light.icon, marginTop: 4, fontSize: 14 },
-  bookmarkIcon: { position: 'absolute', top: 15, right: 15 },
+  heartIcon: { position: 'absolute', top: 15, right: 15 },
+  imageContainer: { position: 'relative' },
+  membershipTag: {
+    position: 'absolute',
+    top: -5,
+    left: -5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  basicTag: { backgroundColor: '#FF4444' },
+  premiumTag: { backgroundColor: '#FFD700' },
+  eliteTag: { backgroundColor: '#FF4444' },
+  membershipTagText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  basicTagText: { color: 'white' },
+  premiumTagText: { color: '#333' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
+  loadingText: { marginTop: 10, fontSize: 16, color: Colors.light.icon },
 });
