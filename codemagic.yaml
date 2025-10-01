@@ -15,7 +15,7 @@ workflows:
       android_signing:
         properties: {}
       vars:
-        APP_DIR: .
+        APP_DIR: 90skalyanam
     cache:
       cache_paths:
         - ~/.npm
@@ -43,12 +43,11 @@ workflows:
           if [ -n "$CM_KEYSTORE" ]; then
             echo "Writing release keystore"
             echo "$CM_KEYSTORE" | base64 --decode > release-keystore.jks
-            cat >> gradle.properties <<EOF
-MYAPP_UPLOAD_STORE_FILE=release-keystore.jks
-MYAPP_UPLOAD_KEY_ALIAS=$CM_KEY_ALIAS
-MYAPP_UPLOAD_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD
-MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD
-EOF
+          printf "%s\n" \
+            "MYAPP_UPLOAD_STORE_FILE=release-keystore.jks" \
+            "MYAPP_UPLOAD_KEY_ALIAS=$CM_KEY_ALIAS" \
+            "MYAPP_UPLOAD_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD" \
+            "MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD" >> gradle.properties
           else
             echo "WARNING: CM_KEYSTORE not set. Build will be unsigned."
           fi
@@ -66,7 +65,7 @@ EOF
     publishing:
       email:
         recipients:
-          - dev-team@tnhappykids.in
+          - dev-support@90skalyanam.com
         notify:
           success: true
 

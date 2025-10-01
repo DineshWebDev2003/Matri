@@ -5,12 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "90skalyanam",
+    "scheme": ["ninetyskalyanam"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "androidStatusBar": {
-      "visible": true
-    },
+    
     "ios": {
       "supportsTablet": true
     },
@@ -19,9 +17,7 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#E02A30"
       },
-      "edgeToEdgeEnabled": true,
-      "fullscreen": false,
-      "theme": "@android:style/Theme.DeviceDefault.NoActionBar"
+      "edgeToEdge": true
     },
     "web": {
       "bundler": "metro",
