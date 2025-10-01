@@ -12,7 +12,6 @@ workflows:
     environment:
       node: 20
       java: 17
-      android_signing: []
       vars:
         APP_DIR: .
     cache:
