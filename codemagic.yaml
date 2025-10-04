@@ -33,7 +33,9 @@ workflows:
       - name: Install dependencies
         script: |
           cd "$APP_DIR"
-          npm ci --production
+          # Clean install to avoid corrupted expo-modules-core
+          rm -rf node_modules package-lock.json
+          npm install --production
       - name: Optimize app size
         script: |
           cd "$APP_DIR"
@@ -50,6 +52,8 @@ workflows:
       - name: Prebuild native Android project (Expo) - Optimized
         script: |
           cd "$APP_DIR"
+          # Ensure expo-modules-core is properly installed
+          npm install expo-modules-core --save
           # Use optimized prebuild with size reduction flags
           CI=1 npx expo prebuild -p android
           # Enable R8 full mode for better optimization
