@@ -189,7 +189,7 @@ workflows:
   # Combined workflow for both platforms
   mobile_release:
     name: Mobile Release (Android + iOS) - Optimized
-    max_build_duration: 150
+    max_build_duration: 120
     instance_type: mac_mini_m1
     triggering:
       events:
