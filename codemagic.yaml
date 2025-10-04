@@ -1,6 +1,6 @@
 workflows:
   android_release:
-    name: Android Release (Expo)
+    name: Android Release (Expo) - Optimized
     max_build_duration: 60
     triggering:
       events:
@@ -14,6 +14,9 @@ workflows:
       java: 17
       vars:
         APP_DIR: .
+        # App size optimization flags
+        EXPO_OPTIMIZE: true
+        EXPO_NO_FLIPPER: true
     cache:
       cache_paths:
         - ~/.npm
@@ -30,11 +33,30 @@ workflows:
       - name: Install dependencies
         script: |
           cd "$APP_DIR"
-          npm ci
-      - name: Prebuild native Android project (Expo)
+          npm ci --production
+      - name: Optimize app size
         script: |
           cd "$APP_DIR"
-          npx expo prebuild -p android --non-interactive
+          # Remove dev dependencies and unused packages
+          npm prune --production
+          # Remove unnecessary files
+          find node_modules -name "*.md" -delete
+          find node_modules -name "*.txt" -delete
+          find node_modules -name "LICENSE*" -delete
+          find node_modules -name "CHANGELOG*" -delete
+          find node_modules -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "__tests__" -type d -exec rm -rf {} + 2>/dev/null || true
+      - name: Prebuild native Android project (Expo) - Optimized
+        script: |
+          cd "$APP_DIR"
+          # Use optimized prebuild with size reduction flags
+          npx expo prebuild -p android --non-interactive --clear
+          # Enable R8 full mode for better optimization
+          echo "android.enableR8.fullMode=true" >> android/gradle.properties
+          echo "android.enableSeparateBuildPerCPUArchitecture=true" >> android/gradle.properties
+          echo "android.enableProguardInReleaseBuilds=true" >> android/gradle.properties
+          echo "android.bundle.enableUncompressedNativeLibs=false" >> android/gradle.properties
       - name: Configure Android keystore
         script: |
           cd "$APP_DIR/android"
@@ -49,14 +71,14 @@ workflows:
           else
             echo "WARNING: CM_KEYSTORE not set. Build will be unsigned."
           fi
-      - name: Build Android App Bundle (AAB)
+      - name: Build Android App Bundle (AAB) - Optimized
         script: |
           cd "$APP_DIR/android"
-          ./gradlew clean bundleRelease --no-daemon
-      - name: Build Android APK (optional)
+          ./gradlew clean bundleRelease --no-daemon --parallel
+      - name: Build Android APK (optional) - Optimized
         script: |
           cd "$APP_DIR/android"
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon --parallel
     artifacts:
       - "$APP_DIR/android/app/build/outputs/**/*.aab"
       - "$APP_DIR/android/app/build/outputs/**/*.apk"
@@ -67,3 +89,225 @@ workflows:
         notify:
           success: true
 
+  ios_release:
+    name: iOS Release (Expo) - Optimized
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    environment:
+      node: 20
+      xcode: latest
+      cocoapods: default
+      vars:
+        APP_DIR: .
+        # App size optimization flags
+        EXPO_OPTIMIZE: true
+        EXPO_NO_FLIPPER: true
+        # iOS specific optimizations
+        EXPO_IOS_SIMULATOR_BUILD: false
+    cache:
+      cache_paths:
+        - ~/.npm
+        - $APP_DIR/node_modules
+        - ~/Library/Caches/CocoaPods
+        - $APP_DIR/ios/Pods
+    scripts:
+      - name: Show versions
+        script: |
+          echo "Node $(node -v)"
+          echo "NPM  $(npm -v)"
+          xcodebuild -version
+          pod --version
+      - name: Install dependencies
+        script: |
+          cd "$APP_DIR"
+          npm ci --production
+      - name: Optimize app size
+        script: |
+          cd "$APP_DIR"
+          # Remove dev dependencies and unused packages
+          npm prune --production
+          # Remove unnecessary files
+          find node_modules -name "*.md" -delete
+          find node_modules -name "*.txt" -delete
+          find node_modules -name "LICENSE*" -delete
+          find node_modules -name "CHANGELOG*" -delete
+          find node_modules -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "__tests__" -type d -exec rm -rf {} + 2>/dev/null || true
+      - name: Prebuild native iOS project (Expo) - Optimized
+        script: |
+          cd "$APP_DIR"
+          # Use optimized prebuild with size reduction flags
+          npx expo prebuild -p ios --non-interactive --clear
+      - name: Install CocoaPods dependencies
+        script: |
+          cd "$APP_DIR/ios"
+          pod install --repo-update
+      - name: Configure iOS signing
+        script: |
+          cd "$APP_DIR/ios"
+          # Configure automatic signing (requires certificates in Codemagic)
+          xcode-project use-profiles
+      - name: Build iOS App (IPA) - Optimized
+        script: |
+          cd "$APP_DIR/ios"
+          # Build with optimizations for smaller app size
+          xcodebuild -workspace *.xcworkspace \
+            -scheme "90skalyanam" \
+            -configuration Release \
+            -destination generic/platform=iOS \
+            -archivePath "$APP_DIR/build/90skalyanam.xcarchive" \
+            archive \
+            ENABLE_BITCODE=YES \
+            STRIP_INSTALLED_PRODUCT=YES \
+            DEPLOYMENT_POSTPROCESSING=YES \
+            COPY_PHASE_STRIP=YES
+      - name: Export IPA
+        script: |
+          cd "$APP_DIR"
+          xcodebuild -exportArchive \
+            -archivePath "$APP_DIR/build/90skalyanam.xcarchive" \
+            -exportPath "$APP_DIR/build" \
+            -exportOptionsPlist "$APP_DIR/ios/ExportOptions.plist"
+    artifacts:
+      - "$APP_DIR/build/*.ipa"
+      - "$APP_DIR/build/90skalyanam.xcarchive"
+    publishing:
+      email:
+        recipients:
+          - dev-support@90skalyanam.com
+        notify:
+          success: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  # Combined workflow for both platforms
+  mobile_release:
+    name: Mobile Release (Android + iOS) - Optimized
+    max_build_duration: 150
+    instance_type: mac_mini_m1
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+    environment:
+      node: 20
+      java: 17
+      xcode: latest
+      cocoapods: default
+      vars:
+        APP_DIR: .
+        EXPO_OPTIMIZE: true
+        EXPO_NO_FLIPPER: true
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/.gradle/caches
+        - ~/.gradle/wrapper
+        - $APP_DIR/node_modules
+        - $APP_DIR/android/.gradle
+        - ~/Library/Caches/CocoaPods
+        - $APP_DIR/ios/Pods
+    scripts:
+      - name: Show versions
+        script: |
+          echo "Node $(node -v)"
+          echo "NPM  $(npm -v)"
+          java -version || true
+          xcodebuild -version
+          pod --version
+      - name: Install dependencies
+        script: |
+          cd "$APP_DIR"
+          npm ci --production
+      - name: Optimize app size
+        script: |
+          cd "$APP_DIR"
+          npm prune --production
+          # Clean unnecessary files
+          find node_modules -name "*.md" -delete
+          find node_modules -name "*.txt" -delete
+          find node_modules -name "LICENSE*" -delete
+          find node_modules -name "CHANGELOG*" -delete
+          find node_modules -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "__tests__" -type d -exec rm -rf {} + 2>/dev/null || true
+      - name: Prebuild both platforms
+        script: |
+          cd "$APP_DIR"
+          npx expo prebuild --non-interactive --clear
+          # Android optimizations
+          echo "android.enableR8.fullMode=true" >> android/gradle.properties
+          echo "android.enableSeparateBuildPerCPUArchitecture=true" >> android/gradle.properties
+          echo "android.enableProguardInReleaseBuilds=true" >> android/gradle.properties
+          echo "android.bundle.enableUncompressedNativeLibs=false" >> android/gradle.properties
+      - name: Configure Android keystore
+        script: |
+          cd "$APP_DIR/android"
+          if [ -n "$CM_KEYSTORE" ]; then
+            echo "Writing release keystore"
+            echo "$CM_KEYSTORE" | base64 --decode > release-keystore.jks
+          printf "%s\n" \
+            "MYAPP_UPLOAD_STORE_FILE=release-keystore.jks" \
+            "MYAPP_UPLOAD_KEY_ALIAS=$CM_KEY_ALIAS" \
+            "MYAPP_UPLOAD_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD" \
+            "MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD" >> gradle.properties
+          fi
+      - name: Install CocoaPods dependencies
+        script: |
+          cd "$APP_DIR/ios"
+          pod install --repo-update
+      - name: Configure iOS signing
+        script: |
+          cd "$APP_DIR/ios"
+          xcode-project use-profiles
+      - name: Build Android
+        script: |
+          cd "$APP_DIR/android"
+          ./gradlew clean bundleRelease assembleRelease --no-daemon --parallel
+      - name: Build iOS
+        script: |
+          cd "$APP_DIR/ios"
+          xcodebuild -workspace *.xcworkspace \
+            -scheme "90skalyanam" \
+            -configuration Release \
+            -destination generic/platform=iOS \
+            -archivePath "$APP_DIR/build/90skalyanam.xcarchive" \
+            archive \
+            ENABLE_BITCODE=YES \
+            STRIP_INSTALLED_PRODUCT=YES \
+            DEPLOYMENT_POSTPROCESSING=YES \
+            COPY_PHASE_STRIP=YES
+      - name: Export iOS IPA
+        script: |
+          cd "$APP_DIR"
+          xcodebuild -exportArchive \
+            -archivePath "$APP_DIR/build/90skalyanam.xcarchive" \
+            -exportPath "$APP_DIR/build" \
+            -exportOptionsPlist "$APP_DIR/ios/ExportOptions.plist"
+    artifacts:
+      - "$APP_DIR/android/app/build/outputs/**/*.aab"
+      - "$APP_DIR/android/app/build/outputs/**/*.apk"
+      - "$APP_DIR/build/*.ipa"
+    publishing:
+      email:
+        recipients:
+          - dev-support@90skalyanam.com
+        notify:
+          success: true
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

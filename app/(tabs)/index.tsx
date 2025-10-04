@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import axios from 'axios';
 import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, TextInput, FlatList, ImageBackground, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -14,15 +15,16 @@ const banners = [
   { id: '3', title: 'Art Expo', location: 'Nungambakkam, Chennai', image: 'https://images.unsplash.com/photo-1531058020387-3be344556be6?q=80&w=2070&auto=format&fit=crop' },
 ];
 
-const stats = [
-  { label: 'Interest Requests', value: '02', icon: 'user-check', gradient: ['#60A5FA', '#3B82F6'], route: '/interest-received' },
-  { label: 'Interest Sent', value: '01', icon: 'send', gradient: ['#FDE68A', '#FBBF24'], route: '/interest-sent' },
-  { label: 'Total Shortlist', value: '06', icon: 'heart', gradient: ['#EF4444', '#DC2626'], route: '/shortlisted' },
+const getStats = (t: (key: string) => string) => [
+  { label: t('interest_requests'), value: '02', icon: 'user-check', gradient: ['#60A5FA', '#3B82F6'], route: '/interest-received' },
+  { label: t('interest_sent'), value: '01', icon: 'send', gradient: ['#FDE68A', '#FBBF24'], route: '/interest-sent' },
+  { label: t('total_shortlist'), value: '06', icon: 'heart', gradient: ['#EF4444', '#DC2626'], route: '/shortlisted' },
 ] as const;
 
 export default function HomeScreen() {
   const router = useRouter();
   const auth = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const [selectedBanner, setSelectedBanner] = useState(0);
   const [newlyJoinedProfiles, setNewlyJoinedProfiles] = useState([]);
   const [newMatchesProfiles, setNewMatchesProfiles] = useState([]);
@@ -32,7 +34,12 @@ export default function HomeScreen() {
   const [isTyping, setIsTyping] = useState(true);
   const textAnim = useState(new Animated.Value(0))[0];
   const logoAnim = useState(new Animated.Value(0))[0];
+  const logoScale = useState(new Animated.Value(1))[0];
+  const logoRotate = useState(new Animated.Value(0))[0];
   const cursorOpacity = useState(new Animated.Value(0))[0];
+  const toggleAnim = useState(new Animated.Value(language === 'en' ? 1 : 0))[0];
+  
+  const stats = getStats(t);
 
   useEffect(() => {
     Animated.loop(
@@ -42,6 +49,20 @@ export default function HomeScreen() {
       ])
     ).start();
   }, []);
+
+  const toggleLanguage = () => {
+    const newLanguage = language === 'en' ? 'ta' : 'en';
+    const toValue = newLanguage === 'en' ? 1 : 0;
+    
+    Animated.spring(toggleAnim, {
+      toValue,
+      friction: 8,
+      tension: 40,
+      useNativeDriver: false,
+    }).start();
+    
+    setLanguage(newLanguage);
+  };
 
   useEffect(() => {
     const fullText = `Hi, ${userInfo?.firstname || 'User'}`;
@@ -61,29 +82,58 @@ export default function HomeScreen() {
               useNativeDriver: true,
             }).start(() => {
               setIsTyping(false);
+                // Enhanced logo animation with scale, rotation and bounce
+                Animated.parallel([
               Animated.spring(logoAnim, {
                 toValue: 1,
                 friction: 4,
                 useNativeDriver: true,
-              }).start();
-            });
-          }, 1000);
+                  }),
+                  Animated.sequence([
+                    Animated.timing(logoScale, {
+                      toValue: 1.2,
+                      duration: 300,
+                      useNativeDriver: true,
+                    }),
+                    Animated.spring(logoScale, {
+                      toValue: 1,
+                      friction: 6,
+                      useNativeDriver: true,
+                    }),
+                  ]),
+                  Animated.timing(logoRotate, {
+                    toValue: 1,
+                    duration: 800,
+                    useNativeDriver: true,
+                  }),
+                ]).start();
+              });
+            }, 1500); // Increased delay for better effect
         }
       }, 150);
 
       return () => clearInterval(typingInterval);
     } else {
       const imageVisibleTimeout = setTimeout(() => {
+        Animated.parallel([
         Animated.timing(logoAnim, {
           toValue: 0,
           duration: 300,
           useNativeDriver: true,
-        }).start(() => {
+          }),
+          Animated.timing(logoScale, {
+            toValue: 0.8,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
           setDisplayedText('');
           setIsTyping(true);
           textAnim.setValue(0);
+          logoScale.setValue(1);
+          logoRotate.setValue(0);
         });
-      }, 2000);
+      }, 4000); // Increased display time from 2000 to 4000ms
 
       return () => clearTimeout(imageVisibleTimeout);
     }
@@ -168,7 +218,15 @@ export default function HomeScreen() {
                 styles.logo,
                 {
                   opacity: logoAnim,
-                  transform: [{ scale: logoAnim }],
+                  transform: [
+                    { scale: Animated.multiply(logoAnim, logoScale) },
+                    { 
+                      rotateZ: logoRotate.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }) 
+                    }
+                  ],
                   position: 'absolute',
                 },
               ]}
@@ -176,12 +234,37 @@ export default function HomeScreen() {
             <Image source={{ uri: 'https://app.90skalyanam.com/assets/images/logoIcon/logo.png' }} style={[styles.logo, { opacity: 0 }]} />
           </View>
           <View style={styles.headerIcons}>
-            <TouchableOpacity onPress={() => router.push('/notifications')}><Feather name="bell" size={24} /></TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.animatedToggle}
+              onPress={toggleLanguage}
+              activeOpacity={0.8}
+            >
+              <View style={styles.toggleContainer}>
+                <Text style={[styles.toggleLabel, { color: language === 'ta' ? '#fff' : '#666' }]}>தமிழ்</Text>
+                <Animated.View 
+                  style={[
+                    styles.toggleSlider,
+                    {
+                      transform: [{
+                        translateX: toggleAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [2, 32],
+                        })
+                      }]
+                    }
+                  ]}
+                />
+                <Text style={[styles.toggleLabel, { color: language === 'en' ? '#fff' : '#666' }]}>EN</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/notifications')} style={styles.bellIcon}>
+              <Feather name="bell" size={24} />
+            </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.searchContainer}>
-          <TextInput placeholder="Search..." style={styles.searchInput} />
+          <TextInput placeholder={t('search_placeholder')} style={styles.searchInput} />
           <TouchableOpacity style={styles.searchButton}>
             <Feather name="search" size={20} color="black" />
           </TouchableOpacity>
@@ -215,8 +298,8 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Just Joined</Text>
-          <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/profiles', params: { initialTab: 'Newly joined' } })}><Text style={styles.viewAll}>View all</Text></TouchableOpacity>
+          <Text style={styles.sectionTitle}>{t('just_joined')}</Text>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/profiles', params: { initialTab: 'Newly joined' } })}><Text style={styles.viewAll}>{t('view_all')}</Text></TouchableOpacity>
         </View>
         <FlatList
           horizontal
@@ -234,8 +317,8 @@ export default function HomeScreen() {
         />
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>New Matches</Text>
-          <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/profiles', params: { initialTab: 'New Matches' } })}><Text style={styles.viewAll}>View all</Text></TouchableOpacity>
+          <Text style={styles.sectionTitle}>{t('recommended_matches')}</Text>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/profiles', params: { initialTab: 'Recommended Matches' } })}><Text style={styles.viewAll}>{t('view_all')}</Text></TouchableOpacity>
         </View>
         <FlatList
           horizontal
@@ -263,7 +346,46 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: 'bold' },
   logo: { width: 120, height: 60, resizeMode: 'contain' },
   cursor: { width: 2, height: 28, backgroundColor: 'black', marginLeft: 2 },
-  headerIcons: { flexDirection: 'row' },
+  headerIcons: { flexDirection: 'row', alignItems: 'center' },
+  animatedToggle: {
+    marginRight: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  toggleContainer: {
+    width: 80,
+    height: 32,
+    backgroundColor: '#333',
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    position: 'relative',
+  },
+  toggleSlider: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    backgroundColor: Colors.light.tint,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  toggleLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    zIndex: 1,
+  },
+  bellIcon: {
+    padding: 5,
+  },
   searchContainer: { flexDirection: 'row', paddingHorizontal: 20, marginTop: 20 },
   searchInput: { flex: 1, backgroundColor: '#F3F4F6', borderRadius: 10, padding: 12, marginRight: 10 },
   searchButton: { backgroundColor: Colors.light.tint, padding: 12, borderRadius: 10 },

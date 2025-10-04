@@ -2,6 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 const API_BASE_URL = 'https://app.90skalyanam.com/api';
+const ASSET_BASE_URL = 'https://app.90skalyanam.com';
 
 // Create axios instance
 const apiClient = axios.create({
@@ -112,7 +113,7 @@ export const apiService = {
   },
 
   // Profiles/Users - Get real member data using new API endpoints
-  getProfiles: async (params?: { type?: string; limit?: number; search?: string }) => {
+  getProfiles: async (params?: { type?: string; limit?: number; search?: string; page?: number }) => {
     try {
       console.log('🔄 Fetching real member profiles from API...');
       console.log('📋 Request params:', params);
@@ -125,6 +126,9 @@ export const apiService = {
       }
       if (params?.limit) {
         queryParams.append('per_page', params.limit.toString());
+      }
+      if (params?.page) {
+        queryParams.append('page', params.page.toString());
       }
       if (params?.search) {
         queryParams.append('search', params.search);
@@ -266,7 +270,6 @@ export const apiService = {
   },
 };
 
-
 // Helper function to transform backend member data to mobile app profile format
 const transformMemberToProfile = (memberData: any) => {
   // Safely access nested properties
@@ -312,12 +315,41 @@ const transformMemberToProfile = (memberData: any) => {
     city: safeGet(memberData, 'basic_info.city') || safeGet(memberData, 'address.city') || 'N/A',
     idNo: safeGet(memberData, 'profile_id') || `USR${safeGet(memberData, 'id', '1')?.toString().padStart(5, '0') || '00001'}`,
     profile_id: safeGet(memberData, 'profile_id'),
-    images: safeGet(memberData, 'image') ? [`https://app.90skalyanam.com/assets/images/user/profile/${safeGet(memberData, 'image')}`] : 
-            safeGet(memberData, 'galleries', []).length > 0 ? 
-            safeGet(memberData, 'galleries', []).map((gallery: any) => `https://app.90skalyanam.com/assets/images/user/gallery/${gallery.image}`) :
-            ['https://randomuser.me/api/portraits/women/1.jpg'],
+    
+    // Fix image URLs - check multiple possible paths
+    images: (() => {
+      // Check for profile image first
+      if (safeGet(memberData, 'image')) {
+        return [`${ASSET_BASE_URL}/assets/images/user/profile/${safeGet(memberData, 'image')}`];
+      }
+      // Check galleries
+      const galleries = safeGet(memberData, 'galleries', []);
+      if (galleries && galleries.length > 0) {
+        return galleries.map((gallery: any) => `${ASSET_BASE_URL}/assets/images/user/gallery/${gallery.image}`);
+      }
+      // Fallback
+      return ['https://randomuser.me/api/portraits/women/1.jpg'];
+    })(),
+    
     image: safeGet(memberData, 'image'),
-    premium: (safeGet(memberData, 'package_id', 0) > 0) || false,
+    
+    // Fix premium/membership detection
+    premium: (() => {
+      const packageId = safeGet(memberData, 'limitation.package_id') || safeGet(memberData, 'limitation.package.id') || 0;
+      return packageId > 0 && packageId !== 4; // 4 is usually free package
+    })(),
+    
+    membership_type: (() => {
+      const packageName = safeGet(memberData, 'limitation.package.name');
+      if (packageName) return packageName;
+      
+      const packageId = safeGet(memberData, 'limitation.package_id') || safeGet(memberData, 'limitation.package.id') || 0;
+      if (packageId === 1 || packageId === 2) return 'Premium';
+      if (packageId === 3) return 'Elite';
+      return 'Basic';
+    })(),
+    
+    package_id: safeGet(memberData, 'limitation.package_id') || safeGet(memberData, 'limitation.package.id') || 0,
     profileComplete: safeGet(memberData, 'profile_complete') === '1',
     lookingFor: safeGet(memberData, 'looking_for', '1'),
     kycVerified: safeGet(memberData, 'kv') === '1',
@@ -381,92 +413,5 @@ const transformMemberToProfile = (memberData: any) => {
 
   return profile;
 };
-
-// Helper function to transform real user data to profile format
-const transformUserToProfile = (userData: any, type: string) => {
-  // Safely access nested properties
-  const safeGet = (obj: any, path: string, defaultValue: any = null) => {
-    try {
-      return path.split('.').reduce((current, key) => current?.[key], obj) ?? defaultValue;
-    } catch {
-      return defaultValue;
-    }
-  };
-
-  // Calculate age from birth_date if available
-  const calculateAge = (birthDate: string) => {
-    if (!birthDate) return 25; // Default age
-    try {
-      const today = new Date();
-      const birth = new Date(birthDate);
-      let age = today.getFullYear() - birth.getFullYear();
-      const monthDiff = today.getMonth() - birth.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-        age--;
-      }
-      return age;
-    } catch {
-      return 25;
-    }
-  };
-
-  // Ensure userData is not null/undefined
-  if (!userData) {
-    userData = {};
-  }
-
-  // Transform real user data to profile format with safe property access
-  const profile = {
-    id: safeGet(userData, 'id', '1')?.toString() || '1',
-    name: `${safeGet(userData, 'firstname', 'User')} ${safeGet(userData, 'lastname', '')}`.trim(),
-    firstname: safeGet(userData, 'firstname', 'User'),
-    lastname: safeGet(userData, 'lastname', ''),
-    age: safeGet(userData, 'birth_date') ? calculateAge(safeGet(userData, 'birth_date')) : 25,
-    height: safeGet(userData, 'height', '165cm'),
-    location: safeGet(userData, 'city') || safeGet(userData, 'address.city') || 'Chennai',
-    idNo: `USR${safeGet(userData, 'id', '1')?.toString().padStart(5, '0') || '00001'}`,
-    images: safeGet(userData, 'image') ? [`https://app.90skalyanam.com/assets/images/user/profile/${safeGet(userData, 'image')}`] : ['https://randomuser.me/api/portraits/women/1.jpg'],
-    premium: (safeGet(userData, 'package_id', 0) > 0) || false,
-    profileComplete: safeGet(userData, 'reg_step') === 1,
-    lookingFor: safeGet(userData, 'looking_for', '1'),
-    kycVerified: safeGet(userData, 'kv') === 1,
-    emailVerified: safeGet(userData, 'ev') === 1,
-    mobileVerified: safeGet(userData, 'sv') === 1,
-    joinedDate: safeGet(userData, 'created_at') || new Date().toISOString(),
-    isNewlyJoined: true,
-    
-    // Additional profile details with safe access
-    dob: safeGet(userData, 'birth_date', '01/01/1999'),
-    education: safeGet(userData, 'education', 'Graduate'),
-    born: '1st Born',
-    star: safeGet(userData, 'star', 'Rohini'),
-    rassi: safeGet(userData, 'rassi', 'Taurus'),
-    bloodGroup: safeGet(userData, 'blood_group', 'O +ve'),
-    maritalStatus: safeGet(userData, 'marital_status', 'Never Married'),
-    job: safeGet(userData, 'profession', 'Professional'),
-    salary: safeGet(userData, 'income', '5-7 LPA'),
-    birthPlace: safeGet(userData, 'birth_place') || safeGet(userData, 'city', 'Chennai'),
-    birthTime: safeGet(userData, 'birth_time', '10:00 AM'),
-    fatherName: safeGet(userData, 'father_name', 'Father'),
-    fatherOccupation: safeGet(userData, 'father_occupation', 'Business'),
-    motherName: safeGet(userData, 'mother_name', 'Mother'),
-    motherOccupation: safeGet(userData, 'mother_occupation', 'Homemaker'),
-    siblings: safeGet(userData, 'siblings', '1 Brother'),
-    ownHouse: safeGet(userData, 'own_house', 'Yes'),
-    ownPlot: safeGet(userData, 'own_plot', 'No'),
-    familyStatus: safeGet(userData, 'family_status', 'Middle class'),
-    familyType: safeGet(userData, 'family_type', 'Nuclear family'),
-    diet: safeGet(userData, 'diet', 'Vegetarian'),
-    patham: '****',
-    lagnam: '****',
-    horoscopeType: 'Dosham',
-    doshamType: '****',
-    married: '1',
-  };
-
-  return profile;
-};
-
-// All mock data removed - using only real API data
 
 export default apiService;

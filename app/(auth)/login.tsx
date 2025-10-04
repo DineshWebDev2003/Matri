@@ -33,7 +33,7 @@ export default function LoginScreen() {
                 key={`${rowIndex}-${colIndex}`}
                 name={iconName as any}
                 size={iconSize}
-                color="rgba(0, 0, 0, 0.05)" // Subtle gray color
+                color="rgba(255, 99, 99, 0.08)" // Light red watermark
                 style={{
                   position: 'absolute',
                   top: rowIndex * iconSize * 2.5,

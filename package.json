@@ -8,7 +8,13 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "optimize": "npm run clean-deps && npm run compress-images",
+    "clean-deps": "npm prune --production && find node_modules -name '*.md' -delete && find node_modules -name 'LICENSE*' -delete",
+    "compress-images": "find assets -name '*.png' -exec pngquant --force --ext .png {} \\;",
+    "build:android": "expo prebuild -p android --clear && cd android && ./gradlew bundleRelease",
+    "build:ios": "expo prebuild -p ios --clear && cd ios && xcodebuild -workspace *.xcworkspace -scheme 90skalyanam archive",
+    "analyze-bundle": "npx expo export --dump-assetmap"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

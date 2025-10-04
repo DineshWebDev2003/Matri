@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Activity
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/Colors';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiService } from '../../services/api';
 import ProfileImage from '../../components/ProfileImage';
+import VerificationBadge from '../../components/VerificationBadge';
 
 // Removed hardcoded profiles - now using real API data
 
-const ProfileCard = ({ item, onPress }: { item: any, onPress: () => void }) => {
+const ProfileCard = ({ item, onPress, t }: { item: any, onPress: () => void, t: (key: string) => string }) => {
   // Safe access to profile properties
   const profileName = item?.name || `${item?.firstname || 'Unknown'} ${item?.lastname || ''}`.trim();
   const profileId = item?.idNo || `USR${item?.id?.toString().padStart(5, '0') || '00000'}`;
@@ -20,8 +22,11 @@ const ProfileCard = ({ item, onPress }: { item: any, onPress: () => void }) => {
   
   // Determine membership tier
   const getMembershipTier = () => {
-    if (item?.premium || item?.membership_type === 'premium') return 'premium';
-    if (item?.elite || item?.membership_type === 'elite') return 'elite';
+    const membershipType = item?.membership_type?.toLowerCase();
+    const packageId = item?.package_id || 0;
+    
+    if (membershipType === 'premium' || packageId === 1 || packageId === 2) return 'premium';
+    if (membershipType === 'elite' || packageId === 3) return 'elite';
     return 'basic';
   };
   
@@ -55,13 +60,13 @@ const ProfileCard = ({ item, onPress }: { item: any, onPress: () => void }) => {
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={styles.profileName}>{profileName}</Text>
           {isVerified && (
-            <Feather name="check-circle" size={16} color="#007AFF" style={{ marginLeft: 5 }} />
+            <VerificationBadge size={16} style={{ marginLeft: 5 }} />
           )}
         </View>
-        <Text style={styles.profileDetail}>Age: {age}</Text>
-        <Text style={styles.profileDetail}>Height: {height}</Text>
-        <Text style={styles.profileDetail}>Location: {location}</Text>
-        <Text style={styles.profileDetail}>ID: {profileId}</Text>
+        <Text style={styles.profileDetail}>{t('age')}: {age}</Text>
+        <Text style={styles.profileDetail}>{t('height')}: {height}</Text>
+        <Text style={styles.profileDetail}>{t('location')}: {location}</Text>
+        <Text style={styles.profileDetail}>{t('id')}: {profileId}</Text>
       </View>
       <TouchableOpacity style={styles.heartIcon}>
         <Feather name="heart" size={20} color={Colors.light.icon} />
@@ -74,12 +79,17 @@ export default function ProfilesScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { initialTab } = params;
+  const { t } = useLanguage();
 
-  const [activeTab, setActiveTab] = useState(initialTab || 'New Matches');
+  const [activeTab, setActiveTab] = useState(initialTab || 'Recommended Matches');
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [userInfo, setUserInfo] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMorePages, setHasMorePages] = useState(true);
+  const [totalProfiles, setTotalProfiles] = useState(0);
 
   useEffect(() => {
     if (initialTab) {
@@ -116,48 +126,37 @@ export default function ProfilesScreen() {
     }
   };
 
-  const fetchUserData = async () => {
+  const fetchUserData = async (page: number = 1, append: boolean = false) => {
     try {
-      setLoading(true);
+      if (!append) {
+        setLoading(true);
+        setCurrentPage(1);
+        setHasMorePages(true);
+      } else {
+        setLoadingMore(true);
+      }
+      
       console.log('📊 Fetching profiles data...');
-      console.log('🎯 Active tab:', activeTab);
+      console.log('🎯 Active tab:', activeTab, 'Page:', page);
       
-      // Determine the type and filters based on active tab
+      // Determine the type based on active tab
       let profileType = 'all';
-      let filters = {};
       
-      if (activeTab === 'New Matches') {
+      if (activeTab === 'Recommended Matches') {
         profileType = 'new_matches';
-        // Add account requirement matching logic
-        filters = {
-          match_preferences: true,
-          age_range: true,
-          location_preference: true
-        };
       } else if (activeTab === 'Newly joined') {
         profileType = 'newly_joined';
-        // Show users created within last week
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        filters = {
-          created_after: oneWeekAgo.toISOString().split('T')[0]
-        };
       } else if (activeTab === 'All Profiles') {
         profileType = 'all';
-        // Show users up to 60+ years
-        filters = {
-          max_age: 65
-        };
       }
       
       console.log('🔄 Profile type determined:', profileType);
-      console.log('🎯 Filters applied:', filters);
       
-      // Fetch profiles using real API
+      // Fetch profiles using real API with pagination
       const profilesResponse = await apiService.getProfiles({
         type: profileType,
         limit: 20,
-        ...filters
+        page: page
       });
 
       console.log('👥 Profiles API response:', profilesResponse);
@@ -185,22 +184,50 @@ export default function ProfilesScreen() {
         
         console.log('🔄 Processed profiles:', processedProfiles.length);
         
-        setProfiles(processedProfiles);
+        // Handle pagination data
+        const pagination = profilesResponse.data.pagination;
+        if (pagination) {
+          setCurrentPage(pagination.current_page);
+          setHasMorePages(pagination.has_more || pagination.current_page < pagination.last_page);
+          setTotalProfiles(pagination.total);
+          console.log('📄 Pagination info:', pagination);
+        }
+        
+        // Append or replace profiles based on append flag
+        if (append) {
+          setProfiles(prevProfiles => [...prevProfiles, ...processedProfiles]);
+        } else {
+          setProfiles(processedProfiles);
+        }
       } else {
         console.log('⚠️ Profiles API returned invalid response structure');
         console.log('📋 Response structure:', JSON.stringify(profilesResponse, null, 2));
+        if (!append) {
+          setProfiles([]);
+        }
+      }
+    } catch (error: any) {
+      console.error('💥 Error fetching profiles:', error);
+      console.error('💥 Error details:', error?.message || 'Unknown error');
+      console.error('💥 Error stack:', error?.stack || 'No stack trace');
+      if (!append) {
         setProfiles([]);
       }
-    } catch (error) {
-      console.error('💥 Error fetching profiles:', error);
-      console.error('💥 Error details:', error.message);
-      console.error('💥 Error stack:', error.stack);
-      setProfiles([]);
       console.log('🔄 No profiles available due to error');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
       console.log('⏹️ Profiles loading complete');
     }
+  };
+
+  // Load more profiles for endless scroll
+  const loadMoreProfiles = async () => {
+    if (!hasMorePages || loadingMore) return;
+    
+    const nextPage = currentPage + 1;
+    console.log('📄 Loading more profiles, page:', nextPage);
+    await fetchUserData(nextPage, true);
   };
 
   const calculateAge = (dateString: string) => {
@@ -218,14 +245,20 @@ export default function ProfilesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}><Feather name="arrow-left" size={24} /></TouchableOpacity>
-        <Text style={styles.headerTitle}>Profiles</Text>
-              </View>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+          <Feather name="arrow-left" size={24} />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Feather name="users" size={20} color={Colors.light.tint} style={{ marginRight: 8 }} />
+          <Text style={styles.headerTitle}>{t('profiles')}</Text>
+        </View>
+        <View style={styles.headerButton} />
+      </View>
 
       <View style={styles.searchSection}>
         <View style={styles.searchInputContainer}>
           <TextInput 
-            placeholder="Search by name, caste, or profile ID..." 
+            placeholder={t('search_by_name')}
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -238,16 +271,16 @@ export default function ProfilesScreen() {
       </View>
 
       <View style={styles.tabsContainer}>
-        <TouchableOpacity onPress={() => setActiveTab('New Matches')}>
-          <Text style={[styles.tabText, activeTab === 'New Matches' && styles.activeTabText]}>New Matches</Text>
-          {activeTab === 'New Matches' && <View style={styles.activeTabIndicator} />}
+        <TouchableOpacity onPress={() => setActiveTab('Recommended Matches')}>
+          <Text style={[styles.tabText, activeTab === 'Recommended Matches' && styles.activeTabText]}>{t('recommended_matches')}</Text>
+          {activeTab === 'Recommended Matches' && <View style={styles.activeTabIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setActiveTab('Newly joined')}>
-          <Text style={[styles.tabText, activeTab === 'Newly joined' && styles.activeTabText]}>Newly joined</Text>
+          <Text style={[styles.tabText, activeTab === 'Newly joined' && styles.activeTabText]}>{t('newly_joined')}</Text>
           {activeTab === 'Newly joined' && <View style={styles.activeTabIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setActiveTab('All Profiles')}>
-          <Text style={[styles.tabText, activeTab === 'All Profiles' && styles.activeTabText]}>All Profiles</Text>
+          <Text style={[styles.tabText, activeTab === 'All Profiles' && styles.activeTabText]}>{t('all_profiles')}</Text>
           {activeTab === 'All Profiles' && <View style={styles.activeTabIndicator} />}
         </TouchableOpacity>
       </View>
@@ -255,7 +288,7 @@ export default function ProfilesScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.light.tint} />
-          <Text style={styles.loadingText}>Loading profiles...</Text>
+          <Text style={styles.loadingText}>{t('loading_profiles')}</Text>
         </View>
       ) : profiles.length > 0 ? (
         <FlatList
@@ -263,15 +296,34 @@ export default function ProfilesScreen() {
           renderItem={({ item }) => (
             <ProfileCard 
               item={item} 
+              t={t}
               onPress={() => router.push(`/profile/${item?.id || '1'}`)} 
             />
           )}
           keyExtractor={(item, index) => item?.id?.toString() || index.toString()}
           contentContainerStyle={[styles.listContainer, { paddingBottom: 100 }]}
+          onEndReached={loadMoreProfiles}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={() => (
+            loadingMore ? (
+              <View style={styles.loadMoreContainer}>
+                <ActivityIndicator size="small" color={Colors.light.tint} />
+                <Text style={styles.loadMoreText}>Loading more profiles...</Text>
+              </View>
+            ) : hasMorePages ? (
+              <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreProfiles}>
+                <Text style={styles.loadMoreButtonText}>Load More ({totalProfiles - profiles.length} remaining)</Text>
+              </TouchableOpacity>
+            ) : profiles.length > 0 ? (
+              <View style={styles.endOfListContainer}>
+                <Text style={styles.endOfListText}>You've seen all {totalProfiles} profiles!</Text>
+              </View>
+            ) : null
+          )}
         />
       ) : (
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>No profiles found</Text>
+          <Text style={styles.loadingText}>{t('no_profiles_found')}</Text>
         </View>
       )}
     </View>
@@ -280,8 +332,32 @@ export default function ProfilesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9F9F9' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, backgroundColor: 'white' },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    paddingVertical: 15, 
+    backgroundColor: 'white',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerCenter: { 
+    flexDirection: 'row',
+    alignItems: 'center', 
+    justifyContent: 'center',
+    flex: 1,
+  },
+  headerButton: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   searchSection: { padding: 20, backgroundColor: 'white' },
   searchInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' },
   searchInput: { flex: 1, height: 50, paddingHorizontal: 15, fontSize: 16 },
@@ -323,4 +399,37 @@ const styles = StyleSheet.create({
   premiumTagText: { color: '#333' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
   loadingText: { marginTop: 10, fontSize: 16, color: Colors.light.icon },
+  loadMoreContainer: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    paddingVertical: 20 
+  },
+  loadMoreText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: Colors.light.icon,
+  },
+  loadMoreButton: {
+    backgroundColor: Colors.light.tint,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginVertical: 20,
+    alignSelf: 'center',
+  },
+  loadMoreButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  endOfListContainer: {
+    paddingVertical: 30,
+    alignItems: 'center',
+  },
+  endOfListText: {
+    fontSize: 16,
+    color: Colors.light.icon,
+    fontWeight: '500',
+  },
 });
