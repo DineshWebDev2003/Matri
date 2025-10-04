@@ -52,12 +52,12 @@ workflows:
       - name: Prebuild native Android project (Expo) - Optimized
         script: |
           cd "$APP_DIR"
-          # Ensure expo-modules-core is properly installed
-          npm install expo-modules-core --save
-          # Use optimized prebuild with size reduction flags
-          CI=1 npx expo prebuild -p android
-          # Enable R8 full mode for better optimization
+          # Create expo prebuild with minimal native modules to avoid CMake issues
+          CI=1 EXPO_NO_FLIPPER=1 npx expo prebuild -p android --skip-dependency-update
+          # Disable problematic native modules in gradle.properties
           cd android
+          echo "expo.modules.core.android.usesCMake=false" >> gradle.properties
+          # Enable R8 full mode for better optimization
           echo "android.enableR8.fullMode=true" >> gradle.properties
           echo "android.enableSeparateBuildPerCPUArchitecture=true" >> gradle.properties
           echo "android.enableProguardInReleaseBuilds=true" >> gradle.properties
