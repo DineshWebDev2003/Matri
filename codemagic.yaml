@@ -100,8 +100,6 @@ workflows:
         - pattern: main
           include: true
           source: true
-    integrations:
-      app_store_connect: codemagic_app_store_connect
     environment:
       node: 20
       xcode: latest
@@ -187,9 +185,6 @@ workflows:
           - dev-support@90skalyanam.com
         notify:
           success: true
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
 
   # Combined workflow for both platforms
   mobile_release:
@@ -202,9 +197,6 @@ workflows:
       tag_patterns:
         - pattern: 'v*'
           include: true
-    integrations:
-      app_store_connect: codemagic_app_store_connect
-      google_play: codemagic_google_play
     environment:
       node: 20
       java: 17
@@ -310,9 +302,3 @@ workflows:
           - dev-support@90skalyanam.com
         notify:
           success: true
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        track: internal
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
