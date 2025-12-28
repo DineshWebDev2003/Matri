@@ -1,656 +1,1274 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, ImageBackground, TouchableOpacity, FlatList, Dimensions, Modal } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Dimensions, Alert, ActivityIndicator, FlatList, Modal, PanResponder, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Colors } from '@/constants/Colors';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
-import ProfileImage from '../../components/ProfileImage';
+import FallbackImage from '../../components/FallbackImage';
+import UniversalHeader from '../../components/UniversalHeader';
+import { getImageUrl, getGalleryImageUrl } from '../../utils/imageUtils';
 
-interface DetailItemProps {
-  label: string;
-  value: string;
-}
+const { width: screenWidth } = Dimensions.get('window');
 
-const DetailItem: React.FC<DetailItemProps> = ({ label, value }) => (
-  <View style={styles.detailItem}>
-    <Text style={styles.detailLabel}>{label}</Text>
-    <Text style={styles.detailValue}>{value}</Text>
-  </View>
-);
+const DetailRow = ({ label, value, theme }: { label: string; value: string; theme?: string }) => {
+  // Show all fields including N/A
+  return (
+    <View style={[styles.detailRow, theme === 'dark' && { backgroundColor: '#1A1A1A', paddingHorizontal: 8, paddingVertical: 6, marginVertical: 2, borderRadius: 6 }]}>
+      <Text style={[styles.detailLabel, theme === 'dark' && { color: '#9CA3AF' }]}>{label}</Text>
+      <Text style={[styles.detailValue, theme === 'dark' && { color: value === 'N/A' ? '#6B7280' : (theme === 'dark' ? '#FFFFFF' : '#1F2937') }]}>{value}</Text>
+    </View>
+  );
+};
 
-interface TagProps {
-  icon?: keyof typeof Feather.glyphMap;
-  text: string;
-  highlight?: boolean;
-}
-
-const Tag: React.FC<TagProps> = ({ icon, text, highlight }) => (
-  <View style={[styles.tag, highlight && styles.tagHighlight]}>
-    {icon && <Feather name={icon} size={14} color={highlight ? 'white' : Colors.light.tint} />}
-    <Text style={[styles.tagText, highlight && styles.tagTextHighlight]}>{text}</Text>
-  </View>
-);
-
-const { width } = Dimensions.get('window');
-
-export default function ProfileDetail() {
+export default function ProfileDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const { theme } = useTheme();
+  const auth = useAuth();
+  const updateLimitation = auth?.updateLimitation;
+  
   const [profile, setProfile] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState('Details');
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [contactViewsRemaining, setContactViewsRemaining] = useState(454);
-
-  const onViewableItemsChanged = useRef(({ viewableItems }) => {
-    if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index);
-    }
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
-
-  React.useEffect(() => {
-    const fetchProfile = async () => {
+  const [loading, setLoading] = useState(true);
+  const [isInterested, setIsInterested] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'preferences' | 'photos'>('details');
+  const [fullScreenPhoto, setFullScreenPhoto] = useState<any>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  // Remaining contact-view credits from limitation data
+  const [remainingCredits, setRemainingCredits] = useState<number>(() => {
+    const lim = auth?.limitation?.contact_view_limit;
+    if (lim === -1) return Infinity; // unlimited
+    return lim ?? 0;
+  });
+  // keep credits up-to-date whenever popup shown or auth.user updates
+  useEffect(() => {
+    const fetchCredits = async () => {
+      if (!showCreditPopup) return;
       try {
-        console.log('🔄 Fetching profile for ID:', id);
-        const response = await apiService.getProfile(id as string);
-        console.log('👤 Profile API response:', response);
-        
-        if (response.status === 'success') {
-          // The API can return either data.member or data.profile
-          const memberData = response.data.member || response.data.profile;
-          console.log('✅ Member data received:', memberData);
-          
-          // Transform member data to profile format
-          const transformedProfile = {
-            id: memberData.id,
-            name: memberData.name || `${memberData.firstname || ''} ${memberData.lastname || ''}`.trim(),
-            age: memberData.age || 'N/A',
-            height: memberData.height || 'N/A',
-            location: memberData.location || memberData.city || 'N/A',
-            images: memberData.images?.length > 0 ? memberData.images : 
-                   memberData.image ? [`https://app.90skalyanam.com/assets/images/user/profile/${memberData.image}`] : 
-                   ['https://randomuser.me/api/portraits/women/1.jpg'],
-            
-            // Basic details
-            dob: memberData.dob || 'N/A',
-            education: memberData.education || 'N/A',
-            born: memberData.born || '1st Born',
-            star: memberData.star || 'N/A',
-            rassi: memberData.rassi || 'N/A',
-            bloodGroup: memberData.bloodGroup || 'N/A',
-            maritalStatus: memberData.maritalStatus || 'N/A',
-            religion: memberData.religion?.name || memberData.religion || 'N/A',
-            caste: memberData.caste || 'N/A',
-            languages: memberData.languages || memberData.motherTongue || 'N/A',
-            eyeColor: memberData.eyeColor || 'N/A',
-            hairColor: memberData.hairColor || 'N/A',
-            disability: memberData.disability || 'N/A',
-            complexion: memberData.complexion || 'N/A',
-            
-            // Professional details
-            job: memberData.job || 'N/A',
-            salary: memberData.salary || 'N/A',
-            profession: memberData.profession || memberData.job || 'N/A',
-            
-            // Address details
-            presentAddress: memberData.presentAddress || memberData.city || 'N/A',
-            permanentAddress: memberData.permanentAddress || 'N/A',
-            
-            // Horoscope details
-            birthPlace: memberData.birthPlace || memberData.city || 'N/A',
-            birthTime: memberData.birthTime || 'N/A',
-            patham: memberData.patham || '****',
-            lagnam: memberData.lagnam || '****',
-            horoscopeType: memberData.horoscopeType || 'Dosham',
-            doshamType: memberData.doshamType || '****',
-            
-            // Family details
-            fatherName: memberData.fatherName || 'N/A',
-            fatherOccupation: memberData.fatherOccupation || 'N/A',
-            motherName: memberData.motherName || 'N/A',
-            motherOccupation: memberData.motherOccupation || 'N/A',
-            siblings: memberData.siblings || 'N/A',
-            
-            // Other details
-            married: memberData.married || 'N/A',
-            ownHouse: memberData.ownHouse || 'N/A',
-            ownPlot: memberData.ownPlot || 'N/A',
-            familyStatus: memberData.familyStatus || 'N/A',
-            familyType: memberData.familyType || 'N/A',
-            
-            // Contact details
-            mobile: memberData.mobile || memberData.phone || 'N/A',
-            email: memberData.email || 'N/A',
-            
-            // Partner preferences from partnerExpectation relationship
-            partnerAgeMin: memberData.partnerExpectation?.min_age || 'N/A',
-            partnerAgeMax: memberData.partnerExpectation?.max_age || 'N/A',
-            partnerHeightMin: memberData.partnerExpectation?.min_height || 'N/A',
-            partnerHeightMax: memberData.partnerExpectation?.max_height || 'N/A',
-            partnerReligion: memberData.partnerExpectation?.religion || 'N/A',
-            partnerCaste: memberData.partnerExpectation?.caste || 'N/A',
-            partnerEducation: memberData.partnerExpectation?.education || 'N/A',
-            partnerProfession: memberData.partnerExpectation?.profession || 'N/A',
-            partnerCountry: memberData.partnerExpectation?.country || 'N/A',
-            partnerState: memberData.partnerExpectation?.state || 'N/A',
-            partnerCity: memberData.partnerExpectation?.city || 'N/A',
-            partnerIncome: memberData.partnerExpectation?.income || 'N/A',
-            partnerMaritalStatus: memberData.partnerExpectation?.marital_status || 'N/A',
-            lookingFor: memberData.lookingFor || 'N/A',
-            
-            // Verification and membership
-            verified: memberData.verified || memberData.is_verified || 0,
-            membershipTier: memberData.limitation?.package?.name || 'Basic',
-          };
-          
-          console.log('🔄 Transformed profile:', transformedProfile);
-          setProfile(transformedProfile);
-        } else {
-          console.log('❌ Profile API failed:', response);
+        // get latest limitation counts from dashboard
+        const dash = await apiService.getDashboard();
+        const lim = dash?.data?.limitation || auth?.limitation;
+        const current = lim?.contact_view_limit;
+        if (current !== undefined) {
+          setRemainingCredits(current === -1 ? Infinity : current);
         }
-      } catch (error) {
-        console.error('💥 Failed to fetch profile:', error);
+      } catch (e) {
+        // fallback to existing value
       }
     };
+    fetchCredits();
+  }, [showCreditPopup]);
+  const [contactDetailsUnlocked, setContactDetailsUnlocked] = useState(false);
 
-    if (id) {
-      fetchProfile();
-    }
+  // Persist contact unlock status per profile
+  useEffect(() => {
+    if (!profile?.id) return;
+    const key = `contact_unlocked_${profile.id}`;
+    AsyncStorage.getItem(key).then((val) => {
+      if (val === 'true') setContactDetailsUnlocked(true);
+    });
+  }, [profile?.id]);
+  const [isInIgnoredList, setIsInIgnoredList] = useState(false);
+  const [showCreditPopup, setShowCreditPopup] = useState(false);
+  const [showInterestAnimation, setShowInterestAnimation] = useState(false);
+  const slideUpAnim = useState(new Animated.Value(500))[0];
+  const opacityAnim = useState(new Animated.Value(0))[0];
+  const [expandedSections, setExpandedSections] = useState({
+    basic: true,
+    family: true,
+    education: true,
+    career: true,
+    contact: false,
+  });
+
+  useEffect(() => {
+    fetchProfileData();
   }, [id]);
 
-  // Helper function to calculate age
-  const calculateAge = (dateString: string) => {
-    if (!dateString) return null;
-    const today = new Date();
-    const birthDate = new Date(dateString);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+  const fetchProfileData = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Fetching profile for ID:', id);
+      const response = await apiService.getProfile(id as string);
+      
+      console.log('📥 Profile API Response:', response);
+      
+      if (response.status === 'success') {
+        // API returns data in response.data.profile (from transformMemberToProfile)
+        const memberData = response.data?.profile || response.data?.member || response.data;
+        console.log('📊 Member Data:', memberData);
+        
+        // Log full JSON for debugging
+        console.log('📋 ===== FULL PROFILE JSON =====');
+        console.log(JSON.stringify(memberData, null, 2));
+        console.log('📋 ===== END PROFILE JSON =====');
+        
+        const processedProfile = {
+          id: memberData.id,
+          name: `${memberData.firstname || ''} ${memberData.lastname || ''}`.trim(),
+          age: memberData.age || 'N/A',
+          location: memberData.location || memberData.city || 'N/A',
+          profession: memberData.profession || memberData.job || 'N/A',
+          education: memberData.education || 'N/A',
+          religion: memberData.religion || 'N/A',
+          caste: memberData.caste || 'N/A',
+          height: memberData.height || 'N/A',
+          weight: memberData.weight || 'N/A',
+          mobile: memberData.mobile || 'N/A',
+          email: memberData.email || 'N/A',
+          is_premium: (memberData.package_id && memberData.package_id !== 4) || false,
+          packageId: memberData.package_id || 4,
+          image: memberData.image ? (memberData.image.startsWith('http') ? memberData.image : `https://90skalyanam.com/assets/images/user/profile/${memberData.image}`) : null,
+          bloodGroup: memberData.bloodGroup || 'N/A',
+          maritalStatus: memberData.maritalStatus || 'N/A',
+          birthPlace: memberData.birthPlace || 'N/A',
+          lookingFor: memberData.lookingFor || 'N/A',
+          ageRange: memberData.ageRange || 'N/A',
+          heightRange: memberData.heightRange || 'N/A',
+          preferredReligion: memberData.preferredReligion || 'N/A',
+          preferredCaste: memberData.preferredCaste || 'N/A',
+          preferredEducation: memberData.preferredEducation || 'N/A',
+          preferredProfession: memberData.preferredProfession || 'N/A',
+          preferredLocation: memberData.preferredLocation || 'N/A',
+          preferredMaritalStatus: memberData.preferredMaritalStatus || 'N/A',
+          galleries: memberData.galleries || [],
+        };
+        
+        console.log('✅ Processed Profile:', processedProfile);
+        setProfile(processedProfile);
+
+        // Check if already hearted
+        try {
+          const hRes = await apiService.getHeartedProfiles();
+          if (hRes.status === 'success') {
+            const idsArr = (hRes.data?.profiles || hRes.data || []).map((p: any) => p.id?.toString());
+            setIsInterested(idsArr.includes(memberData.id?.toString()));
+          }
+        } catch(e) { /* ignore */ }
+      } else {
+        console.error('❌ API returned error status:', response.status);
+        const alertMsg = typeof response.message === 'string' ? response.message : JSON.stringify(response.message);
+        Alert.alert('Error', alertMsg || 'Failed to load profile');
+      }
+    } catch (error: any) {
+      console.error('💥 Error fetching profile:', error);
+      console.error('Error message:', error.message);
+      Alert.alert('Error', error.message || 'Failed to load profile');
+    } finally {
+      setLoading(false);
     }
-    return age;
   };
 
-  const handleContactView = () => {
-    setShowContactModal(true);
+  const handleChat = () => {
+    if (auth?.isGuest) {
+      Alert.alert('Login Required', 'Please login to chat with this member', [
+        { text: 'Cancel' },
+        { text: 'Login', onPress: () => router.push('/(auth)/login') }
+      ]);
+      return;
+    }
+    
+    // Use full image URL from API (already includes full URL)
+    const chatImageUrl = profile?.image || 'https://via.placeholder.com/40';
+    
+    console.log('💬 Opening chat with profile:', {
+      id: profile?.id,
+      name: profile?.name,
+      rawImage: profile?.image,
+      chatImageUrl: chatImageUrl
+    });
+    
+    router.push({
+      pathname: '/chat/[id]',
+      params: {
+        userId: profile?.id?.toString(),
+        id: profile?.id?.toString(),
+        name: profile?.name || 'User',
+        image: chatImageUrl
+      }
+    });
   };
 
-  const confirmContactView = () => {
-    setContactViewsRemaining(prev => prev - 1);
-    setShowContactModal(false);
-    // Here you would typically make an API call to deduct contact view
+  // Unlock contact – calls backend and refreshes user credits
+  const handleViewContact = async () => {
+    console.log('🔓 Attempting to unlock contact for profile:', profile?.id);
+    console.log('🔢 Credits before unlock:', remainingCredits===Infinity ? 'Unlimited' : remainingCredits);
+    try {
+      const resp = await apiService.viewContact(profile?.id?.toString());
+      console.log('📡 viewContact API response:', resp);
+      if (resp?.status === 'success' && (resp?.data?.mobile || resp?.data?.contact || resp?.data?.remaining_credits !== undefined || resp?.data?.remaining_contact_view !== undefined)) {
+        setContactDetailsUnlocked(true);
+        await AsyncStorage.setItem(`contact_unlocked_${profile?.id}`, 'true');
+        // Set credits from backend if provided, otherwise fallback to local decrement
+        const newCredits = resp?.data?.remaining_credits ?? resp?.data?.remaining_contact_view ?? resp?.data?.contact_view_limit;
+        if (newCredits !== undefined) {
+          setRemainingCredits(newCredits === -1 ? Infinity : newCredits);
+          if (updateLimitation) {
+            const updatedLim = { ...(auth?.limitation || {}), contact_view_limit: newCredits };
+            updateLimitation(updatedLim);
+          }
+        } else {
+          // fallback: subtract 1
+          const fallbackNew = (prev: number) => (prev === Infinity ? prev : Math.max(0, prev - 1));
+          setRemainingCredits(fallbackNew);
+          if (updateLimitation) {
+            const updatedLim = { ...(auth?.limitation || {}), contact_view_limit: fallbackNew(remainingCredits) };
+            updateLimitation(updatedLim);
+          }
+        }
+        // refresh limitation quietly
+        // Optionally refresh limitation from dashboard in background
+        apiService.getDashboard().then((dash) => {
+          const lim = dash?.data?.limitation;
+          if (lim?.contact_view_limit !== undefined) {
+            setRemainingCredits(lim.contact_view_limit === -1 ? Infinity : lim.contact_view_limit);
+          }
+        }).catch((err) => console.warn('⚠️ Failed to refresh dashboard after unlock:', err));
+      } else {
+        // failure: keep locked and clear stored flag
+        setContactDetailsUnlocked(false);
+        await AsyncStorage.removeItem(`contact_unlocked_${profile?.id}`);
+        Alert.alert('Error', resp?.message || 'Failed to unlock contact');
+        return;
+      }
+    } catch (error: any) {
+      console.error('❌ viewContact error:', error);
+      Alert.alert('Error', error.message || 'Failed to unlock contact');
+    } finally {
+      setShowCreditPopup(false);
+    }
   };
 
-  const renderTabContent = () => {
-    if (!profile) {
-      return (
-        <View style={styles.card}>
-          <Text style={styles.emptyState}>Loading profile information...</Text>
+  const handleInterest = async () => {
+    if (auth?.isGuest) {
+      Alert.alert('Login Required', 'Please login to send interest', [
+        { text: 'Cancel' },
+        { text: 'Login', onPress: () => router.push('/(auth)/login') }
+      ]);
+      return;
+    }
+
+    try {
+      if (isInterested) {
+        Alert.alert('Already Expressed', 'You have already sent a heart to this profile.');
+        return;
+      }
+      // Sending interest - call API
+      const response = await apiService.expressHeart(profile?.id);
+      if (response.status === 'success') {
+        setIsInterested(true);
+        // Show animation
+        setShowInterestAnimation(true);
+        Animated.parallel([
+          Animated.timing(slideUpAnim, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+          setShowInterestAnimation(true);
+          Animated.parallel([
+            Animated.timing(slideUpAnim, {
+              toValue: 0,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacityAnim, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+          ]).start();
+          
+          // Auto-hide after 3 seconds
+          setTimeout(() => {
+            Animated.parallel([
+              Animated.timing(slideUpAnim, {
+                toValue: 500,
+                duration: 500,
+                useNativeDriver: true,
+              }),
+              Animated.timing(opacityAnim, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true,
+              }),
+            ]).start(() => setShowInterestAnimation(false));
+          }, 3000);
+        }, 3000);
+      } else {
+        Alert.alert('Error', 'Failed to send interest. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending interest:', error);
+      Alert.alert('Error', 'Failed to send interest. Please try again.');
+    }
+  };
+
+  const handleIgnore = () => {
+    Alert.alert(
+      'Ignore Member',
+      'Are you sure you want to ignore this member?',
+      [
+        { text: 'Cancel' },
+        { 
+          text: 'Ignore', 
+          onPress: () => {
+            setIsBlocked(true);
+            Alert.alert('Success', 'Member blocked successfully');
+            setTimeout(() => router.back(), 1500);
+          },
+          style: 'destructive'
+        }
+      ]
+    );
+  };
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const CollapsibleSection = ({ 
+    title, 
+    icon, 
+    section, 
+    children 
+  }: { 
+    title: string; 
+    icon: string; 
+    section: keyof typeof expandedSections; 
+    children: React.ReactNode 
+  }) => (
+    <View style={[styles.collapsibleSection, theme === 'dark' && { borderColor: '#3A3A3A', backgroundColor: '#2A2A2A' }]}>
+      <TouchableOpacity 
+        style={[styles.sectionHeader, theme === 'dark' && { backgroundColor: '#1A1A1A', borderBottomColor: '#3A3A3A' }]}
+        onPress={() => toggleSection(section)}
+      >
+        <View style={styles.sectionHeaderLeft}>
+          <Feather name={icon as any} size={20} color="#DC2626" />
+          <Text style={[styles.sectionHeaderTitle, theme === 'dark' && { color: '#FFFFFF' }]}>
+            {title}
+          </Text>
         </View>
-      );
-    }
+        <Feather 
+          name={expandedSections[section] ? 'chevron-up' : 'chevron-down'} 
+          size={20} 
+          color={theme === 'dark' ? '#9CA3AF' : '#6B7280'}
+        />
+      </TouchableOpacity>
+      
+      {expandedSections[section] && (
+        <View style={[styles.sectionContent, theme === 'dark' && { backgroundColor: '#2A2A2A' }]}>
+          {children}
+        </View>
+      )}
+    </View>
+  );
 
-    switch (activeTab) {
-      case 'Details':
-        return (
-          <>
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Basic Information</Text>
-              <DetailItem label="Age" value={`${profile?.age || 'N/A'} Years`} />
-              <DetailItem label="Blood Group" value={profile?.bloodGroup || 'N/A'} />
-              <DetailItem label="Height" value={profile?.height || 'N/A'} />
-              <DetailItem label="Religion" value={profile?.religion || 'N/A'} />
-              <DetailItem label="Caste" value={profile?.caste || 'N/A'} />
-              <DetailItem label="Languages" value={profile?.languages || 'N/A'} />
-              <DetailItem label="Eye Color" value={profile?.eyeColor || 'N/A'} />
-              <DetailItem label="Hair Color" value={profile?.hairColor || 'N/A'} />
-              <DetailItem label="Disability" value={profile?.disability || 'N/A'} />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Professional Details</Text>
-              <DetailItem label="Profession" value={profile?.profession || 'N/A'} />
-              <DetailItem label="Salary" value={profile?.salary || 'N/A'} />
-              <DetailItem label="Job Location" value={profile?.location || 'N/A'} />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Address Information</Text>
-              <DetailItem label="Present Address" value={profile?.presentAddress || 'N/A'} />
-              <DetailItem label="Permanent Address" value={profile?.permanentAddress || 'N/A'} />
-              <DetailItem label="Face Colour" value={profile?.complexion || 'N/A'} />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Horoscope Details</Text>
-              <DetailItem label="Place of Birth" value={profile?.birthPlace || 'N/A'} />
-              <DetailItem label="Time of Birth" value={profile?.birthTime || 'N/A'} />
-              <DetailItem label="Raasi" value={profile?.rassi || 'N/A'} />
-              <DetailItem label="Star" value={profile?.star || 'N/A'} />
-              <DetailItem label="Patham" value={profile?.patham || 'N/A'} />
-              <DetailItem label="Lagnam" value={profile?.lagnam || 'N/A'} />
-              <DetailItem label="Horoscope type" value={profile?.horoscopeType || 'N/A'} />
-              <DetailItem label="Dosham type" value={profile?.doshamType || 'N/A'} />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Family Details</Text>
-              <DetailItem label="Father's Name" value={profile?.fatherName || 'N/A'} />
-              <DetailItem label="Father's Profession" value={profile?.fatherOccupation || 'N/A'} />
-              <DetailItem label="Mother's Name" value={profile?.motherName || 'N/A'} />
-              <DetailItem label="Mother's Profession" value={profile?.motherOccupation || 'N/A'} />
-              <DetailItem label="Siblings" value={profile?.siblings || 'N/A'} />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Other Details</Text>
-              <DetailItem label="Married" value={profile?.married || 'N/A'} />
-              <DetailItem label="Own House" value={profile?.ownHouse || 'N/A'} />
-              <DetailItem label="Own Plot" value={profile?.ownPlot || 'N/A'} />
-              <DetailItem label="Family Status" value={profile?.familyStatus || 'N/A'} />
-            </View>
-          </>
-        );
-      case 'Partner':
-        return (
-          <>
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Partner Preferences</Text>
-              <DetailItem label="Age Range" value={`${profile?.partnerAgeMin || 'N/A'} - ${profile?.partnerAgeMax || 'N/A'} Years`} />
-              <DetailItem label="Height Range" value={`${profile?.partnerHeightMin || 'N/A'} - ${profile?.partnerHeightMax || 'N/A'}`} />
-              <DetailItem label="Religion" value={profile?.partnerReligion || 'N/A'} />
-              <DetailItem label="Caste" value={profile?.partnerCaste || 'N/A'} />
-              <DetailItem label="Education" value={profile?.partnerEducation || 'N/A'} />
-              <DetailItem label="Profession" value={profile?.partnerProfession || 'N/A'} />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Location Preferences</Text>
-              <DetailItem label="Country" value={profile?.partnerCountry || 'N/A'} />
-              <DetailItem label="State" value={profile?.partnerState || 'N/A'} />
-              <DetailItem label="City" value={profile?.partnerCity || 'N/A'} />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Other Preferences</Text>
-              <DetailItem label="Income" value={profile?.partnerIncome || 'N/A'} />
-              <DetailItem label="Marital Status" value={profile?.partnerMaritalStatus || 'N/A'} />
-              <DetailItem label="Looking For" value={profile?.lookingFor === '1' ? 'Bride' : 'Groom'} />
-            </View>
-          </>
-        );
-      case 'Gallery':
-        return (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Photo Gallery</Text>
-            <Text style={styles.emptyState}>Photo gallery will be displayed here...</Text>
-          </View>
-        );
-      default:
-        return (
-          <View style={styles.card}>
-            <Text style={styles.emptyState}>Select a tab to view information</Text>
-          </View>
-        );
-    }
-  };
-
-  if (profile && !profile.images) {
-    profile.images = [profile.image];
-  }
-
-  if (!profile) {
+  if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text>Loading profile...</Text>
-        </View>
+      <SafeAreaView style={[styles.container, theme === 'dark' && { backgroundColor: '#0F0F0F' }]}>
+        <ActivityIndicator size="large" color="#DC2626" style={{ flex: 1 }} />
       </SafeAreaView>
     );
   }
 
+  // Use image directly from API (already includes full URL from formatProfileResponse)
+  const profileImagePrimary = profile?.image || 'https://via.placeholder.com/400x600';
+  const profileImageFallback = undefined;
+  console.log('👤 Profile Detail Screen - Main Image:', {
+    profileId: profile?.id,
+    profileName: profile?.name,
+    rawImage: profile?.image,
+    primaryUrl: profileImagePrimary,
+    fallbackUrl: profileImageFallback,
+    hasImage: !!profile?.image,
+  });
+  const age = profile?.age || 'N/A';
+  const location = profile?.location || 'Location N/A';
+  const name = profile?.name || 'User';
+
+  const themeStyles = {
+    container: theme === 'dark' ? { backgroundColor: '#1A1A1A' } : { backgroundColor: '#FFFFFF' },
+    text: theme === 'dark' ? { color: '#FFFFFF' } : { color: '#1A1A2E' },
+    secondaryText: theme === 'dark' ? { color: '#B0B0B0' } : { color: '#6B7280' },
+    cardBg: theme === 'dark' ? { backgroundColor: '#2A2A2A' } : { backgroundColor: '#FFFFFF' },
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.imageContainer}>
-          <FlatList
-            data={profile.images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <View style={{ width }}>
-                {item && item !== 'https://randomuser.me/api/portraits/women/1.jpg' ? (
-                  <ImageBackground source={{ uri: item }} style={[styles.profileImage, { width }]}>
-                    <View style={styles.imageOverlay} />
-                  </ImageBackground>
-                ) : (
-                  <View style={[styles.profileImage, { width }]}>
-                    <ProfileImage 
-                      imageUrl={null}
-                      name={profile?.name || 'User'}
-                      size={width * 0.6}
-                      isVerified={profile?.verified === 1 || profile?.is_verified === 1}
-                      showBadge={false}
-                    />
-                    <View style={styles.imageOverlay} />
-                  </View>
-                )}
-              </View>
-            )}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-          />
-          <View style={styles.headerButtons}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Feather name="arrow-left" size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.shortlistButton}>
-              <Feather name="heart" size={30} color={Colors.light.tint} />
-            </TouchableOpacity>
-          </View>
-          {profile.images.length > 1 && (
-            <View style={styles.pagination}>
-              <Text style={styles.paginationText}>{currentIndex + 1} / {profile.images.length}</Text>
-            </View>
-          )}
-        </View>
+    <View style={[styles.container, themeStyles.container]}>
+      {/* Universal Header - Prevents overlap */}
+      <UniversalHeader 
+        title="Profile"
+        showProfileImage={false}
+        leftIcon="back"
+        onLeftIconPress={() => router.back()}
+      />
 
-        <View style={styles.contentContainer}>
-          <View style={styles.headerSection}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.profileName}>{profile.name}, {profile.age}</Text>
-              {(profile?.verified === 1 || profile?.is_verified === 1) && (
-                <Feather name="check-circle" size={20} color="#007AFF" style={{ marginLeft: 8 }} />
+      <ScrollView showsVerticalScrollIndicator={false} style={[styles.scrollContent, themeStyles.container]}>
+        {/* Main Profile Card */}
+        <View style={[styles.mainCard, themeStyles.cardBg]}>
+          {/* Profile Image Card */}
+          <View style={styles.imageCardContainer}>
+            <LinearGradient
+              colors={['#DC2626', '#EF4444', '#F87171']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.imageCard}
+            >
+              <FallbackImage
+                source={{ uri: profileImagePrimary }}
+                fallbackSource={profileImageFallback}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+              
+              {/* Black Overlay for Blocked Users */}
+              {isBlocked && (
+                <View style={styles.blockedOverlay}>
+                  <Text style={styles.blockedText}>User Blocked</Text>
+                </View>
               )}
-            </View>
-            <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.actionButton}><Feather name="share-2" size={20} color="white" /></TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}><Feather name="download" size={20} color="white" /></TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}><Feather name="bookmark" size={20} color="white" /></TouchableOpacity>
-            </View>
+              
+              {/* Profile Info Overlay */}
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)']}
+                style={styles.infoOverlay}
+              >
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName}>{name}</Text>
+                  <Text style={styles.profileDetails}>Age: {age}  • {location}</Text>
+                </View>
+              </LinearGradient>
+
+              {/* Premium Badge */}
+              {(profile?.packageId && profile.packageId !== 4) && (
+                <View style={styles.premiumBadge}>
+                  <Text style={styles.premiumBadgeText}>⭐ Premium</Text>
+                </View>
+              )}
+            </LinearGradient>
           </View>
 
-          {/* Profile Tabs */}
-          <View style={styles.tabsContainer}>
+          {/* Action Buttons - Bottom of Card */}
+          <View style={[styles.cardActionButtons, theme === 'dark' && styles.cardActionButtonsDark]}>
+            {/* Chat Button - X Icon - Small */}
             <TouchableOpacity 
-              style={[styles.tab, activeTab === 'Details' && styles.activeTab]}
-              onPress={() => setActiveTab('Details')}
+              style={[styles.cardActionButton, styles.cardActionButtonSmall, theme === 'dark' ? styles.chatButtonDark : styles.chatButton]}
+              onPress={handleChat}
             >
-              <Feather name="user" size={18} color={activeTab === 'Details' ? 'white' : Colors.light.icon} />
-              <Text style={[styles.tabText, activeTab === 'Details' && styles.activeTabText]}>
-                Details
-              </Text>
+              <Feather name="message-circle" size={22} color="white" />
             </TouchableOpacity>
-            
+
+            {/* Heart Button - Interest - Large Center */}
             <TouchableOpacity 
-              style={[styles.tab, activeTab === 'Partner' && styles.activeTab]}
-              onPress={() => setActiveTab('Partner')}
+              style={[
+                styles.cardActionButton, 
+                styles.cardActionButtonLarge,
+                theme === 'dark' ? styles.interestCardButtonDark : styles.interestCardButton,
+                isInterested && (theme === 'dark' ? styles.interestCardButtonActiveDark : styles.interestCardButtonActive)
+              ]}
+              onPress={handleInterest}
+              disabled={isBlocked}
             >
-              <Feather name="heart" size={18} color={activeTab === 'Partner' ? 'white' : Colors.light.icon} />
-              <Text style={[styles.tabText, activeTab === 'Partner' && styles.activeTabText]}>
-                Partner
-              </Text>
+              <Feather 
+                name="heart" 
+                size={36} 
+                color={isInterested ? '#DC2626' : '#FFC5C5'}
+                fill={isInterested ? '#DC2626' : 'none'}
+              />
             </TouchableOpacity>
-            
+
+            {/* Ignore Button - X Icon - Small */}
             <TouchableOpacity 
-              style={[styles.tab, activeTab === 'Gallery' && styles.activeTab]}
-              onPress={() => setActiveTab('Gallery')}
+              style={[styles.cardActionButton, styles.cardActionButtonSmall, theme === 'dark' ? styles.ignoreButtonDark : styles.ignoreButton, isBlocked && (theme === 'dark' ? styles.ignoreButtonActiveDark : styles.ignoreButtonActive)]}
+              onPress={handleIgnore}
+              disabled={isBlocked}
             >
-              <Feather name="image" size={18} color={activeTab === 'Gallery' ? 'white' : Colors.light.icon} />
-              <Text style={[styles.tabText, activeTab === 'Gallery' && styles.activeTabText]}>
-                Gallery
-              </Text>
+              <Feather name="x-circle" size={22} color={isBlocked ? '#6B7280' : 'white'} />
             </TouchableOpacity>
+          </View>
+
+          {/* Tabs Section */}
+          <View style={[styles.tabsContainer, themeStyles.container]}>
+          {/* Tab Buttons */}
+          <View style={styles.tabButtons}>
+            {['details', 'preferences', 'photos'].map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
+                onPress={() => setActiveTab(tab as any)}
+              >
+                {/* Icon centered at top */}
+                <View style={styles.tabIconContainer}>
+                  <Feather 
+                    name={tab === 'details' ? 'info' : tab === 'preferences' ? 'heart' : 'image'} 
+                    size={24} 
+                    color={activeTab === tab ? '#DC2626' : '#9CA3AF'}
+                  />
+                </View>
+                {/* Text below icon */}
+                <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>
+                  {tab === 'details' ? 'Details' : tab === 'preferences' ? 'Preferences' : 'Photos'}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
           {/* Tab Content */}
-          {renderTabContent()}
+          <View style={[styles.tabContent, theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>
+            {/* Details Tab */}
+            {activeTab === 'details' && (
+              <ScrollView showsVerticalScrollIndicator={false} style={[theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>
+                {/* Basic Information Section */}
+                <CollapsibleSection title="Basic Information" icon="user" section="basic">
+                  {profile?.age && (
+                    <DetailRow label="Age" value={`${profile.age} years`} theme={theme} />
+                  )}
+                  {profile?.religion && (
+                    <DetailRow label="Religion" value={profile.religion} theme={theme} />
+                  )}
+                  {profile?.caste && (
+                    <DetailRow label="Caste" value={profile.caste} theme={theme} />
+                  )}
+                  {profile?.maritalStatus && (
+                    <DetailRow label="Marital Status" value={profile.maritalStatus} theme={theme} />
+                  )}
+                  {profile?.height && (
+                    <DetailRow label="Height" value={profile.height} theme={theme} />
+                  )}
+                  {profile?.weight && (
+                    <DetailRow label="Weight" value={profile.weight} theme={theme} />
+                  )}
+                  {profile?.bloodGroup && (
+                    <DetailRow label="Blood Group" value={profile.bloodGroup} theme={theme} />
+                  )}
+                  {profile?.complexion && (
+                    <DetailRow label="Complexion" value={profile.complexion} theme={theme} />
+                  )}
+                  {profile?.eyeColor && (
+                    <DetailRow label="Eye Color" value={profile.eyeColor} theme={theme} />
+                  )}
+                  {profile?.hairColor && (
+                    <DetailRow label="Hair Color" value={profile.hairColor} theme={theme} />
+                  )}
+                  {profile?.faceColour && (
+                    <DetailRow label="Face Colour" value={profile.faceColour} theme={theme} />
+                  )}
+                  {profile?.disability && (
+                    <DetailRow label="Disability" value={profile.disability} theme={theme} />
+                  )}
+                  {profile?.languages && (
+                    <DetailRow label="Languages" value={profile.languages} theme={theme} />
+                  )}
+                  {profile?.location && (
+                    <DetailRow label="Location" value={profile.location} theme={theme} />
+                  )}
+                  {profile?.presentAddress && (
+                    <DetailRow label="Present Address" value={profile.presentAddress} theme={theme} />
+                  )}
+                  {profile?.permanentAddress && (
+                    <DetailRow label="Permanent Address" value={profile.permanentAddress} theme={theme} />
+                  )}
+                </CollapsibleSection>
 
-          {/* Contact Details Card - Moved to Bottom */}
-          <TouchableOpacity style={styles.contactCard} onPress={handleContactView}>
-            <View style={styles.contactHeader}>
-              <Text style={styles.contactTitle}>Contact Details</Text>
-              <Feather name="chevron-up" size={20} color={Colors.light.tint} />
-            </View>
-            <View style={styles.contactContent}>
-              <View style={styles.contactItem}>
-                <Feather name="phone" size={16} color={Colors.light.tint} />
-                <Text style={styles.contactText}>{profile?.mobile || 'N/A'}</Text>
-              </View>
-              <View style={styles.contactItem}>
-                <Feather name="mail" size={16} color={Colors.light.tint} />
-                <Text style={styles.contactText}>{profile?.email || 'N/A'}</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
+                {/* Education Section */}
+                <CollapsibleSection title="Education" icon="book" section="education">
+                  <DetailRow label="Education" value={profile?.education || 'N/A'} theme={theme} />
+                  <DetailRow label="Degree" value={profile?.degree || 'N/A'} theme={theme} />
+                  <DetailRow label="Field of Study" value={profile?.fieldOfStudy || 'N/A'} theme={theme} />
+                  <DetailRow label="Institute" value={profile?.institute || 'N/A'} theme={theme} />
+                  <DetailRow label="Education Start Year" value={profile?.educationStartYear || 'N/A'} theme={theme} />
+                  <DetailRow label="Education End Year" value={profile?.educationEndYear || 'N/A'} theme={theme} />
+                </CollapsibleSection>
 
-          {/* Contact View Confirmation Modal */}
-          <Modal
-            visible={showContactModal}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowContactModal(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Confirm Contact View</Text>
-                  <TouchableOpacity onPress={() => setShowContactModal(false)}>
-                    <Feather name="x" size={24} color={Colors.light.icon} />
-                  </TouchableOpacity>
-                </View>
+                {/* Career Section */}
+                <CollapsibleSection title="Career" icon="briefcase" section="career">
+                  <DetailRow label="Profession" value={profile?.profession || 'N/A'} theme={theme} />
+                  <DetailRow label="Company" value={profile?.company || 'N/A'} theme={theme} />
+                  <DetailRow label="Designation" value={profile?.designation || 'N/A'} theme={theme} />
+                  <DetailRow label="Career Start Year" value={profile?.careerStartYear || 'N/A'} theme={theme} />
+                  <DetailRow label="Career End Year" value={profile?.careerEndYear || 'N/A'} theme={theme} />
+                </CollapsibleSection>
+
+                {/* Family Section */}
+                <CollapsibleSection title="Family" icon="home" section="family">
+                  <DetailRow label="Father's Name" value={profile?.fatherName || 'N/A'} theme={theme} />
+                  <DetailRow label="Father's Profession" value={profile?.fatherProfession || 'N/A'} theme={theme} />
+                  <DetailRow label="Father's Contact" value={profile?.fatherContact || 'N/A'} theme={theme} />
+                  <DetailRow label="Mother's Name" value={profile?.motherName || 'N/A'} theme={theme} />
+                  <DetailRow label="Mother's Profession" value={profile?.motherProfession || 'N/A'} theme={theme} />
+                  <DetailRow label="Mother's Contact" value={profile?.motherContact || 'N/A'} theme={theme} />
+                  <DetailRow label="Number of Brothers" value={profile?.numberOfBrothers || 'N/A'} theme={theme} />
+                  <DetailRow label="Number of Sisters" value={profile?.numberOfSisters || 'N/A'} theme={theme} />
+                </CollapsibleSection>
                 
-                <View style={styles.modalBody}>
-                  <Text style={styles.remainingText}>
-                    Remaining Contact View : {contactViewsRemaining} times
-                  </Text>
-                  <Text style={styles.warningText}>
-                    **N.B. Viewing this members contact information will cost 1 from your remaining contact view**
-                  </Text>
-                </View>
-                
-                <TouchableOpacity style={styles.submitButton} onPress={confirmContactView}>
-                  <Text style={styles.submitButtonText}>Submit</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-
-          
-          
-          
-          
+                {/* Contact Information - Locked Initially */}
+                <TouchableOpacity 
+                  style={[styles.contactSection, themeStyles.cardBg]}
+                  onPress={() => {
+                    if (!contactDetailsUnlocked) {
+                      // Show attractive credit popup
+                      setShowCreditPopup(true);
+                    }
+                  }}
+                >
+                  <View style={styles.contactHeader}>
+                    <Text style={[styles.contactTitle, theme === 'dark' && { color: '#FFFFFF' }]}>📞 Contact Info</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      {contactDetailsUnlocked && (
+                        <Text style={{ fontSize: 11, color: '#9CA3AF', fontStyle: 'italic' }}>Already opened</Text>
+                      )}
+                      <Feather 
+                        name={contactDetailsUnlocked ? 'unlock' : 'lock'} 
+                        size={16} 
+                        color={contactDetailsUnlocked ? '#10B981' : '#DC2626'} 
+                      />
+                    </View>
                   </View>
+                  
+                  {contactDetailsUnlocked ? (
+                    <>
+                      <View style={styles.contactRow}>
+                        <Feather name="phone" size={18} color="#3B82F6" />
+                        <Text style={[styles.contactValue, theme === 'dark' && { color: '#E5E7EB' }]}>
+                          {profile?.mobile || 'N/A'}
+                        </Text>
+                      </View>
+                      <View style={styles.contactRow}>
+                        <Feather name="mail" size={18} color="#3B82F6" />
+                        <Text style={[styles.contactValue, theme === 'dark' && { color: '#E5E7EB' }]}>
+                          {profile?.email || 'N/A'}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={[styles.lockedText, theme === 'dark' && { color: '#9CA3AF' }]}>
+                      🔒 Tap to view contact details
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Credit Popup Modal */}
+                {showCreditPopup && (
+                  <Modal
+                    visible={showCreditPopup}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setShowCreditPopup(false)}
+                  >
+                    <View style={styles.creditPopupOverlay}>
+                      <View style={[styles.creditPopupContainer, theme === 'dark' && { backgroundColor: '#2A2A2A' }]}>
+                        {/* Header */}
+                        <View style={styles.creditPopupHeader}>
+                          <Feather name="star" size={32} color="#FCD34D" />
+                          <Text style={[styles.creditPopupTitle, theme === 'dark' && { color: '#FFFFFF' }]}>
+                            View Contact Details
+                          </Text>
+                        </View>
+
+                        {/* Credit Info */}
+                        <View style={styles.creditInfoBox}>
+                          <View style={styles.creditItem}>
+                            <Text style={styles.creditLabel}>Your Credits</Text>
+                            <Text style={styles.creditValue}>{remainingCredits===Infinity ? 'Unlimited' : remainingCredits}</Text>
+                          </View>
+                          <Feather name="arrow-right" size={24} color="#DC2626" />
+                          <View style={styles.creditItem}>
+                            <Text style={styles.creditLabel}>After View</Text>
+                            <Text style={styles.creditValue}>{remainingCredits===Infinity ? 'Unlimited' : Math.max(0, remainingCredits - 1)}</Text>
+                          </View>
+                        </View>
+
+                        {/* Cost Info */}
+                        <View style={[styles.costBox, theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>
+                          <Feather name="info" size={20} color="#3B82F6" />
+                          <Text style={[styles.costText, theme === 'dark' && { color: '#E5E7EB' }]}>
+                            Viewing this contact costs <Text style={{ fontWeight: '700', color: '#DC2626' }}>1 credit</Text>
+                          </Text>
+                        </View>
+
+                        {/* Buttons */}
+                        <View style={styles.creditPopupButtons}>
+                          <TouchableOpacity 
+                            style={[styles.creditButton, styles.cancelButton, theme === 'dark' && { backgroundColor: '#3A3A3A' }]}
+                            onPress={() => setShowCreditPopup(false)}
+                          >
+                            <Text style={[styles.buttonText, { color: theme === 'dark' ? '#E5E7EB' : '#1F2937' }]}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={[styles.creditButton, styles.viewButton]}
+                            onPress={handleViewContact}
+                          >
+                            <Feather name="unlock" size={18} color="white" />
+                            <Text style={[styles.buttonText, { color: 'white', marginLeft: 8 }]}>View Contact</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  </Modal>
+                )}
+              </ScrollView>
+            )}
+
+            {/* Preferences Tab */}
+            {activeTab === 'preferences' && (
+              <ScrollView showsVerticalScrollIndicator={false} style={[theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>
+                {/* Partner Preferences Section - Only Important Fields */}
+                <View style={[styles.collapsibleSection, theme === 'dark' && { borderColor: '#3A3A3A', backgroundColor: '#2A2A2A' }]}>
+                  <View style={[styles.sectionHeader, theme === 'dark' && { backgroundColor: '#1A1A1A', borderBottomColor: '#3A3A3A' }]}>
+                    <View style={styles.sectionHeaderLeft}>
+                      <Feather name="heart" size={20} color="#DC2626" />
+                      <Text style={[styles.sectionHeaderTitle, theme === 'dark' && { color: '#FFFFFF' }]}>
+                        Partner Preferences
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.sectionContent, theme === 'dark' && { backgroundColor: '#2A2A2A' }]}>
+                    <DetailRow label="Religion" value={profile?.preferredReligion || 'N/A'} theme={theme} />
+                    <DetailRow label="Caste" value={profile?.preferredCaste || 'N/A'} theme={theme} />
+                    <DetailRow label="Marital Status" value={profile?.preferredMaritalStatus || 'N/A'} theme={theme} />
+                    <DetailRow label="Age Range" value={profile?.ageRange || 'N/A'} theme={theme} />
+                    <DetailRow label="Height Range" value={profile?.heightRange || 'N/A'} theme={theme} />
+                    <DetailRow label="Education" value={profile?.preferredEducation || 'N/A'} theme={theme} />
+                    <DetailRow label="Profession" value={profile?.preferredProfession || 'N/A'} theme={theme} />
+                    <DetailRow label="Smoking Habits" value={profile?.preferredSmokingHabits || 'N/A'} theme={theme} />
+                    <DetailRow label="Drinking Status" value={profile?.preferredDrinkingStatus || 'N/A'} theme={theme} />
+                    <DetailRow label="General Requirement" value={profile?.generalRequirement || 'N/A'} theme={theme} />
+                  </View>
+                </View>
+              </ScrollView>
+            )}
+
+            {/* Photos Tab */}
+            {activeTab === 'photos' && (
+              <View style={styles.photosGrid}>
+                {profile?.galleries && profile.galleries.length > 0 ? (
+                  <FlatList
+                    data={profile.galleries}
+                    numColumns={3}
+                    renderItem={({ item, index }) => {
+                      const galleryImageUrls = getGalleryImageUrl(item.image);
+                      console.log(`🖼️ Profile Gallery Image ${index + 1}:`, {
+                        profileId: profile?.id,
+                        galleryIndex: index,
+                        rawImage: item.image,
+                        primaryUrl: galleryImageUrls.primary,
+                        fallbackUrl: galleryImageUrls.fallback,
+                        hasImage: !!galleryImageUrls.primary,
+                      });
+                      return (
+                        <TouchableOpacity
+                          style={styles.photoGridItem}
+                          onPress={() => {
+                            setFullScreenPhoto(profile.galleries);
+                            setPhotoIndex(index);
+                          }}
+                        >
+                          {galleryImageUrls.primary ? (
+                            <FallbackImage
+                              source={{ uri: galleryImageUrls.primary }}
+                              fallbackSource={galleryImageUrls.fallback ? { uri: galleryImageUrls.fallback } : undefined}
+                              style={styles.photoGridImage}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={[styles.photoGridImage, { backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }]}>
+                              <Feather name="image" size={24} color="#9CA3AF" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    }}
+                    keyExtractor={(item, index) => `photo-${index}`}
+                    scrollEnabled={false}
+                  />
+                ) : (
+                  <Text style={[styles.noPhotosText, theme === 'dark' && { color: '#9CA3AF' }]}>
+                    No photos uploaded yet
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+        </View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
-      <TouchableOpacity style={styles.sendInterestButton}>
-        <Feather name="send" size={20} color="white" />
-        <Text style={styles.sendInterestButtonText}>Send Interest</Text>
-      </TouchableOpacity>
-    </SafeAreaView>
+
+      {/* Full Screen Photo Viewer Modal */}
+      {fullScreenPhoto && (
+        <Modal
+          visible={!!fullScreenPhoto}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setFullScreenPhoto(null)}
+        >
+          <SafeAreaView style={styles.fullScreenPhotoContainer}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={styles.closePhotoButton}
+              onPress={() => setFullScreenPhoto(null)}
+            >
+              <Feather name="x" size={28} color="white" />
+            </TouchableOpacity>
+
+            {/* Photo Counter */}
+            <View style={styles.photoCounter}>
+              <Text style={styles.photoCounterText}>
+                {photoIndex + 1} / {fullScreenPhoto.length}
+              </Text>
+            </View>
+
+            {/* Main Photo */}
+            <View style={styles.fullScreenPhotoContent}>
+              <Image
+                source={{ uri: fullScreenPhoto[photoIndex]?.image }}
+                style={styles.fullScreenPhoto}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Navigation Buttons */}
+            <View style={styles.photoNavigation}>
+              <TouchableOpacity
+                style={styles.navButton}
+                onPress={() => setPhotoIndex(photoIndex > 0 ? photoIndex - 1 : fullScreenPhoto.length - 1)}
+              >
+                <Feather name="chevron-left" size={32} color="white" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.navButton}
+                onPress={() => setPhotoIndex(photoIndex < fullScreenPhoto.length - 1 ? photoIndex + 1 : 0)}
+              >
+                <Feather name="chevron-right" size={32} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Thumbnail Strip */}
+            <View style={styles.thumbnailStrip}>
+              <FlatList
+                data={fullScreenPhoto}
+                horizontal
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.thumbnail,
+                      photoIndex === index && styles.thumbnailActive
+                    ]}
+                    onPress={() => setPhotoIndex(index)}
+                  >
+                    <Image
+                      source={{ uri: item.image }}
+                      style={styles.thumbnailImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                )}
+                keyExtractor={(item, index) => `thumb-${index}`}
+                showsHorizontalScrollIndicator={false}
+              />
+            </View>
+          </SafeAreaView>
+        </Modal>
+      )}
+
+      {/* Interest Animation Container */}
+      {showInterestAnimation && (
+        <Animated.View
+          style={[
+            styles.interestAnimationContainer,
+            {
+              transform: [{ translateY: slideUpAnim }],
+              opacity: opacityAnim,
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#DC2626', '#EF4444']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.interestAnimationGradient}
+          >
+            <View style={styles.interestAnimationContent}>
+              <Feather name="heart" size={28} color="white" fill="white" />
+              <View style={styles.interestAnimationText}>
+                <Text style={styles.interestAnimationTitle}>Interest Sent!</Text>
+                <Text style={styles.interestAnimationSubtitle}>
+                  {profile?.name} will see your interest
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f2f5',
+    backgroundColor: '#FFFFFF',
   },
-  imageContainer: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A2E',
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  imageCardContainer: {
+    paddingHorizontal: 10,
+    paddingVertical: 20,
+  },
+  imageCard: {
     width: '100%',
-    height: 400,
+    height: 500,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   profileImage: {
     width: '100%',
     height: '100%',
   },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  headerButtons: {
+  infoOverlay: {
     position: 'absolute',
-    top: 40,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 140,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 10,
+    paddingBottom: 20,
   },
-  backButton: {},
-  shortlistButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    padding: 8,
-    borderRadius: 25,
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pagination: {
-    position: 'absolute',
-    bottom: 10,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 15,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-  },
-  paginationText: {
-    color: 'white',
-    fontSize: 14,
-  },
-  contentContainer: {
-    padding: 15,
-    marginTop: -50,
-  },
-  headerSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  profileInfo: {
+    gap: 4,
   },
   profileName: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
-  actionButtons: {
-    flexDirection: 'row',
+  profileDetails: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#E5E7EB',
   },
-  actionButton: {
-    backgroundColor: Colors.light.tint,
-    padding: 8,
+  blockedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 24,
+  },
+  blockedText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  premiumBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
-    marginLeft: 10,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
+  premiumBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  detailsSection: {
+    marginHorizontal: 10,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#eef6ff',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginRight: 10,
-    marginBottom: 10,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginVertical: 12,
+    marginHorizontal: 12,
   },
-  tagHighlight: {
-    backgroundColor: Colors.light.tint,
-  },
-  tagText: {
-    marginLeft: 8,
-    color: Colors.light.tint,
-    fontSize: 14,
-  },
-  tagTextHighlight: {
-    color: 'white',
-  },
-  detailItem: {
+  detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 10,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#F3F4F6',
   },
   detailLabel: {
-    fontSize: 15,
-    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   detailValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
   },
-  sendInterestButton: {
-    backgroundColor: Colors.light.tint,
+  actionButtonsContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    marginHorizontal: 15,
-    marginBottom: 15,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    gap: 12,
   },
-  sendInterestButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  notFoundContainer: {
+  actionButton: {
     flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  chatButton: {
+    backgroundColor: '#3B82F6',
+  },
+  interestButton: {
+    backgroundColor: '#DC2626',
+  },
+  interestButtonActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  blockButton: {
+    backgroundColor: '#EF4444',
+  },
+  blockButtonActive: {
+    backgroundColor: '#1F2937',
+    opacity: 0.7,
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'white',
+    letterSpacing: 0.3,
+  },
+  // Main Card Styles
+  mainCard: {
+    marginHorizontal: 16,
+    marginVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  // Card Action Buttons Styles
+  cardActionButtons: {
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 16,
+    gap: 20,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
-  notFoundText: {
-    fontSize: 18,
-    color: '#666',
+  cardActionButtonsDark: {
+    backgroundColor: '#2A2A2A',
+    borderTopColor: '#3A3A3A',
   },
-  contactCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
+  cardActionButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+    borderRadius: 26,
+  },
+  cardActionButtonSmall: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  cardActionButtonLarge: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+  },
+  rejectButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#EF4444',
+  },
+  rejectButtonDark: {
+    backgroundColor: '#1A1A1A',
+    borderWidth: 2,
+    borderColor: '#EF4444',
+  },
+  interestCardButton: {
+    backgroundColor: '#DC2626',
+  },
+  interestCardButtonActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  interestCardButtonDark: {
+    backgroundColor: '#DC2626',
+  },
+  interestCardButtonActiveDark: {
+    backgroundColor: '#7F1D1D',
+  },
+  blockCardButton: {
+    backgroundColor: '#9CA3AF',
+  },
+  blockCardButtonActive: {
+    backgroundColor: '#6B7280',
+    opacity: 0.8,
+  },
+  chatButton: {
+    backgroundColor: '#3B82F6',
+  },
+  chatButtonDark: {
+    backgroundColor: '#1E40AF',
+  },
+  ignoreButton: {
+    backgroundColor: '#EF4444',
+  },
+  ignoreButtonDark: {
+    backgroundColor: '#DC2626',
+  },
+  ignoreButtonActive: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
+  },
+  ignoreButtonActiveDark: {
+    backgroundColor: '#6B7280',
+    opacity: 0.7,
+  },
+  // Tabs Styles
+  tabsContainer: {
+    marginHorizontal: 10,
+    marginVertical: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  tabButtons: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: '#DC2626',
+  },
+  tabIconContainer: {
+    marginBottom: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  tabButtonTextActive: {
+    color: '#DC2626',
+    fontWeight: '700',
+  },
+  tabContent: {
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    minHeight: 300,
+  },
+  // Contact Section Styles
+  contactSection: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#DC2626',
   },
   contactHeader: {
     flexDirection: 'row',
@@ -659,112 +1277,294 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   contactTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-  },
-  contactContent: {
-    gap: 8,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  contactText: {
-    fontSize: 16,
-    color: Colors.light.text,
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  activeTab: {
-    backgroundColor: Colors.light.tint,
-  },
-  tabText: {
-    fontSize: 12,
-    color: Colors.light.icon,
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  emptyState: {
     fontSize: 14,
-    color: Colors.light.icon,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 8,
+    fontWeight: '700',
+    color: '#1F2937',
   },
-  modalOverlay: {
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 12,
+  },
+  contactValue: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#374151',
     flex: 1,
+  },
+  lockedText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  // Photos Grid Styles
+  photosGrid: {
+    paddingVertical: 8,
+  },
+  photoGridItem: {
+    flex: 1,
+    margin: 6,
+    aspectRatio: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+  },
+  photoGridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  noPhotosText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingVertical: 40,
+  },
+  // Full Screen Photo Viewer Styles
+  fullScreenPhotoContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'space-between',
+  },
+  closePhotoButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 100,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    margin: 20,
-    width: '90%',
-    maxWidth: 400,
+  photoCounter: {
+    alignSelf: 'center',
+    marginTop: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 16,
   },
-  modalHeader: {
+  photoCounterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  fullScreenPhotoContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  fullScreenPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  photoNavigation: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-  },
-  modalBody: {
-    marginBottom: 20,
-  },
-  remainingText: {
-    fontSize: 16,
-    color: Colors.light.text,
-    marginBottom: 12,
-  },
-  warningText: {
-    fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic',
-    lineHeight: 20,
-  },
-  submitButton: {
-    backgroundColor: Colors.light.tint,
-    borderRadius: 8,
-    paddingVertical: 12,
+  navButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  submitButtonText: {
-    color: 'white',
+  thumbnailStrip: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  thumbnailActive: {
+    borderColor: '#DC2626',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  // Collapsible Section Styles
+  collapsibleSection: {
+    marginVertical: 4,
+    marginHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sectionHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  sectionContent: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  // Credit Popup Styles
+  creditPopupOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  creditPopupContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    width: '100%',
+    maxWidth: 340,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  creditPopupHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  creditPopupTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 12,
+  },
+  creditInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    marginBottom: 16,
+  },
+  creditItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  creditLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  creditValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  costBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 24,
+    gap: 12,
+  },
+  costText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+    flex: 1,
+  },
+  creditPopupButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  creditButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+  },
+  viewButton: {
+    backgroundColor: '#DC2626',
+  },
+  buttonText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  // Interest Animation Styles
+  interestAnimationContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 999,
+  },
+  interestAnimationGradient: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  interestAnimationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  interestAnimationText: {
+    flex: 1,
+  },
+  interestAnimationTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  interestAnimationSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
 });

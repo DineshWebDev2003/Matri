@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import FemaleAvatar from './FemaleAvatar';
+import MaleAvatar from './MaleAvatar';
 
 interface ProfileImageProps {
   imageUrl?: string;
@@ -8,6 +10,7 @@ interface ProfileImageProps {
   size?: number;
   isVerified?: boolean;
   showBadge?: boolean;
+  gender?: 'male' | 'female' | string;
 }
 
 const ProfileImage: React.FC<ProfileImageProps> = ({ 
@@ -15,7 +18,8 @@ const ProfileImage: React.FC<ProfileImageProps> = ({
   name, 
   size = 80, 
   isVerified = false, 
-  showBadge = true 
+  showBadge = true,
+  gender = 'male'
 }) => {
   const [imageError, setImageError] = useState(false);
   
@@ -40,7 +44,7 @@ const ProfileImage: React.FC<ProfileImageProps> = ({
   const initial = getInitial(name);
   
   // Check if we should show image or fallback
-  const shouldShowImage = imageUrl && !imageError && imageUrl !== 'https://randomuser.me/api/portraits/women/1.jpg';
+  const shouldShowImage = imageUrl && !imageError && imageUrl.length > 0 && !imageUrl.includes('randomuser.me');
 
   return (
     <View style={[styles.container, { width: size, height: size * 1.25 }]}>
@@ -56,13 +60,19 @@ const ProfileImage: React.FC<ProfileImageProps> = ({
           { 
             width: size, 
             height: size * 1.25, 
-            backgroundColor,
+            backgroundColor: gender === 'female' ? '#F3E8FF' : gender === 'male' ? '#F1F5F9' : backgroundColor,
             borderRadius: size * 0.15
           }
         ]}>
-          <Text style={[styles.fallbackText, { fontSize: size * 0.4 }]}>
-            {initial}
-          </Text>
+          {gender === 'female' ? (
+            <FemaleAvatar size={size * 0.8} color="#a196a6" />
+          ) : gender === 'male' ? (
+            <MaleAvatar size={size * 0.8} color="#c2c2c2" />
+          ) : (
+            <Text style={[styles.fallbackText, { fontSize: size * 0.4 }]}>
+              {initial}
+            </Text>
+          )}
         </View>
       )}
       

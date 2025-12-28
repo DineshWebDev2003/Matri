@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Dimensions, StyleSheet, View, TextInput, Text, TouchableOpacity, Image, SafeAreaView, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import { Dimensions, StyleSheet, View, TextInput, Text, TouchableOpacity, Image, SafeAreaView, ScrollView, ActivityIndicator, Alert, Platform, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
+import { apiService } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
+
+const { width, height } = Dimensions.get('window');
 
 const BackgroundOverlay = () => {
   const icons = ['heart', 'ring', 'flower-tulip', 'human-male-female', 'camera-iris'];
@@ -25,7 +31,7 @@ const BackgroundOverlay = () => {
               key={`${rowIndex}-${colIndex}`}
               name={iconName}
               size={iconSize}
-              color="rgba(255, 99, 99, 0.08)" // Light red watermark
+              color="rgba(0, 0, 0, 0.05)" // Subtle gray color
               style={{
                 position: 'absolute',
                 top: rowIndex * iconSize * 2.5,
@@ -43,15 +49,67 @@ const BackgroundOverlay = () => {
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [langRotate] = useState(new Animated.Value(0));
+  const [themeRotate] = useState(new Animated.Value(0));
+  const [themeSpread] = useState(new Animated.Value(0));
   const router = useRouter();
   const auth = useAuth();
+  const { colors, theme, setThemeMode, themeMode } = useTheme();
+  const { t, language, setLanguage } = useLanguage();
+
+  // Dynamic dropdown data
+  const [religions, setReligions] = useState<any[]>([]);
+  const [castes, setCastes] = useState<any[]>([]);
+  const [countries, setCountries] = useState<any[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await apiService.getDropdownOptions();
+        // Extract religions array regardless of exact nesting
+        const relList = resp?.data?.data?.religions || resp?.data?.religions || resp?.religions || [];
+        if (Array.isArray(relList)) {
+          setReligions(relList);
+        }
+      } catch (err) {
+        console.warn('Failed to load religions', err);
+      }
+      try {
+        const countryResp = await apiService.getCountries();
+        const list = countryResp?.data?.countries || countryResp?.countries || countryResp;
+        if (Array.isArray(list)) {
+          setCountries(list);
+        }
+      } catch (err) {
+        console.warn('Failed to load countries', err);
+      }
+    })();
+  }, []);
+
+  const fetchCastes = async (religionId: string) => {
+    try {
+      const resp = await apiService.getCastesByReligion(religionId);
+      const casteList = resp?.data?.castes || resp?.data?.data?.castes;
+      if (resp?.status === 'success' && Array.isArray(casteList)) {
+        setCastes(casteList);
+      } else {
+        setCastes([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load castes', err);
+      setCastes([]);
+    }
+  };
 
   const [formData, setFormData] = useState({
     looking_for: '',
     firstname: '',
     lastname: '',
     email: '',
+    mobile_code: '',
     mobile: '',
+    country_code: '',
+    country: '',
     birth_date: '',
     password: '',
     religion: '',
@@ -59,52 +117,84 @@ export default function RegisterScreen() {
     agree: false,
   });
 
-  // Religion options from your web project
-  const religions = [
-    { id: '1', name: 'Hindu' },
-    { id: '2', name: 'Muslim' },
-    { id: '3', name: 'Christian' },
-    { id: '4', name: 'Sikh' },
-    { id: '5', name: 'Buddhist' },
-    { id: '6', name: 'Jain' },
-    { id: '7', name: 'Parsi' },
-    { id: '8', name: 'Other' }
-  ];
-
-  // Caste options based on religion
-  const casteOptions = {
-    '1': [ // Hindu
-      'Brahmin', 'Kshatriya', 'Vaishya', 'Shudra', 'Vanniyar', 'Gounder', 'Thevar', 'Nadar',
-      'Chettiar', 'Mudaliar', 'Pillai', 'Naicker', 'Reddy', 'Gowda', 'Lingayat', 'Vokkaliga',
-      'Maratha', 'Jat', 'Gujjar', 'Rajput', 'Kamma', 'Kapu', 'Balija', 'Velama',
-      'Baniya', 'Khatri', 'Arora', 'Bhumihar', 'Kayastha', 'Kurmi', 'Yadav', 'Kuruba',
-      'Besta', 'Mala', 'Madiga', 'Chamar', 'Dusadh', 'Pasi', 'Other'
-    ],
-    '2': [ // Muslim
-      'Shaikh', 'Sayyid', 'Mughal', 'Pathan', 'Ansari', 'Qureshi', 'Siddiqui', 'Faruqi',
-      'Usmani', 'Khan', 'Mirza', 'Malik', 'Sheikh', 'Syed', 'Memon', 'Bohra',
-      'Khoja', 'Dudhwala', 'Rayeen', 'Qassab', 'Mansoori', 'Salmani', 'Fareedi', 'Other'
-    ],
-    '3': [ // Christian
-      'Roman Catholic', 'Protestant', 'Syro-Malabar', 'Syro-Malankara', 'Jacobite', 'Orthodox',
-      'Latin Catholic', 'CSI', 'Knanaya', 'Goan Catholic', 'Mangalorean Catholic', 'Anglo-Indian',
-      'Nadar Christian', 'Dalian', 'Baptist', 'Pentecostal', 'Seventh-day Adventist', 'Other'
-    ],
-    '4': [ // Sikh
-      'Jat Sikh', 'Khatri', 'Arora', 'Ramgarhia', 'Ahluwalia', 'Bhatia', 'Kamboj', 'Lubana',
-      'Mazhabi', 'Ramdasia', 'Rai Sikh', 'Saini', 'Tarkhan', 'Other'
-    ],
-    '5': ['Other'], // Buddhist
-    '6': ['Other'], // Jain
-    '7': ['Parsi', 'Other'], // Parsi
-    '8': ['Other'] // Other
+  const handleLanguageToggle = () => {
+    Animated.sequence([
+      Animated.timing(langRotate, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(langRotate, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    setLanguage(language === 'en' ? 'ta' : 'en');
   };
+
+  const handleThemeToggle = () => {
+    Animated.sequence([
+      Animated.timing(themeRotate, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(themeRotate, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.sequence([
+      Animated.timing(themeSpread, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: false,
+      }),
+      Animated.timing(themeSpread, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: false,
+      }),
+    ]).start();
+
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setThemeMode(newTheme);
+  };
+
+  const langRotateInterpolate = langRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const themeRotateInterpolate = themeRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const spreadScale = themeSpread.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.max(width, height) * 2],
+  });
+
+  const spreadOpacity = themeSpread.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.8, 0.4, 0],
+  });
 
   const handleInputChange = (name: string, value: string | boolean) => {
     setFormData(prev => {
       const newData = { ...prev, [name]: value };
       // Reset caste when religion changes
       if (name === 'religion') {
+        newData.caste = '';
+        if (value) {
+          fetchCastes(value as string);
+        } else {
+          setCastes([]);
+        }
         newData.caste = '';
       }
       return newData;
@@ -124,121 +214,321 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    if (!formData.looking_for || !formData.firstname || !formData.lastname || !formData.email || !formData.mobile || !formData.birth_date || !formData.password || !formData.religion || !formData.caste) {
-      Alert.alert('Error', 'Please fill all required fields.');
+    console.log('🚀 Starting registration process...');
+    console.log('📋 Current form data:', formData);
+
+    // Validation checks with detailed logging
+    const requiredFields = {
+      looking_for: formData.looking_for,
+      firstname: formData.firstname,
+      lastname: formData.lastname,
+      email: formData.email,
+      mobile: formData.mobile,
+      birth_date: formData.birth_date,
+      password: formData.password,
+      religion: formData.religion,
+      caste: formData.caste
+    };
+
+    console.log('🔍 Checking required fields:', requiredFields);
+    
+    const missingFields = Object.entries(requiredFields)
+      .filter(([key, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingFields.length > 0) {
+      console.error('❌ Missing required fields:', missingFields);
+      Alert.alert('Error', `Please fill all required fields: ${missingFields.join(', ')}`);
       return;
     }
+
     if (!formData.agree) {
+      console.error('❌ Terms not agreed');
       Alert.alert('Error', 'You must agree to the terms and policies.');
       return;
     }
 
+    console.log('✅ All validations passed, proceeding with registration...');
     setLoading(true);
+    
     try {
       // Generate username from email (required field)
       const emailPrefix = formData.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const username = emailPrefix + randomSuffix;
 
-      console.log('📝 Registration data being sent:', {
-        looking_for: formData.looking_for,
-        firstname: formData.firstname,
-        lastname: formData.lastname,
-        email: formData.email,
-        mobile: formData.mobile,
-        birth_date: formData.birth_date,
-        religion: formData.religion,
-        caste: formData.caste,
-        username: username
-      });
+      console.log('🔧 Generated username:', username);
 
       const registrationData = {
-        looking_for: formData.looking_for,
-        firstname: formData.firstname,
-        lastname: formData.lastname,
-        email: formData.email,
-        mobile: formData.mobile,
-        birth_date: formData.birth_date,
-        password: formData.password,
-        religion: formData.religion,
-        caste: formData.caste,
-        username: username,
-        mobile_code: '91',
-        country_code: 'IN',
-        country: 'India',
-        password_confirmation: formData.password,
-        agree: '1',
+        looking_for: formData.looking_for || '',
+        firstname: formData.firstname || '',
+        lastname: formData.lastname || '',
+        email: formData.email || '',
+        mobile: formData.mobile || '',
+        birth_date: formData.birth_date || '',
+        password: formData.password || '',
+        religion: formData.religion || '',
+        caste: formData.caste || '',
+        username: username || '',
+        mobile_code: formData.mobile_code || '',
+        country_code: formData.country_code || '',
+        country: formData.country || '',
+        password_confirmation: formData.password || '',
+        agree: formData.agree ? '1' : '0',
       };
 
-      await auth?.register(registrationData);
-      Alert.alert('Success', 'Registration successful! Please log in.');
-      router.replace('/(auth)/login');
+      console.log('📤 Final registration data being sent to API:', registrationData);
+      console.log('✓ looking_for:', registrationData.looking_for);
+      console.log('✓ firstname:', registrationData.firstname);
+      console.log('✓ lastname:', registrationData.lastname);
+      console.log('✓ email:', registrationData.email);
+      console.log('✓ mobile:', registrationData.mobile);
+      console.log('✓ birth_date:', registrationData.birth_date);
+      console.log('✓ password:', registrationData.password);
+      console.log('✓ religion:', registrationData.religion);
+      console.log('✓ caste:', registrationData.caste);
+      console.log('✓ username:', registrationData.username);
+      console.log('✓ agree:', registrationData.agree);
+      console.log('🌐 Calling auth.register()...');
+
+      const result = await auth?.register(registrationData);
+      console.log('✅ Registration API call completed successfully:', result);
+      
+      // Navigate to profile completion screen with registration data
+      router.replace({
+        pathname: '/(auth)/profile-completion',
+        params: {
+          registrationData: JSON.stringify(registrationData),
+          isNewUser: 'true'
+        }
+      });
+      
     } catch (error: any) {
-      console.error('💥 Registration error:', error);
-      Alert.alert('Registration Failed', error.message || 'An unexpected error occurred.');
+      console.error('💥 Registration error caught in handleRegister:');
+      console.error('🔴 Error type:', typeof error);
+      console.error('🔴 Error message:', error?.message);
+      console.error('🔴 Error stack:', error?.stack);
+      console.error('🔴 Full error object:', error);
+      
+      if (error?.response) {
+        console.error('🔴 API Response Error:');
+        console.error('  - Status:', error.response.status);
+        console.error('  - Status Text:', error.response.statusText);
+        console.error('  - Headers:', error.response.headers);
+        console.error('  - Data:', error.response.data);
+      }
+      
+      if (error?.request) {
+        console.error('🔴 Network Request Error:', error.request);
+      }
+      
+      const errorMessage = error?.response?.data?.message || 
+                          error?.response?.data?.error || 
+                          error?.message || 
+                          'An unexpected error occurred during registration.';
+      
+      console.error('🔴 Final error message to show user:', errorMessage);
+      Alert.alert('Registration Failed', errorMessage);
+      
     } finally {
+      console.log('🏁 Registration process completed, setting loading to false');
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <BackgroundOverlay />
-      <ScrollView contentContainerStyle={styles.container}>
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>Create an account</Text>
-        <Text style={styles.subtitle}>Please Provide your valid informations to register!</Text>
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      {/* Theme Spread Animation Overlay */}
+      <Animated.View
+        style={[
+          styles.themeSpreadOverlay,
+          {
+            width: spreadScale,
+            height: spreadScale,
+            opacity: spreadOpacity,
+            backgroundColor: theme === 'dark' ? '#FFFFFF' : '#1A1A2E',
+          },
+        ]}
+      />
 
-        {/* Looking For Dropdown */}
-        <View style={styles.pickerContainer}>
-          <Text style={styles.pickerLabel}>Looking For *</Text>
-          <Picker
-            selectedValue={formData.looking_for}
-            style={styles.picker}
-            onValueChange={(itemValue) => handleInputChange('looking_for', itemValue)}
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Modern Vibrant Header Section */}
+        <View style={styles.modernHeader}>
+          {/* Background Image */}
+          <Image
+            source={require('../../assets/images/login.webp')}
+            style={styles.headerBackgroundImage}
+            resizeMode="cover"
+          />
+          {/* Fade Gradient Overlay */}
+          <LinearGradient
+            colors={['rgba(220, 38, 38, 0.8)', 'rgba(239, 68, 68, 0.6)', 'rgba(255, 255, 255, 0.7)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerGradient}
           >
-            <Picker.Item label="Select One" value="" />
-            <Picker.Item label="Bridegroom (மணமகன்)" value="1" />
-            <Picker.Item label="Bride (மணமகள்)" value="2" />
-          </Picker>
-        </View>
-        <View style={styles.row}>
-            <View style={[styles.inputContainer, styles.halfWidth]}>
-                <TextInput style={styles.input} placeholder="First Name *" placeholderTextColor="#9CA3AF" value={formData.firstname} onChangeText={(text) => handleInputChange('firstname', text)} />
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeTitle}>Join</Text>
+              <Text style={styles.welcomeSubtitle}>90sKalyanam</Text>
             </View>
-            <View style={[styles.inputContainer, styles.halfWidth]}>
-                <TextInput style={styles.input} placeholder="Last Name *" placeholderTextColor="#9CA3AF" value={formData.lastname} onChangeText={(text) => handleInputChange('lastname', text)} />
-            </View>
+          </LinearGradient>
         </View>
-        <View style={styles.inputContainer}>
-            <TextInput style={styles.input} placeholder="E-Mail Address *" placeholderTextColor="#9CA3AF" keyboardType="email-address" value={formData.email} onChangeText={(text) => handleInputChange('email', text)} autoCapitalize="none" />
+
+        {/* Toggle Buttons - Right Side Horizontal with Signup Text */}
+        <View style={styles.toggleButtonsContainer}>
+          <Text style={styles.screenTitleText}>Signup</Text>
+          <View style={styles.rightToggleButtonsContainer}>
+            {/* Theme Toggle Button */}
+            <Animated.View style={{ transform: [{ rotate: themeRotateInterpolate }] }}>
+              <TouchableOpacity 
+                style={[styles.toggleButton, { borderColor: '#DC2626', backgroundColor: 'rgba(220, 38, 38, 0.2)' }]}
+                onPress={handleThemeToggle}
+              >
+                {theme === 'dark' ? (
+                  <MaterialCommunityIcons name="moon-waning-crescent" size={16} color="#DC2626" />
+                ) : (
+                  <MaterialCommunityIcons name="white-balance-sunny" size={16} color="#DC2626" />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Language Toggle Button */}
+            <Animated.View style={{ transform: [{ rotate: langRotateInterpolate }] }}>
+              <TouchableOpacity 
+                style={[styles.toggleButton, { borderColor: '#DC2626', backgroundColor: 'rgba(220, 38, 38, 0.2)' }]}
+                onPress={handleLanguageToggle}
+              >
+                <Text style={[styles.languageButtonText, { color: '#DC2626' }]}>
+                  {language === 'en' ? 'EN' : 'TA'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
         </View>
-        <View style={styles.row}>
-            <View style={[styles.inputContainer, {flex: 1, marginRight: 5}]}>
-                <TextInput style={styles.input} placeholder="+91" placeholderTextColor="#9CA3AF" editable={false} />
+
+        <View style={[styles.formContainer, { backgroundColor: colors.background }]}>
+
+          {/* Looking For Dropdown */}
+          <View style={styles.formSection}>
+            <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('looking_for')}</Text>
+            <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
+              <Picker
+                selectedValue={formData.looking_for}
+                style={[styles.modernInput, { color: colors.textPrimary }]}
+                onValueChange={(itemValue) => handleInputChange('looking_for', itemValue)}
+              >
+                <Picker.Item label="Select One" value="" />
+                <Picker.Item label="Bridegroom (மணமகன்)" value="1" />
+                <Picker.Item label="Bride (மணமகள்)" value="2" />
+              </Picker>
             </View>
-            <View style={[styles.inputContainer, {flex: 3, marginLeft: 5}]}>
-                <TextInput style={styles.input} placeholder="Mobile Number *" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" value={formData.mobile} onChangeText={(text) => handleInputChange('mobile', text)} />
+          </View>
+
+          {/* First Name & Last Name */}
+          <View style={styles.row}>
+            <View style={[styles.formSection, styles.halfWidth]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('first_name')}</Text>
+              <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
+                <TextInput 
+                  style={[styles.modernInput, { color: colors.textPrimary }]} 
+                  placeholder="First Name" 
+                  placeholderTextColor={colors.textTertiary}
+                  value={formData.firstname} 
+                  onChangeText={(text) => handleInputChange('firstname', text)} 
+                />
+              </View>
             </View>
-        </View>
-        <View style={styles.row}>
-            {/* Date Picker */}
-            <View style={[styles.inputContainer, styles.halfWidth]}>
-                <TouchableOpacity onPress={showDatePickerModal} style={styles.datePickerButton}>
-                    <Text style={[styles.input, { color: formData.birth_date ? '#1F2937' : '#9CA3AF' }]}>
-                        {formData.birth_date || 'Date of Birth *'}
-                    </Text>
-                    <Feather name="calendar" size={20} color="#9CA3AF" />
+            <View style={[styles.formSection, styles.halfWidth]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('last_name')}</Text>
+              <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
+                <TextInput 
+                  style={[styles.modernInput, { color: colors.textPrimary }]} 
+                  placeholder="Last Name" 
+                  placeholderTextColor={colors.textTertiary}
+                  value={formData.lastname} 
+                  onChangeText={(text) => handleInputChange('lastname', text)} 
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Email */}
+          <View style={styles.formSection}>
+            <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('email')}</Text>
+            <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
+              <TextInput 
+                style={[styles.modernInput, { color: colors.textPrimary }]} 
+                placeholder="example@email.com" 
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="email-address" 
+                value={formData.email} 
+                onChangeText={(text) => handleInputChange('email', text)} 
+                autoCapitalize="none" 
+              />
+            </View>
+          </View>
+
+          {/* Mobile */}
+          <View style={styles.formSection}>
+            <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('mobile_number')}</Text>
+            <View style={styles.row}>
+              <View style={[styles.modernInputContainer, { flex: 1, marginRight: 8, borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
+                <Picker
+                  selectedValue={formData.mobile_code}
+                  style={[styles.modernInput, { color: colors.textPrimary }]}
+                  onValueChange={(dialCode) => {
+                    const sel = countries.find((c:any) => c.dial_code == dialCode);
+                    handleInputChange('mobile_code', dialCode);
+                    handleInputChange('country_code', sel?.country_code || '');
+                    handleInputChange('country', sel?.country || '');
+                  }}
+                >
+                  <Picker.Item label="Select" value="" />
+                  {countries.map((c:any) => (
+                    <Picker.Item key={c.country_code} label={`${c.country} (+${c.dial_code})`} value={c.dial_code} />
+                  ))}
+                </Picker>
+              </View>
+              <View style={[styles.modernInputContainer, { flex: 3, marginLeft: 8, borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
+                <TextInput 
+                  style={[styles.modernInput, { color: colors.textPrimary }]} 
+                  placeholder="Mobile Number" 
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="phone-pad" 
+                  value={formData.mobile} 
+                  onChangeText={(text) => handleInputChange('mobile', text)} 
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Date of Birth & Password */}
+          <View style={styles.row}>
+            <View style={[styles.formSection, styles.halfWidth]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('date_of_birth')}</Text>
+              <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
+                <TouchableOpacity onPress={showDatePickerModal} style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={[styles.modernInput, { color: formData.birth_date ? colors.textPrimary : colors.textTertiary }]}>
+                    {formData.birth_date || 'Select Date'}
+                  </Text>
+                  <Feather name="calendar" size={16} color={colors.textTertiary} />
                 </TouchableOpacity>
+              </View>
             </View>
-            <View style={[styles.inputContainer, styles.halfWidth]}>
-                <TextInput style={styles.input} placeholder="Password *" placeholderTextColor="#9CA3AF" secureTextEntry value={formData.password} onChangeText={(text) => handleInputChange('password', text)} />
+            <View style={[styles.formSection, styles.halfWidth]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('password')}</Text>
+              <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
+                <TextInput 
+                  style={[styles.modernInput, { color: colors.textPrimary }]} 
+                  placeholder="Password" 
+                  placeholderTextColor={colors.textTertiary}
+                  secureTextEntry 
+                  value={formData.password} 
+                  onChangeText={(text) => handleInputChange('password', text)} 
+                />
+              </View>
             </View>
-        </View>
+          </View>
 
         {/* Date Picker Modal */}
         {showDatePicker && (
@@ -250,60 +540,83 @@ export default function RegisterScreen() {
             maximumDate={new Date()}
           />
         )}
-        {/* Religion Dropdown */}
-        <View style={styles.row}>
-            <View style={[styles.pickerContainer, styles.halfWidth]}>
-                <Text style={styles.pickerLabel}>Religion *</Text>
+          {/* Religion & Caste */}
+          <View style={styles.row}>
+            <View style={[styles.formSection, styles.halfWidth]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('religion')}</Text>
+              <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
                 <Picker
                   selectedValue={formData.religion}
-                  style={styles.picker}
+                  style={[styles.modernInput, { color: colors.textPrimary }]}
                   onValueChange={(itemValue) => handleInputChange('religion', itemValue)}
                 >
                   <Picker.Item label="Select Religion" value="" />
-                  {religions.map((religion) => (
+                  {religions.map((religion:any) => (
                     <Picker.Item key={religion.id} label={religion.name} value={religion.id} />
                   ))}
                 </Picker>
+              </View>
             </View>
             
-            {/* Caste Dropdown */}
-            <View style={[styles.pickerContainer, styles.halfWidth]}>
-                <Text style={styles.pickerLabel}>Caste *</Text>
+            <View style={[styles.formSection, styles.halfWidth]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('caste')}</Text>
+              <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
                 <Picker
                   selectedValue={formData.caste}
-                  style={styles.picker}
+                  style={[styles.modernInput, { color: colors.textPrimary }]}
                   onValueChange={(itemValue) => handleInputChange('caste', itemValue)}
                   enabled={!!formData.religion}
                 >
                   <Picker.Item label={formData.religion ? "Select Caste" : "Select Religion First"} value="" />
-                  {formData.religion && casteOptions[formData.religion]?.map((caste, index) => (
-                    <Picker.Item key={index} label={caste} value={caste} />
+                  {castes.map((caste: any) => (
+                    <Picker.Item key={caste.id} label={caste.name} value={caste.name} />
                   ))}
                 </Picker>
+              </View>
             </View>
-        </View>
+          </View>
 
-        <TouchableOpacity style={styles.checkboxContainer} onPress={() => handleInputChange('agree', !formData.agree)}>
-            <Feather name={formData.agree ? 'check-square' : 'square'} size={24} color={Colors.light.tint} />
-            <Text style={styles.checkboxLabel}>I agree with <Text style={styles.link}>Privacy Policy</Text>, <Text style={styles.link}>Terms of Service</Text>, <Text style={styles.link}>Purchase Policy</Text></Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.registerButton, loading && styles.disabledButton]} onPress={handleRegister} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.registerButtonText}>Register</Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.loginContainer}>
-          <Text style={styles.loginText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
-            <Text style={styles.loginLink}>Log in</Text>
+          {/* Terms & Conditions */}
+          <TouchableOpacity style={styles.checkboxContainer} onPress={() => handleInputChange('agree', !formData.agree)}>
+            <Feather name={formData.agree ? 'check-square' : 'square'} size={24} color="#DC2626" />
+            <Text style={[styles.checkboxLabel, { color: colors.textSecondary }]}>I agree with <Text style={styles.link}>Privacy Policy</Text>, <Text style={styles.link}>Terms of Service</Text>, <Text style={styles.link}>Purchase Policy</Text></Text>
           </TouchableOpacity>
+
+          {/* Register Button */}
+          <TouchableOpacity style={[styles.registerButton, loading && styles.disabledButton]} onPress={handleRegister} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.registerButtonText}>{t('signup')}</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Social Signup */}
+          <View style={styles.socialContainer}>
+            <Text style={[styles.socialLabel, { color: colors.textSecondary }]}>{t('or')}</Text>
+            <View style={styles.socialButtonsRow}>
+              <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                <FontAwesome name="facebook" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                <FontAwesome name="google" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                <FontAwesome name="apple" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Login Link */}
+          <View style={styles.loginContainer}>
+            <Text style={[styles.loginText, { color: colors.textSecondary }]}>{t('have_account')}{' '}</Text>
+            <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
+              <Text style={styles.loginLink}>{t('sign_in')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -311,7 +624,8 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    position: 'relative',
+    overflow: 'hidden',
   },
   overlayContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -319,63 +633,188 @@ const styles = StyleSheet.create({
   },
   container: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
-  logo: {
-    width: 120, // Smaller logo for register screen
-    height: 120,
-    alignSelf: 'center',
+  
+  // Theme Spread Overlay
+  themeSpreadOverlay: {
+    position: 'absolute',
+    borderRadius: 9999,
+    top: '50%',
+    left: '50%',
+    marginLeft: -50,
+    marginTop: -50,
+    zIndex: 999,
+  },
+
+  // Toggle Buttons Container - With Title
+  toggleButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  screenTitleText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  // Right Side Toggle Buttons - Horizontal
+  rightToggleButtonsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+  },
+  toggleButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  languageButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Modern Header Styles
+  modernHeader: {
+    width: '100%',
+    height: 200,
+    overflow: 'hidden',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  headerBackgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  welcomeTextContainer: {
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  welcomeTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 4,
+  },
+  welcomeSubtitle: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
+  // Form Container
+  formContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 30,
+  },
+  formSection: {
     marginBottom: 20,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.light.tint,
-    textAlign: 'center',
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 10,
+    textTransform: 'capitalize',
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 30,
+  
+  // Modern Input Styles
+  modernInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  modernInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 15,
     paddingHorizontal: 15,
     height: 50,
+    borderWidth: 1,
   },
   input: {
     flex: 1,
     height: 50,
     fontSize: 16,
-    color: '#1F2937',
   },
   halfWidth: {
     width: '48%',
   },
   pickerContainer: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 15,
     paddingHorizontal: 15,
     minHeight: 50,
+    borderWidth: 1,
   },
   pickerLabel: {
     fontSize: 12,
-    color: '#6B7280',
     marginTop: 8,
     marginBottom: -5,
+    fontWeight: '600',
   },
   picker: {
     height: 40,
-    color: '#1F2937',
   },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  
+  // Social Buttons
+  socialContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  socialLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 12,
+    textTransform: 'lowercase',
+  },
+  socialButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  socialButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  
   datePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -392,10 +831,9 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     marginLeft: 10,
     fontSize: 14,
-    color: '#6B7280',
   },
   link: {
-    color: Colors.light.tint,
+    color: '#DC2626',
     fontWeight: 'bold',
   },
   row: {
@@ -403,16 +841,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   registerButton: {
-    backgroundColor: Colors.light.tint,
+    backgroundColor: '#DC2626',
     paddingVertical: 15,
-    borderRadius: 25,
+    borderRadius: 12,
     alignItems: 'center',
     height: 50,
     justifyContent: 'center',
     marginTop: 20,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
   },
   disabledButton: {
-    backgroundColor: Colors.light.tint + '99',
+    backgroundColor: '#DC2626',
+    opacity: 0.6,
   },
   registerButtonText: {
     color: '#FFFFFF',
@@ -427,11 +871,10 @@ const styles = StyleSheet.create({
   },
   loginText: {
     fontSize: 16,
-    color: '#6B7280',
   },
   loginLink: {
     fontSize: 16,
-    color: Colors.light.tint,
+    color: '#DC2626',
     fontWeight: 'bold',
     marginLeft: 4,
   },
