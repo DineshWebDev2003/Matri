@@ -114,6 +114,7 @@ export default function RegisterScreen() {
     password: '',
     religion: '',
     caste: '',
+    gender: '',
     agree: false,
   });
 
@@ -188,6 +189,17 @@ export default function RegisterScreen() {
     setFormData(prev => {
       const newData = { ...prev, [name]: value };
       // Reset caste when religion changes
+      if (name === 'looking_for') {
+        // Auto-set gender based on selected looking_for value
+        if (value === '1') {
+          newData.gender = 'male';
+        } else if (value === '2') {
+          newData.gender = 'female';
+        } else {
+          newData.gender = '';
+        }
+      }
+
       if (name === 'religion') {
         newData.caste = '';
         if (value) {
@@ -269,6 +281,7 @@ export default function RegisterScreen() {
         password: formData.password || '',
         religion: formData.religion || '',
         caste: formData.caste || '',
+        gender: formData.gender || '',
         username: username || '',
         mobile_code: formData.mobile_code || '',
         country_code: formData.country_code || '',
@@ -420,6 +433,23 @@ export default function RegisterScreen() {
                 <Picker.Item label="Select One" value="" />
                 <Picker.Item label="Bridegroom (மணமகன்)" value="1" />
                 <Picker.Item label="Bride (மணமகள்)" value="2" />
+              </Picker>
+            </View>
+          </View>
+
+          {/* Gender (auto-selected) */}
+          <View style={styles.formSection}>
+            <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Gender</Text>
+            <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.02)' : 'rgba(0, 0, 0, 0.02)' }]}> 
+              <Picker
+                enabled={false}
+                selectedValue={formData.gender}
+                style={[styles.modernInput, { color: colors.textPrimary }]}
+                onValueChange={() => {}}
+              >
+                <Picker.Item label="Select Gender" value="" />
+                <Picker.Item label="Male" value="male" />
+                <Picker.Item label="Female" value="female" />
               </Picker>
             </View>
           </View>
