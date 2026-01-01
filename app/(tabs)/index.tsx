@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import { apiService } from '../../services/api';
 import MenuModal from '../../components/MenuModal';
 import UniversalHeader from '../../components/UniversalHeader';
-import WithSwipe from '../../components/WithSwipe';
+// import WithSwipe from '../../components/WithSwipe';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
@@ -432,12 +432,19 @@ export default function HomeScreen() {
   };
 
   // Main useEffect to fetch data on mount
+  // Initial data fetch
   useEffect(() => {
     fetchUserInfo();
     fetchStats();
     loadHeartedProfiles();
-    fetchProfiles();
   }, [auth?.token, auth?.user]);
+
+  // Fetch profiles once user information (gender) is available
+  useEffect(() => {
+    if (userInfo) {
+      fetchProfiles();
+    }
+  }, [userInfo]);
 
   // Auto-refresh stats every 30 seconds when app is active
   useEffect(() => {
@@ -486,7 +493,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <WithSwipe toRight="/(tabs)/profiles" toLeft="/(tabs)/account">
+    <>
       <>
       <StatusBar 
         barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
@@ -876,7 +883,7 @@ export default function HomeScreen() {
         onClose={() => setMenuModalVisible(false)}
       />
     </>
-    </WithSwipe>
+    </>
   );
 }
 

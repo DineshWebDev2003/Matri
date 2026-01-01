@@ -25,24 +25,6 @@ import { Picker } from '@react-native-picker/picker';
 
 const { width } = Dimensions.get('window');
 
-// Religion options mapping
-const religions = [
-  { id: '1', name: 'Hindu' },
-  { id: '2', name: 'Muslim' },
-  { id: '3', name: 'Christian' },
-  { id: '4', name: 'Sikh' },
-  { id: '5', name: 'Buddhist' },
-  { id: '6', name: 'Jain' },
-  { id: '7', name: 'Parsi' },
-  { id: '8', name: 'Other' }
-];
-
-// Helper function to get religion name from ID
-const getReligionName = (religionId: string): string => {
-  const religion = religions.find(r => r.id === religionId);
-  return religion ? religion.name : religionId;
-};
-
 // Smoking Habits options
 const smokingHabits = [
   { id: 'yes', name: 'Yes' },
@@ -55,29 +37,6 @@ const drinkingHabits = [
   { id: 'yes', name: 'Yes' },
   { id: 'no', name: 'No' },
   { id: 'occasionally', name: 'Occasionally' }
-];
-
-// Marital Status options
-const maritalStatuses = [
-  { id: 'single', name: 'Single' },
-  { id: 'married', name: 'Married' },
-  { id: 'divorced', name: 'Divorced' },
-  { id: 'widowed', name: 'Widowed' }
-];
-
-// Mother Tongue options
-const motherTongues = [
-  { id: 'tamil', name: 'Tamil' },
-  { id: 'english', name: 'English' },
-  { id: 'hindi', name: 'Hindi' },
-  { id: 'telugu', name: 'Telugu' },
-  { id: 'kannada', name: 'Kannada' },
-  { id: 'malayalam', name: 'Malayalam' },
-  { id: 'marathi', name: 'Marathi' },
-  { id: 'gujarati', name: 'Gujarati' },
-  { id: 'punjabi', name: 'Punjabi' },
-  { id: 'urdu', name: 'Urdu' },
-  { id: 'other', name: 'Other' }
 ];
 
 // Height options (in feet)
@@ -174,20 +133,27 @@ const FormInput = ({ label, icon, containerStyle, fieldName, formData, onFieldCh
 };
 
 export default function ProfileCompletionScreen() {
+  const [religionOptions, setReligionOptions] = useState<{id:string;name:string}[]>([]);
+  const [casteOptions, setCasteOptions] = useState<{id:string;name:string}[]>([]);
+  const getCasteName = (cid:string)=> casteOptions.find(c=>c.id===String(cid))?.name || cid;
+  const [maritalStatusOptions, setMaritalStatusOptions] = useState<{id:string;name:string}[]>([]);
+  const getReligionName = (rid:string)=> religionOptions.find(r=>r.id===String(rid))?.name || rid;
   const router = useRouter();
   const auth = useAuth();
   const params = useLocalSearchParams();
   
   const [formData, setFormData] = useState({
-    // Step 1: Basic Information
-    firstname: '',
-    lastname: '',
+    // ------ Step 1 required only (web parity) ------
+    birth_date: '',          // YYYY-MM-DD
+    religion_id: '',         // numeric id
+    gender: '',              // m / f
+    looking_for: '',         // 1 = groom, 2 = Bride
+    marital_status: '',      // string title matching table
+
     dateOfBirth: '',
     religion: '',
-    gender: '',
     profession: '',
-    motherTongue: '',
-    financialCondition: '',
+    annualIncome: '',
     smokingHabits: '',
     drinkingHabits: '',
     maritalStatus: '',
@@ -249,6 +215,25 @@ export default function ProfileCompletionScreen() {
     educationEndYear: '',
   });
 
+  // Multi-entry arrays
+  type EducationRecord = { institute: string; degree: string; fieldOfStudy: string; start: string; end: string };
+  type CareerRecord = { company: string; designation: string; start: string; end: string };
+
+  const [educationList, setEducationList] = useState<EducationRecord[]>([{ institute: '', degree: '', fieldOfStudy: '', start: '', end: '' }]);
+  const [careerList, setCareerList] = useState<CareerRecord[]>([{ company: '', designation: '', start: '', end: '' }]);
+
+  // Helpers
+  const addEducation = () => setEducationList(prev => [...prev, { institute:'', degree:'', fieldOfStudy:'', start:'', end:'' }]);
+  const updateEducation = (index:number, field:keyof EducationRecord, value:string) => {
+    setEducationList(prev=> prev.map((rec,i)=> i===index ? { ...rec, [field]: value } as EducationRecord : rec));
+  };
+  const deleteEducation = (index:number) => setEducationList(prev => prev.filter((_,i)=> i !== index));
+  const addCareer = () => setCareerList(prev => [...prev, { company:'', designation:'', start:'', end:'' }]);
+  const updateCareer = (index:number, field:keyof CareerRecord, value:string) => {
+    setCareerList(prev=> prev.map((rec,i)=> i===index ? { ...rec, [field]: value } as CareerRecord : rec));
+  };
+  const deleteCareer = (index:number) => setCareerList(prev => prev.filter((_,i)=> i !== index));
+
   const { colors } = useTheme();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
@@ -256,29 +241,58 @@ export default function ProfileCompletionScreen() {
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
   useEffect(() => {
+    // fetch dropdown options once
+    const fetchDropdowns = async () => {
+      try {
+        const res = await apiService.getDropdownOptions(); // expects { religions:[], maritalStatuses:[] }
+        if(res.status==='success'){
+          setReligionOptions(res.data.religions || []);
+          setMaritalStatusOptions(res.data.maritalStatuses || []);
+        }
+      } catch(err){ console.error('dropdown fetch err', err);}
+    }
+    fetchDropdowns();
     // Pre-fill from registration data if available
     if (params.registrationData) {
       try {
         const regData = JSON.parse(params.registrationData as string);
         console.log('📋 Registration data received:', regData);
         
-        setFormData(prev => ({
-          ...prev,
-          firstname: regData.firstname || prev.firstname,
-          lastname: regData.lastname || prev.lastname,
-          dateOfBirth: regData.birth_date || prev.dateOfBirth,
-          religion: regData.religion || prev.religion,
-          caste: regData.caste || prev.caste,
-          // Auto-detect gender from looking_for (1 = Bridegroom/Male, 2 = Bride/Female)
-          gender: regData.looking_for === '1' ? 'male' : regData.looking_for === '2' ? 'female' : prev.gender,
-        }));
+        setFormData(prev => {
+          const updated = {
+            ...prev,
+            dateOfBirth: regData.birth_date || prev.dateOfBirth,
+            religion: String(regData.religion_id || regData.religion || prev.religion),
+            caste: String(regData.caste_id || regData.caste || prev.caste),
+            presentCountry: regData.country || prev.presentCountry,
+            presentState: regData.state || regData.present_state || prev.presentState,
+            // Auto-detect gender from looking_for (1 = Bridegroom/Male, 2 = Bride/Female)
+            gender: regData.gender || (regData.looking_for === '1' ? 'male' : regData.looking_for === '2' ? 'female' : prev.gender),
+          };
+          // Preload castes
+          if(updated.religion){
+            fetchCastes(updated.religion);
+          }
+          return updated;
+        });
       } catch (error) {
         console.error('Error parsing registration data:', error);
       }
     }
     
+    // We will fetch castes after setting the form data
     fetchUserProfile();
   }, []);
+
+  // Fetch castes list by religion id helper
+  const fetchCastes = async (religionId:string)=>{
+    try{
+      const res = await apiService.getCastesByReligion(religionId);
+      if(res.status==='success'){
+        setCasteOptions(res.data.castes || []);
+      }
+    }catch(err){console.error('castes fetch err', err);}
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -290,8 +304,6 @@ export default function ProfileCompletionScreen() {
       if (user) {
         setFormData(prev => ({
           ...prev,
-          firstname: user.firstname || '',
-          lastname: user.lastname || '',
         }));
       }
 
@@ -306,21 +318,17 @@ export default function ProfileCompletionScreen() {
         setFormData(prev => ({
           ...prev,
           // Basic Information
-          firstname: profileData.firstname || prev.firstname,
-          lastname: profileData.lastname || prev.lastname,
           dateOfBirth: profileData.dateOfBirth || profileData.date_of_birth || '',
-          religion: profileData.religion || '',
+          religion: profileData.religion || prev.religion,
           gender: profileData.gender || '',
           profession: profileData.profession || '',
-          motherTongue: profileData.motherTongue || profileData.mother_tongue || '',
-          financialCondition: profileData.financialCondition || profileData.financial_condition || '',
           smokingHabits: profileData.smokingHabits || profileData.smoking_habits || '',
           drinkingHabits: profileData.drinkingHabits || profileData.drinking_habits || '',
           maritalStatus: profileData.maritalStatus || profileData.marital_status || '',
-          caste: profileData.caste || '',
+          caste: profileData.caste || prev.caste,
           spokenLanguages: profileData.spokenLanguages || profileData.spoken_languages || '',
-          presentCountry: profileData.presentCountry || profileData.present_country || '',
-          presentState: profileData.presentState || profileData.present_state || '',
+          presentCountry: profileData.presentCountry || profileData.present_country || prev.presentCountry,
+          presentState: profileData.presentState || profileData.present_state || prev.presentState,
           presentCity: profileData.presentCity || profileData.present_city || '',
           presentZipCode: profileData.presentZipCode || profileData.present_zip_code || '',
           // Physical Attributes
@@ -369,6 +377,27 @@ export default function ProfileCompletionScreen() {
           educationStartYear: profileData.educationStartYear || '',
           educationEndYear: profileData.educationEndYear || '',
         }));
+
+        // --- Prefill multi-entry arrays ---
+        if (Array.isArray(profileData.educations) && profileData.educations.length) {
+          const mappedEdu = profileData.educations.map((e:any)=>({
+            institute: e.institute || '',
+            degree: e.degree || '',
+            fieldOfStudy: e.field_of_study || '',
+            start: e.start || '',
+            end: e.end || '',
+          }));
+          setEducationList(mappedEdu);
+        }
+        if (Array.isArray(profileData.careers) && profileData.careers.length) {
+          const mappedCareer = profileData.careers.map((c:any)=>({
+            company: c.company || '',
+            designation: c.designation || '',
+            start: c.start || '',
+            end: c.end || '',
+          }));
+          setCareerList(mappedCareer);
+        }
       }
     } catch (error) {
       console.error('💥 Error fetching profile data:', error);
@@ -407,10 +436,8 @@ export default function ProfileCompletionScreen() {
     setShowSkipConfirm(false);
     setLoading(true);
     try {
-      // Save at least basic info (firstname, lastname) before skipping
+      // Save minimal basic info before skipping
       const basicData = {
-        firstname: formData.firstname,
-        lastname: formData.lastname,
         dateOfBirth: formData.dateOfBirth,
         religion: formData.religion,
         gender: formData.gender,
@@ -444,15 +471,11 @@ export default function ProfileCompletionScreen() {
         case 1:
           // Basic Information
           stepData = {
-            firstname: formData.firstname,
-            lastname: formData.lastname,
             birth_date: formData.dateOfBirth,
             gender: formData.gender,
-            religion: formData.religion,
+            religion_id: formData.religion,
             caste: formData.caste,
             profession: formData.profession,
-            motherTongue: formData.motherTongue,
-            financialCondition: formData.financialCondition,
             smokingHabits: formData.smokingHabits,
             drinkingHabits: formData.drinkingHabits,
             maritalStatus: formData.maritalStatus,
@@ -479,20 +502,20 @@ export default function ProfileCompletionScreen() {
         case 3:
           // Education Information
           stepData = {
-            institute: formData.institute,
-            degree: formData.degree,
-            fieldOfStudy: formData.fieldOfStudy,
-            educationStartYear: formData.educationStartYear,
-            educationEndYear: formData.educationEndYear,
+            institute: educationList.map(e=>e.institute),
+            degree: educationList.map(e=>e.degree),
+            field_of_study: educationList.map(e=>e.fieldOfStudy),
+            start: educationList.map(e=>e.start),
+            end: educationList.map(e=>e.end),
           };
           break;
         case 4:
           // Career Information
           stepData = {
-            company: formData.company,
-            designation: formData.designation,
-            careerStartYear: formData.careerStartYear,
-            careerEndYear: formData.careerEndYear,
+            company: careerList.map(c=>c.company),
+            designation: careerList.map(c=>c.designation),
+            start: careerList.map(c=>c.start),
+            end: careerList.map(c=>c.end),
           };
           break;
         case 5:
@@ -530,6 +553,8 @@ export default function ProfileCompletionScreen() {
           break;
       }
       
+      // Log payload then submit the current step
+      console.log('📦 Payload for step', currentStep, stepData);
       // Submit the current step
       const response = await apiService.submitProfileStep(currentStep, stepData);
       
@@ -555,65 +580,16 @@ export default function ProfileCompletionScreen() {
     }
   };
 
+  const getGenderLabel = (g: string) => (g === 'm' ? 'Male' : g === 'f' ? 'Female' : 'Not detected');
+
   const renderStep = () => {
     switch (currentStep) {
       case 1:
         return (
           <View style={styles.stepContent}>
-            <Text style={[styles.stepTitle, { color: colors.textPrimary }]}>Basic Information</Text>
-            <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>Complete your basic details</Text>
+            <Text style={styles.stepTitle}>Basic Information</Text>
+            <Text style={styles.stepDescription}>Complete your basic details</Text>
             
-            <View style={styles.row}>
-              <FormInput 
-                label="First Name *" 
-                placeholder="Enter first name" 
-                icon="user" 
-                containerStyle={styles.halfWidth}
-                fieldName="firstname"
-                formData={formData}
-                onFieldChange={handleInputChange}
-              />
-              <FormInput 
-                label="Last Name *" 
-                placeholder="Enter last name" 
-                icon="user" 
-                containerStyle={styles.halfWidth}
-                fieldName="lastname"
-                formData={formData}
-                onFieldChange={handleInputChange}
-              />
-            </View>
-            
-            {/* Pre-filled from registration - Read Only */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textPrimary }]}>Date of Birth * (from registration)</Text>
-              <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-                <Feather name="calendar" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-                <Text style={[styles.input, { color: colors.textSecondary }]}>
-                  {formData.dateOfBirth || 'Not provided'}
-                </Text>
-              </View>
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textPrimary }]}>Religion * (from registration)</Text>
-              <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-                <Feather name="moon" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-                <Text style={[styles.input, { color: colors.textSecondary }]}>
-                  {formData.religion ? getReligionName(formData.religion) : 'Not provided'}
-                </Text>
-              </View>
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textPrimary }]}>Gender * (auto-detected)</Text>
-              <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-                <Feather name="user" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-                <Text style={[styles.input, { color: colors.textSecondary, textTransform: 'capitalize' }]}>
-                  {formData.gender || 'Not detected'}
-                </Text>
-              </View>
-            </View>
             <FormInput 
               label="Profession *" 
               placeholder="Your Profession" 
@@ -622,32 +598,16 @@ export default function ProfileCompletionScreen() {
               formData={formData}
               onFieldChange={handleInputChange}
             />
-            <FormInput 
-              label="Mother Tongue" 
-              placeholder="e.g., Tamil" 
-              icon="message-square"
-              fieldName="motherTongue"
-              formData={formData}
-              onFieldChange={handleInputChange}
-            />
-            <FormInput 
-              label="Financial Condition *" 
-              placeholder="e.g., Stable" 
-              icon="dollar-sign"
-              fieldName="financialCondition"
-              formData={formData}
-              onFieldChange={handleInputChange}
-            />
             <View style={styles.row}>
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={[styles.label, { color: colors.textPrimary }]}>Smoking Habits *</Text>
+                <Text style={styles.label}>Smoking Habits</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
                     selectedValue={formData.smokingHabits}
                     onValueChange={(value) => handleInputChange('smokingHabits', value)}
                     style={styles.picker}
                   >
-                    <Picker.Item label="Select Smoking Habits" value="" />
+                    <Picker.Item label="Select" value="" />
                     {smokingHabits.map((habit) => (
                       <Picker.Item key={habit.id} label={habit.name} value={habit.id} />
                     ))}
@@ -655,14 +615,14 @@ export default function ProfileCompletionScreen() {
                 </View>
               </View>
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={[styles.label, { color: colors.textPrimary }]}>Drinking Habits *</Text>
+                <Text style={[styles.label, { color: colors.textPrimary }]}>Drinking Status</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
                     selectedValue={formData.drinkingHabits}
                     onValueChange={(value) => handleInputChange('drinkingHabits', value)}
                     style={styles.picker}
                   >
-                    <Picker.Item label="Select Drinking Habits" value="" />
+                    <Picker.Item label="Select" value="" />
                     {drinkingHabits.map((habit) => (
                       <Picker.Item key={habit.id} label={habit.name} value={habit.id} />
                     ))}
@@ -672,7 +632,7 @@ export default function ProfileCompletionScreen() {
             </View>
             
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textPrimary }]}>Marital Status *</Text>
+              <Text style={styles.label}>Marital Status *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={formData.maritalStatus}
@@ -680,7 +640,7 @@ export default function ProfileCompletionScreen() {
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Marital Status" value="" />
-                  {maritalStatuses.map((status) => (
+                  {maritalStatusOptions.map((status) => (
                     <Picker.Item key={status.id} label={status.name} value={status.id} />
                   ))}
                 </Picker>
@@ -703,21 +663,6 @@ export default function ProfileCompletionScreen() {
               onFieldChange={handleInputChange}
             />
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Mother Tongue *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={formData.motherTongue}
-                  onValueChange={(value) => handleInputChange('motherTongue', value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Mother Tongue" value="" />
-                  {motherTongues.map((tongue) => (
-                    <Picker.Item key={tongue.id} label={tongue.name} value={tongue.id} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
             
             <Text style={styles.subHeader}>Present Address</Text>
             <FormInput 
@@ -759,7 +704,7 @@ export default function ProfileCompletionScreen() {
           </View>
         );
 
-      case 2:
+      case 5:
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Physical Attributes</Text>
@@ -851,7 +796,7 @@ export default function ProfileCompletionScreen() {
           </View>
         );
 
-      case 3:
+      case 2:
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Family Information</Text>
@@ -870,7 +815,7 @@ export default function ProfileCompletionScreen() {
           </View>
         );
 
-      case 4:
+      case 6:
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Partner Expectation</Text>
@@ -901,34 +846,63 @@ export default function ProfileCompletionScreen() {
           </View>
         );
 
-      case 5:
+      case 4:
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Career Information</Text>
-            <Text style={styles.stepDescription}>Tell us about your career</Text>
-            
-            <FormInput label="Company *" placeholder="Company Name" icon="briefcase" fieldName="company" formData={formData} onFieldChange={handleInputChange} />
-            <FormInput label="Designation *" placeholder="Your Designation" icon="award" fieldName="designation" formData={formData} onFieldChange={handleInputChange} />
-            <View style={styles.row}>
-              <FormInput label="Start Year *" placeholder="e.g., 2020" icon="calendar" containerStyle={styles.halfWidth} fieldName="careerStartYear" formData={formData} onFieldChange={handleInputChange} />
-              <FormInput label="End Year" placeholder="Present" icon="calendar" containerStyle={styles.halfWidth} fieldName="careerEndYear" formData={formData} onFieldChange={handleInputChange} />
-            </View>
+            <Text style={styles.stepDescription}>Add your career history (multiple allowed)</Text>
+            {careerList.map((job, idx)=>(
+              <View key={idx} style={{ marginBottom:20 }}>
+                <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+                <Text style={[styles.subHeader, { color: colors.textPrimary }]}>Position #{idx+1}</Text>
+                {careerList.length>1 && (
+                  <TouchableOpacity onPress={()=>deleteCareer(idx)}>
+                    <Feather name="x" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+                <FormInput label="Company *" placeholder="Company" icon="briefcase" value={job.company} onChangeText={val=>updateCareer(idx,'company',val)} />
+                <FormInput label="Designation *" placeholder="Designation" icon="award" value={job.designation} onChangeText={val=>updateCareer(idx,'designation',val)} />
+                <View style={styles.row}>
+                  <FormInput label="Start Year" placeholder="2020" icon="calendar" containerStyle={styles.halfWidth} value={job.start} onChangeText={val=>updateCareer(idx,'start',val)} />
+                  <FormInput label="End Year" placeholder="Present" icon="calendar" containerStyle={styles.halfWidth} value={job.end} onChangeText={val=>updateCareer(idx,'end',val)} />
+                </View>
+              </View>
+            ))}
+            <TouchableOpacity onPress={addCareer} style={[styles.button, styles.secondaryButton, { alignSelf:'flex-start', backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}> 
+              <Text style={[styles.secondaryButtonText, { color: colors.textPrimary }]}>+ Add another career</Text>
+            </TouchableOpacity>
           </View>
         );
 
-      case 6:
+      case 3:
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Education Information</Text>
-            <Text style={styles.stepDescription}>Tell us about your education</Text>
-            
-            <FormInput label="Institute *" placeholder="Institute Name" icon="book-open" fieldName="institute" formData={formData} onFieldChange={handleInputChange} />
-            <FormInput label="Degree *" placeholder="e.g., B.Tech" icon="award" fieldName="degree" formData={formData} onFieldChange={handleInputChange} />
-            <FormInput label="Field of Study *" placeholder="e.g., Computer Science" icon="edit-3" fieldName="fieldOfStudy" formData={formData} onFieldChange={handleInputChange} />
-            <View style={styles.row}>
-              <FormInput label="Start Year *" placeholder="e.g., 2016" icon="calendar" containerStyle={styles.halfWidth} fieldName="educationStartYear" formData={formData} onFieldChange={handleInputChange} />
-              <FormInput label="End Year" placeholder="e.g., 2020" icon="calendar" containerStyle={styles.halfWidth} fieldName="educationEndYear" formData={formData} onFieldChange={handleInputChange} />
-            </View>
+            <Text style={styles.stepDescription}>Add your education details (multiple allowed)</Text>
+
+            {educationList.map((edu, idx) => (
+              <View key={idx} style={{ marginBottom: 20 }}>
+                <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+                <Text style={[styles.subHeader, { color: colors.textPrimary }]}>Education #{idx + 1}</Text>
+                {educationList.length>1 && (
+                  <TouchableOpacity onPress={()=>deleteEducation(idx)}>
+                    <Feather name="x" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+                <FormInput label="Institute *" placeholder="Institute Name" icon="book-open" value={edu.institute} onChangeText={val=>updateEducation(idx,'institute',val)} />
+                <FormInput label="Degree *" placeholder="e.g., B.Tech" icon="award" value={edu.degree} onChangeText={val=>updateEducation(idx,'degree',val)} />
+                <FormInput label="Field of Study" placeholder="e.g., Computer Science" icon="edit-3" value={edu.fieldOfStudy} onChangeText={val=>updateEducation(idx,'fieldOfStudy',val)} />
+                <View style={styles.row}>
+                  <FormInput label="Start Year" placeholder="2016" icon="calendar" containerStyle={styles.halfWidth} value={edu.start} onChangeText={val=>updateEducation(idx,'start',val)} />
+                  <FormInput label="End Year" placeholder="2020" icon="calendar" containerStyle={styles.halfWidth} value={edu.end} onChangeText={val=>updateEducation(idx,'end',val)} />
+                </View>
+              </View>
+            ))}
+            <TouchableOpacity onPress={addEducation} style={[styles.button, styles.secondaryButton, { alignSelf:'flex-start', backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}> 
+              <Text style={[styles.secondaryButtonText, { color: colors.textPrimary }]}>+ Add another education</Text>
+            </TouchableOpacity>
           </View>
         );
 

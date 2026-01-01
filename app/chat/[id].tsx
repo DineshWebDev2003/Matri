@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, FlatList, Image, KeyboardAvoidingView, Platform, Modal, Animated, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import FallbackImage from '../../components/FallbackImage';
+
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
@@ -11,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import FallbackImage from '../../components/FallbackImage';
 import { getImageUrl } from '../../utils/imageUtils';
 
 // Wave Animation Component
@@ -95,6 +96,11 @@ export default function ChatScreen() {
     if (params.userId) {
       // Set chat title and image from params or use fallbacks
       setChatTitle(params.name || 'User');
+
+      // Initialize gender from navigation params if provided
+      if (params.gender && typeof params.gender === 'string') {
+        setOtherUserGender(String(params.gender));
+      }
       
       // Handle image URL - construct full URL if needed
       let imageUrl = (params.image as string) || 'https://via.placeholder.com/40';
@@ -675,7 +681,10 @@ export default function ChatScreen() {
         return (
           <View style={[styles.messageContainer, isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer]}>
             {!isMyMessage && (
-              <Image source={{ uri: getAvatarSource(item.senderImage, isMyMessage) }} style={styles.messageAvatar} />
+              <FallbackImage 
+              source={{ uri: getAvatarSource(item.senderImage, isMyMessage) }} 
+              fallbackSource={otherUserGender?.toLowerCase()==='female' ? require('../../assets/images/default-female.jpg') : require('../../assets/images/default-male.jpg')} 
+              style={styles.messageAvatar} />
             )}
             <TouchableOpacity onPress={() => { setSelectedImage(item.uri); setModalVisible(true); }}>
               <View style={[styles.messageBubble, isMyMessage ? styles.myBubble : styles.otherBubble]}>
@@ -688,7 +697,10 @@ export default function ChatScreen() {
         return (
           <View style={[styles.messageContainer, isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer]}>
             {!isMyMessage && (
-              <Image source={{ uri: getAvatarSource(item.senderImage, isMyMessage) }} style={styles.messageAvatar} />
+              <FallbackImage 
+              source={{ uri: getAvatarSource(item.senderImage, isMyMessage) }} 
+              fallbackSource={otherUserGender?.toLowerCase()==='female' ? require('../../assets/images/default-female.jpg') : require('../../assets/images/default-male.jpg')} 
+              style={styles.messageAvatar} />
             )}
             <View style={[styles.messageBubble, isMyMessage ? styles.myBubble : styles.otherBubble]}>
               <TouchableOpacity onPress={() => playAudio(item.uri)} style={styles.audioBubble}>
@@ -702,7 +714,10 @@ export default function ChatScreen() {
         return (
           <View style={[styles.messageContainer, isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer]}>
             {!isMyMessage && (
-              <Image source={{ uri: getAvatarSource(item.senderImage, isMyMessage) }} style={styles.messageAvatar} />
+              <FallbackImage 
+              source={{ uri: getAvatarSource(item.senderImage, isMyMessage) }} 
+              fallbackSource={otherUserGender?.toLowerCase()==='female' ? require('../../assets/images/default-female.jpg') : require('../../assets/images/default-male.jpg')} 
+              style={styles.messageAvatar} />
             )}
             <View style={[styles.messageBubble, isMyMessage ? styles.myBubble : styles.otherBubble]}>
               <Text style={isMyMessage ? styles.myMessageText : styles.otherMessageText}>{item.text}</Text>
@@ -727,10 +742,12 @@ export default function ChatScreen() {
               <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, marginRight: 4 }}>
                 <Feather name="arrow-left" size={24} color={theme === 'dark' ? '#FFFFFF' : '#1F2937'} />
               </TouchableOpacity>
-              <Image 
-                source={{ uri: chatImage }} 
+              <FallbackImage
+                source={{ uri: chatImage }}
+                fallbackSource={otherUserGender?.toLowerCase() === 'female'
+                  ? require('../../assets/images/default-female.jpg')
+                  : require('../../assets/images/default-male.jpg')}
                 style={styles.userInfoAvatar}
-                defaultSource={require('../../assets/images/default-female.jpg')}
               />
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={[styles.userInfoNameLight, theme === 'dark' && { color: '#FFFFFF' }]}>{chatTitle}</Text>
@@ -760,10 +777,12 @@ export default function ChatScreen() {
             <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, marginRight: 4 }}>
               <Feather name="arrow-left" size={24} color={theme === 'dark' ? '#FFFFFF' : '#1F2937'} />
             </TouchableOpacity>
-            <Image 
-              source={{ uri: chatImage }} 
+            <FallbackImage
+              source={{ uri: chatImage }}
+              fallbackSource={otherUserGender?.toLowerCase() === 'female'
+                ? require('../../assets/images/default-female.jpg')
+                : require('../../assets/images/default-male.jpg')}
               style={styles.userInfoAvatar}
-              defaultSource={require('../../assets/images/default-female.jpg')}
             />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={[styles.userInfoNameLight, theme === 'dark' && { color: '#FFFFFF' }]}>{chatTitle}</Text>

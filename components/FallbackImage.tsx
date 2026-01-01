@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Image } from 'react-native';
 
+import { ImageSourcePropType } from 'react-native';
+
 interface FallbackImageProps {
-  source: { uri: string };
-  fallbackSource?: { uri: string };
+  source: ImageSourcePropType;
+  // Can be static require(...) number or { uri }
+  fallbackSource?: ImageSourcePropType;
   style?: any;
   resizeMode?: 'cover' | 'contain' | 'stretch' | 'center';
   [key: string]: any;
@@ -20,13 +23,13 @@ interface FallbackImageProps {
  *   style={styles.image}
  * />
  */
-export const FallbackImage = ({ 
+const FallbackImage = ({ 
   source, 
   fallbackSource,
   ...props 
 }: FallbackImageProps) => {
   // Ensure source is properly formatted
-  let validSource: { uri: string };
+  let validSource: ImageSourcePropType;
   
   if (!source) {
     validSource = { uri: '' };
@@ -40,10 +43,13 @@ export const FallbackImage = ({
   }
 
   // Ensure fallback is properly formatted
-  let validFallback: { uri: string } | undefined;
+  let validFallback: ImageSourcePropType | undefined;
   if (fallbackSource) {
     if (typeof fallbackSource === 'string') {
       validFallback = { uri: String(fallbackSource).trim() };
+    } else if (typeof fallbackSource === 'number') {
+      // Static require(...) returns a number in React Native
+      validFallback = fallbackSource;
     } else if (typeof fallbackSource === 'object' && 'uri' in fallbackSource) {
       const uri = fallbackSource.uri;
       const uriStr = typeof uri === 'string' ? String(uri).trim() : '';
@@ -51,12 +57,13 @@ export const FallbackImage = ({
     }
   }
   
-  const [imageSource, setImageSource] = useState(validSource);
+  const [imageSource, setImageSource] = useState<ImageSourcePropType>(validSource);
   const [error, setError] = useState(false);
 
   const handleError = () => {
-    if (!error && validFallback && validFallback.uri) {
-      console.log('⚠️ Primary image failed, trying fallback:', validFallback.uri);
+    // If we have a fallback image (uri or static), switch to it
+    if (!error && validFallback) {
+      console.log('⚠️ Primary image failed, trying fallback:', typeof validFallback === 'object' && 'uri' in (validFallback as any) ? (validFallback as any).uri : '[static image]');
       setError(true);
       setImageSource(validFallback);
     } else if (!error && !validFallback) {
@@ -66,7 +73,24 @@ export const FallbackImage = ({
   };
 
   // Don't render if no valid source
-  if (!imageSource || !imageSource.uri || imageSource.uri === '') {
+  // If the source is an object with uri ensure it's non-empty; static numbers are ok
+  // If no valid primary source but we have a fallback (static or uri) show fallback directly
+  if (
+    (!imageSource || (typeof imageSource === 'object' && 'uri' in (imageSource as any) && !(imageSource as any).uri)) &&
+    validFallback
+  ) {
+    return (
+      <Image
+        source={validFallback}
+        {...props}
+      />
+    );
+  }
+  
+  if (
+    !imageSource ||
+    (typeof imageSource === 'object' && 'uri' in (imageSource as any) && !(imageSource as any).uri)
+  ) {
     return null;
   }
 

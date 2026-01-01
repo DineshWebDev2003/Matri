@@ -66,8 +66,8 @@ export default function RegisterScreen() {
     (async () => {
       try {
         const resp = await apiService.getDropdownOptions();
-        // Extract religions array regardless of exact nesting
-        const relList = resp?.data?.data?.religions || resp?.data?.religions || resp?.religions || [];
+        // Extract religions array regardless of nesting levels
+        const relList = resp?.religions || resp?.data?.religions || resp?.data?.data?.religions || [];
         if (Array.isArray(relList)) {
           setReligions(relList);
         }
@@ -76,7 +76,8 @@ export default function RegisterScreen() {
       }
       try {
         const countryResp = await apiService.getCountries();
-        const list = countryResp?.data?.countries || countryResp?.countries || countryResp;
+        // Backend returns { data: { countries: [...] } }
+        const list = countryResp?.countries || countryResp?.data?.countries || [];
         if (Array.isArray(list)) {
           setCountries(list);
         }
@@ -191,10 +192,12 @@ export default function RegisterScreen() {
       // Reset caste when religion changes
       if (name === 'looking_for') {
         // Auto-set gender based on selected looking_for value
+        // "1" = looking for groom → user is female
+        // "2" = looking for bride → user is male
         if (value === '1') {
-          newData.gender = 'male';
+          newData.gender = 'f';
         } else if (value === '2') {
-          newData.gender = 'female';
+          newData.gender = 'm';
         } else {
           newData.gender = '';
         }
@@ -238,7 +241,7 @@ export default function RegisterScreen() {
       mobile: formData.mobile,
       birth_date: formData.birth_date,
       password: formData.password,
-      religion: formData.religion,
+      religion_id: formData.religion,
       caste: formData.caste
     };
 
@@ -279,10 +282,10 @@ export default function RegisterScreen() {
         mobile: formData.mobile || '',
         birth_date: formData.birth_date || '',
         password: formData.password || '',
-        religion: formData.religion || '',
-        caste: formData.caste || '',
+        religion_id: formData.religion || '',
+        caste_id: formData.caste || '',
         gender: formData.gender || '',
-        username: username || '',
+        username,
         mobile_code: formData.mobile_code || '',
         country_code: formData.country_code || '',
         country: formData.country || '',
@@ -298,8 +301,8 @@ export default function RegisterScreen() {
       console.log('✓ mobile:', registrationData.mobile);
       console.log('✓ birth_date:', registrationData.birth_date);
       console.log('✓ password:', registrationData.password);
-      console.log('✓ religion:', registrationData.religion);
-      console.log('✓ caste:', registrationData.caste);
+      console.log('✓ religion_id:', registrationData.religion_id);
+      console.log('✓ caste_id:', registrationData.caste_id);
       console.log('✓ username:', registrationData.username);
       console.log('✓ agree:', registrationData.agree);
       console.log('🌐 Calling auth.register()...');
@@ -431,7 +434,7 @@ export default function RegisterScreen() {
                 onValueChange={(itemValue) => handleInputChange('looking_for', itemValue)}
               >
                 <Picker.Item label="Select One" value="" />
-                <Picker.Item label="Bridegroom (மணமகன்)" value="1" />
+                <Picker.Item label="groom (மணமகன்)" value="1" />
                 <Picker.Item label="Bride (மணமகள்)" value="2" />
               </Picker>
             </View>
@@ -448,8 +451,8 @@ export default function RegisterScreen() {
                 onValueChange={() => {}}
               >
                 <Picker.Item label="Select Gender" value="" />
-                <Picker.Item label="Male" value="male" />
-                <Picker.Item label="Female" value="female" />
+                <Picker.Item label="Female" value="f" />
+                <Picker.Item label="Male" value="m" />
               </Picker>
             </View>
           </View>
@@ -476,11 +479,11 @@ export default function RegisterScreen() {
                   placeholder="Last Name" 
                   placeholderTextColor={colors.textTertiary}
                   value={formData.lastname} 
-                  onChangeText={(text) => handleInputChange('lastname', text)} 
+                  onChangeText={(text) => handleInputChange('lastname', text)}
                 />
-              </View>
             </View>
           </View>
+        </View>
 
           {/* Email */}
           <View style={styles.formSection}>
@@ -498,37 +501,38 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          {/* Mobile */}
+          {/* Mobile Number */}
           <View style={styles.formSection}>
             <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('mobile_number')}</Text>
-            <View style={styles.row}>
-              <View style={[styles.modernInputContainer, { flex: 1, marginRight: 8, borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
-                <Picker
-                  selectedValue={formData.mobile_code}
-                  style={[styles.modernInput, { color: colors.textPrimary }]}
-                  onValueChange={(dialCode) => {
-                    const sel = countries.find((c:any) => c.dial_code == dialCode);
-                    handleInputChange('mobile_code', dialCode);
-                    handleInputChange('country_code', sel?.country_code || '');
-                    handleInputChange('country', sel?.country || '');
-                  }}
-                >
-                  <Picker.Item label="Select" value="" />
-                  {countries.map((c:any) => (
-                    <Picker.Item key={c.country_code} label={`${c.country} (+${c.dial_code})`} value={c.dial_code} />
-                  ))}
-                </Picker>
-              </View>
-              <View style={[styles.modernInputContainer, { flex: 3, marginLeft: 8, borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
-                <TextInput 
-                  style={[styles.modernInput, { color: colors.textPrimary }]} 
-                  placeholder="Mobile Number" 
-                  placeholderTextColor={colors.textTertiary}
-                  keyboardType="phone-pad" 
-                  value={formData.mobile} 
-                  onChangeText={(text) => handleInputChange('mobile', text)} 
-                />
-              </View>
+            <View style={[styles.modernInputContainer, { flexDirection: 'row', alignItems: 'center', borderColor: '#DC2626', borderWidth: 2, backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(220, 38, 38, 0.05)' }]}>
+              <Picker
+                mode="dropdown"
+                dropdownIconColor={colors.textPrimary}
+                selectedValue={formData.mobile_code}
+                style={[styles.modernInput, { color: colors.textPrimary, width: 90, height: 40 }]}
+                onValueChange={(dialCode) => {
+                  const sel = countries.find((c: any) => String(c.dial_code) === String(dialCode));
+                  setFormData(prev => ({
+                    ...prev,
+                    mobile_code: String(dialCode),
+                    country_code: sel?.country_code || '',
+                    country: sel?.country || '',
+                  }));
+                }}
+              >
+                <Picker.Item label="Select" value="" />
+                {countries.map((c:any) => (
+                  <Picker.Item key={c.country_code} label={`+${c.dial_code}`} value={String(c.dial_code)} />
+                ))}
+              </Picker>
+              <TextInput
+                style={[styles.modernInput, { color: colors.textPrimary, flex: 1, marginLeft: 8 }]} 
+                placeholder="Mobile Number" 
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="phone-pad" 
+                value={formData.mobile} 
+                onChangeText={(text) => handleInputChange('mobile', text)} 
+              />
             </View>
           </View>
 
@@ -599,7 +603,7 @@ export default function RegisterScreen() {
                 >
                   <Picker.Item label={formData.religion ? "Select Caste" : "Select Religion First"} value="" />
                   {castes.map((caste: any) => (
-                    <Picker.Item key={caste.id} label={caste.name} value={caste.name} />
+                    <Picker.Item key={caste.id} label={caste.name} value={String(caste.id)} />
                   ))}
                 </Picker>
               </View>

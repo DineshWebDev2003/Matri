@@ -323,14 +323,16 @@ export default function AccountScreen() {
         const packageResponse = await apiService.getPackageInfo();
         console.log('📦 Package info response:', packageResponse);
         
-        if (packageResponse?.status === 'success' && packageResponse?.data?.package) {
+        if (packageResponse?.status === 'success' && packageResponse?.data?.package && packageResponse.data.package.id > 0) {
           const packageName = packageResponse.data.package.name || packageResponse.data.package.title || 'Unknown Plan';
           console.log('📦 Package name:', packageName);
           
           // Update user profile with correct package name
           setUserProfile((prev) => ({
             ...prev,
-            packageName: packageName
+            packageName: packageName,
+            packageId: packageResponse.data.package.id,
+            premium: packageResponse.data.package.id > 1 ? 1 : 0
           }));
         }
       } catch (packageError) {
@@ -596,7 +598,7 @@ export default function AccountScreen() {
         </View>
 
         {/* Premium Upgrade Banner - Only show for non-premium users */}
-        {userProfile && !(userProfile.premium === 1 || userProfile.premium === true || userProfile.package_id > 1) && (
+        {userProfile && !(userProfile.premium === 1 || userProfile.premium === true || userProfile.packageId > 1) && (
           <LinearGradient
             colors={['#FCA5A5', '#EF4444']}
             start={{ x: 0, y: 0 }}
@@ -728,16 +730,56 @@ export default function AccountScreen() {
           </View>
 
           {/* Action Buttons */}
-          <View style={[styles.profileCardActions, theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>
+          <View style={[styles.profileCardActions, theme === 'dark' ? { backgroundColor: '#1A1A1A' } : { backgroundColor: '#FFFFFF' }, { flexDirection: 'column', gap: 10 }]}>
             <TouchableOpacity 
-              style={styles.actionButtonPrimary}
+              style={[styles.actionButtonPrimary, { 
+                width: '100%', 
+                flexDirection: 'row', 
+                justifyContent: 'center',
+                backgroundColor: theme === 'dark' ? '#DC2626' : '#DC2626',
+                paddingVertical: 12,
+                borderRadius: 8,
+              }]}
               onPress={() => router.push('/profile-setting')}
             >
-              <Feather name="edit-3" size={18} color="white" />
-              <Text style={styles.actionButtonText}>Edit Profile</Text>
+              <Feather name="edit-3" size={18} color="white" style={{ marginRight: 8 }} />
+              <Text style={[styles.actionButtonText, { color: 'white' }]}>Edit Profile</Text>
             </TouchableOpacity>
+            
             <TouchableOpacity 
-              style={[styles.actionButtonSecondary, theme === 'dark' && { backgroundColor: '#2A2A2A', borderColor: '#3A3A3A' }]}
+              style={[{
+                width: '100%',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingVertical: 12,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: theme === 'dark' ? '#3A3A3A' : '#E5E7EB',
+                backgroundColor: theme === 'dark' ? '#2A2A2A' : '#F9FAFB',
+              }]}
+              onPress={() => router.push(`/profile/${user?.id}`)}
+            >
+              <Feather name="eye" size={18} color="#3B82F6" style={{ marginRight: 8 }} />
+              <Text style={[{
+                fontSize: 16,
+                fontWeight: '500',
+                color: '#3B82F6',
+              }]}>Public Profile</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[{
+                width: '100%',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingVertical: 12,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: theme === 'dark' ? '#3A3A3A' : '#FEE2E2',
+                backgroundColor: theme === 'dark' ? '#2A2A2A' : '#FEF2F2',
+              }]}
               onPress={() => {
                 Alert.alert('Logout', 'Are you sure you want to logout?', [
                   { text: 'Cancel', onPress: () => {} },
@@ -745,8 +787,12 @@ export default function AccountScreen() {
                 ]);
               }}
             >
-              <Feather name="log-out" size={18} color="#DC2626" />
-              <Text style={styles.actionButtonTextSecondary}>Logout</Text>
+              <Feather name="log-out" size={18} color="#DC2626" style={{ marginRight: 8 }} />
+              <Text style={[{
+                fontSize: 16,
+                fontWeight: '500',
+                color: '#DC2626',
+              }]}>Logout</Text>
             </TouchableOpacity>
           </View>
         </View>

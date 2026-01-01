@@ -8,6 +8,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '@/constants/Colors';
 import { apiService, premiumUtils } from '../../services/api';
 import ProfileImage from '../../components/ProfileImage';
+import FallbackImage from '../../components/FallbackImage';
 import UniversalHeader from '../../components/UniversalHeader';
 import MenuModal from '../../components/MenuModal';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -313,11 +314,11 @@ export default function ChatsScreen() {
     
     return (
       <TouchableOpacity style={styles.storyItem} onPress={() => {
-        router.push({ pathname: '/chat/[id]', params: { id: item.id?.toString(), name: profileName, image: profileImage || '', userId: item.id?.toString() } });
+        router.push({ pathname: '/chat/[id]', params: { id: item.id?.toString(), name: profileName, image: profileImage || '', userId: item.id?.toString(), gender: userGender } });
       }}>
         <View style={styles.storyImageContainer}>
           {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.storyImage} resizeMode="cover" />
+            <FallbackImage source={{ uri: profileImage }} fallbackSource={defaultImage} style={styles.storyImage} />
           ) : (
             <Image source={defaultImage} style={styles.storyImage} resizeMode="cover" />
           )}
@@ -337,6 +338,11 @@ export default function ChatsScreen() {
     // First try: other_user.image (full URL from API)
     if (item.other_user?.image) {
       profileImage = item.other_user.image;
+      // If it's just a filename, build full URL
+      if (profileImage && !profileImage.startsWith('http')) {
+        const urls = getImageUrl(profileImage);
+        profileImage = urls.primary;
+      }
     }
     // Second try: other_user_image (flattened structure)
     else if (item.other_user_image) {
@@ -391,7 +397,7 @@ export default function ChatsScreen() {
       >
         <View style={styles.messageAvatar}>
           {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.messageAvatarImage} resizeMode="cover" />
+            <FallbackImage source={{ uri: profileImage }} fallbackSource={defaultImage} style={styles.messageAvatarImage} />
           ) : (
             <Image source={defaultImage} style={styles.messageAvatarImage} resizeMode="cover" />
           )}

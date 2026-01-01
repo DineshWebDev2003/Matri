@@ -765,7 +765,25 @@ export default function ProfilesScreen() {
         console.log('✅ First profile data:', JSON.stringify(allData.profiles[0], null, 2).substring(0, 300));
       }
       
-      setRecommendedProfiles(recommendedData.profiles || []);
+            // Determine filter values
+      const prefReligion = userInfo?.preferred_religion || userInfo?.partnerReligion || userInfo?.preferredReligion;
+      const prefCaste = (userInfo?.preferred_caste || userInfo?.partnerCaste || userInfo?.preferredCaste || '').toString().toLowerCase();
+      const baseReligion = prefReligion || userInfo?.religion_id || userInfo?.religionId || userInfo?.religion;
+      const baseCaste = prefCaste || (userInfo?.caste || userInfo?.caste_id || '').toString().toLowerCase();
+
+      // Filter recommended list
+      let filteredRecommended = recommendedData.profiles || [];
+      if (baseReligion || baseCaste) {
+        filteredRecommended = filteredRecommended.filter((p: any) => {
+          const pReligion = p.religion_id || p.religionId || p.religion;
+          const pCaste = (p.caste || p.caste_id || '').toString().toLowerCase();
+          const religionMatch = baseReligion ? String(pReligion) === String(baseReligion) : true;
+          const casteMatch = baseCaste ? pCaste === baseCaste : true;
+          return religionMatch && casteMatch;
+        });
+      }
+
+      setRecommendedProfiles(filteredRecommended);
       setNewMatchesProfiles(newlyJoinedData.profiles || []);
       setAllProfiles(allData.profiles || []);
       
@@ -836,7 +854,23 @@ export default function ProfilesScreen() {
         fetchProfilesByType('all', 1)
       ]);
 
-      setRecommendedProfiles(recommendedData.profiles);
+            const prefReligion = userInfo?.preferred_religion || userInfo?.partnerReligion || userInfo?.preferredReligion;
+      const prefCaste = (userInfo?.preferred_caste || userInfo?.partnerCaste || userInfo?.preferredCaste || '').toString().toLowerCase();
+      const baseReligion = prefReligion || userInfo?.religion_id || userInfo?.religionId || userInfo?.religion;
+      const baseCaste = prefCaste || (userInfo?.caste || userInfo?.caste_id || '').toString().toLowerCase();
+
+      let filteredRecommended = recommendedData.profiles;
+      if (baseReligion || baseCaste) {
+        filteredRecommended = filteredRecommended.filter((p: any) => {
+          const pReligion = p.religion_id || p.religionId || p.religion;
+          const pCaste = (p.caste || p.caste_id || '').toString().toLowerCase();
+          const religionMatch = baseReligion ? String(pReligion) === String(baseReligion) : true;
+          const casteMatch = baseCaste ? pCaste === baseCaste : true;
+          return religionMatch && casteMatch;
+        });
+      }
+
+      setRecommendedProfiles(filteredRecommended);
       setNewMatchesProfiles(newlyJoinedData.profiles);
       setAllProfiles(allData.profiles);
       

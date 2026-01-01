@@ -115,8 +115,8 @@ export default function ProfileDetailScreen() {
           education: memberData.education || 'N/A',
           religion: memberData.religion || 'N/A',
           caste: memberData.caste || 'N/A',
-          height: memberData.height || 'N/A',
-          weight: memberData.weight || 'N/A',
+          height: memberData.height || memberData.physical_attributes?.height || 'N/A',
+          weight: memberData.weight || memberData.physical_attributes?.weight || 'N/A',
           mobile: memberData.mobile || 'N/A',
           email: memberData.email || 'N/A',
           is_premium: (memberData.package_id && memberData.package_id !== 4) || false,
@@ -126,15 +126,39 @@ export default function ProfileDetailScreen() {
           maritalStatus: memberData.maritalStatus || 'N/A',
           birthPlace: memberData.birthPlace || 'N/A',
           lookingFor: memberData.lookingFor || 'N/A',
-          ageRange: memberData.ageRange || 'N/A',
-          heightRange: memberData.heightRange || 'N/A',
+          ageRange: (memberData.partnerAgeMin && memberData.partnerAgeMax) ? `${memberData.partnerAgeMin}-${memberData.partnerAgeMax}` : (memberData.ageRange || 'N/A'),
+          heightRange: (memberData.partnerHeightMin && memberData.partnerHeightMax) ? `${memberData.partnerHeightMin}-${memberData.partnerHeightMax}` : (memberData.heightRange || 'N/A'),
           preferredReligion: memberData.preferredReligion || 'N/A',
           preferredCaste: memberData.preferredCaste || 'N/A',
           preferredEducation: memberData.preferredEducation || 'N/A',
           preferredProfession: memberData.preferredProfession || 'N/A',
           preferredLocation: memberData.preferredLocation || 'N/A',
           preferredMaritalStatus: memberData.preferredMaritalStatus || 'N/A',
-          galleries: memberData.galleries || [],
+          gender: memberData.gender || (memberData.genderIdentity) || null,
+          galleries: (memberData.galleries && memberData.galleries.length>0) ? memberData.galleries : (Array.isArray(memberData.images) ? memberData.images.map((url:string)=>({ image: url })) : []),
+          complexion: memberData.complexion || memberData.faceColour || 'N/A',
+          faceColour: memberData.faceColour || memberData.faceColor || memberData.complexion || 'N/A',
+          eyeColor: memberData.eye_color || memberData.eyeColor || 'N/A',
+          hairColor: memberData.hair_color || memberData.hairColor || 'N/A',
+          disability: memberData.disability || 'N/A',
+          languages: Array.isArray(memberData.language) ? memberData.language.join(', ') : (memberData.languages || 'N/A'),
+          presentAddress: memberData.present_address || memberData.presentAddress || 'N/A',
+          permanentAddress: memberData.permanent_address || memberData.permanentAddress || 'N/A',
+          fatherName: (memberData.family?.father_name || memberData.fatherName || 'N/A'),
+          fatherProfession: (memberData.family?.father_profession || memberData.family?.father_occupation || memberData.fatherProfession || 'N/A'),
+          fatherContact: (memberData.family?.father_contact || memberData.fatherContact || 'N/A'),
+          motherName: (memberData.family?.mother_name || memberData.motherName || 'N/A'),
+          motherProfession: (memberData.family?.mother_profession || memberData.family?.mother_occupation || memberData.motherProfession || 'N/A'),
+          motherContact: (memberData.family?.mother_contact || memberData.motherContact || 'N/A'),
+          numberOfBrothers: (memberData.family?.number_of_brothers || memberData.family?.brothers || memberData.numberOfBrothers || memberData.brothers || 'N/A'),
+          numberOfSisters: (memberData.family?.number_of_sisters || memberData.family?.sisters || memberData.numberOfSisters || memberData.sisters || 'N/A'),
+          careerStartYear: (memberData.careers?.[0]?.start || memberData.careerStartYear || 'N/A'),
+          careerEndYear: (memberData.careers?.[0]?.end || memberData.careerEndYear || 'N/A'),
+          degree: (memberData.educations?.[0]?.degree || memberData.degree || 'N/A'),
+          fieldOfStudy: (memberData.educations?.[0]?.field_of_study || memberData.fieldOfStudy || 'N/A'),
+          institute: (memberData.educations?.[0]?.institute || memberData.institute || 'N/A'),
+          educationStartYear: (memberData.educations?.[0]?.start || memberData.educationStartYear || 'N/A'),
+          educationEndYear: (memberData.educations?.[0]?.end || memberData.educationEndYear || 'N/A'),
         };
         
         console.log('✅ Processed Profile:', processedProfile);
@@ -388,8 +412,11 @@ export default function ProfileDetailScreen() {
   }
 
   // Use image directly from API (already includes full URL from formatProfileResponse)
-  const profileImagePrimary = profile?.image || 'https://via.placeholder.com/400x600';
-  const profileImageFallback = undefined;
+    const profileImagePrimary = profile?.image || 'https://via.placeholder.com/400x600';
+  const genderLower = (profile?.gender || profile?.looking_for_gender || '').toLowerCase();
+  const profileImageFallback = genderLower === 'female'
+    ? require('../../assets/images/default-female.jpg')
+    : require('../../assets/images/default-male.jpg');
   console.log('👤 Profile Detail Screen - Main Image:', {
     profileId: profile?.id,
     profileName: profile?.name,
@@ -557,10 +584,7 @@ export default function ProfileDetailScreen() {
                   {profile?.bloodGroup && (
                     <DetailRow label="Blood Group" value={profile.bloodGroup} theme={theme} />
                   )}
-                  {profile?.complexion && (
-                    <DetailRow label="Complexion" value={profile.complexion} theme={theme} />
-                  )}
-                  {profile?.eyeColor && (
+                                    {profile?.eyeColor && (
                     <DetailRow label="Eye Color" value={profile.eyeColor} theme={theme} />
                   )}
                   {profile?.hairColor && (

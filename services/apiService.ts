@@ -85,6 +85,10 @@ interface RegisterRequest {
   country: string;
   country_code: string;
   mobile_code: string;
+  religion_id: string;
+  caste: string;
+  gender: string;
+  birth_date: string;
   agree: boolean;
 }
 
@@ -183,7 +187,7 @@ export class APIService {
    */
   async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
     try {
-      const response = await this.api.post('/login', credentials);
+      const response = await this.api.post('/auth/login', credentials);
       
       if (response.data.status === 'success' && response.data.data?.access_token) {
         await SecureStore.setItemAsync('token', response.data.data.access_token);
@@ -208,7 +212,7 @@ export class APIService {
         }
       });
 
-      const response = await this.api.post('/register', formData, {
+      const response = await this.api.post('/auth/register', formData, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
 
@@ -237,6 +241,32 @@ export class APIService {
   // ========================================================================
 
   /**
+   * Get full profile settings for current user
+   * GET /profile-settings
+   */
+  async getProfileSettings(): Promise<ApiResponse> {
+    try {
+      const response = await this.api.get('/profile-settings');
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to fetch profile settings');
+    }
+  }
+
+  /**
+   * Update basic information section of profile
+   * POST /profile-settings/basic
+   */
+  async updateBasicInfo(data: any): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/profile-settings/basic', data);
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to update basic info');
+    }
+  }
+
+  /**
    * Get current user info
    * GET /user-info
    */
@@ -246,6 +276,19 @@ export class APIService {
       return response.data;
     } catch (error: any) {
       throw this.handleError(error, 'Failed to fetch user info');
+    }
+  }
+
+  /**
+   * Get current user's complete details
+   * GET /mobile/user/details
+   */
+  async getUserDetails(): Promise<ApiResponse> {
+    try {
+      const response = await this.api.get('/user/details');
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to fetch user details');
     }
   }
 
@@ -487,6 +530,116 @@ export class APIService {
       return response.data;
     } catch (error: any) {
       throw this.handleError(error, 'Failed to upload image');
+    }
+  }
+
+  
+  // ========================================================================
+  // CAREER ENDPOINTS
+  // -----------------------------------------------------------------------
+  /** List careers */
+  async getCareers(): Promise<ApiResponse> {
+    return await this.api.get('/profile-settings/careers').then(r => r.data);
+  }
+  /** Create career */
+  async createCareer(data: any): Promise<ApiResponse> {
+    return await this.api.post('/profile-settings/careers', data).then(r => r.data);
+  }
+  /** Update career */
+  async updateCareer(id: number, data: any): Promise<ApiResponse> {
+    return await this.api.put(`/profile-settings/careers/${id}`, data).then(r => r.data);
+  }
+  /** Delete career */
+  async deleteCareer(id: number): Promise<ApiResponse> {
+    return await this.api.delete(`/profile-settings/careers/${id}`).then(r => r.data);
+  }
+
+  // EDUCATION ENDPOINTS
+  // -----------------------------------------------------------------------
+  /** List educations */
+  async getEducations(): Promise<ApiResponse> {
+    return await this.api.get('/profile-settings/educations').then(r => r.data);
+  }
+  /** Create education */
+  async createEducation(data: any): Promise<ApiResponse> {
+    return await this.api.post('/profile-settings/educations', data).then(r => r.data);
+  }
+  /** Update education */
+  async updateEducation(id: number, data: any): Promise<ApiResponse> {
+    return await this.api.put(`/profile-settings/educations/${id}`, data).then(r => r.data);
+  }
+  /** Delete education */
+  async deleteEducation(id: number): Promise<ApiResponse> {
+    return await this.api.delete(`/profile-settings/educations/${id}`).then(r => r.data);
+  }
+
+  // PROFILE OTHER SECTIONS ENDPOINTS
+  // -----------------------------------------------------------------------
+  /**
+   * Update physical attributes
+   * POST /profile-settings/physical-attributes
+   */
+  async updatePhysicalAttributes(data: any): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/profile-settings/physical-attributes', data);
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to update physical attributes');
+    }
+  }
+
+  /**
+   * Update family information
+   * POST /profile-settings/family-info
+   */
+  async updateFamilyInfo(data: any): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/profile-settings/family-info', data);
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to update family information');
+    }
+  }
+
+  /**
+   * Update partner expectation
+   * POST /profile-settings/partner-expectation
+   */
+  async updatePartnerExpectation(data: any): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/profile-settings/partner-expectation', data);
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to update partner expectation');
+    }
+  }
+
+  // DROPDOWN / OPTIONS ENDPOINTS
+  /**
+   * Fetch dropdown data (religions, marital statuses, countries, etc.)
+   * GET /options
+   */
+  async getDropdownOptions(): Promise<ApiResponse> {
+    try {
+      const response = await this.api.get('/options');
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to fetch dropdown options');
+    }
+  }
+
+// LOCATION ENDPOINTS
+  // ========================================================================
+  /**
+   * Fetch list of states used in profile settings dropdowns
+   * GET /locations/states
+   */
+  async getStates(): Promise<Record<string, string>> {
+    try {
+      const response = await this.api.get('/locations/states');
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to fetch states');
     }
   }
 

@@ -92,7 +92,15 @@ const withFallback = async (apiCall: () => Promise<any>, retries = 2) => {
 // API Service
 export const apiService = {
   getGalleryImages() {
-    return axiosInstance.get('/gallery-images');
+    return axiosInstance.get('/gallery-images').then(r => r.data);
+  },
+  uploadGalleryImage(formData: FormData){
+    return axiosInstance.post('/upload-gallery-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(r => r.data);
+  },
+  getUserPlan(){
+    return axiosInstance.get('/user-plan').then(r => r.data);
   },
   api: axiosInstance,
 
@@ -103,7 +111,7 @@ export const apiService = {
       const loginPayload = { username, password };
       
       // Log login attempt with full URL
-      const loginUrl = `${axiosInstance.defaults.baseURL}/login`;
+      const loginUrl = `${axiosInstance.defaults.baseURL}/auth/login`;
       console.log('🔐 Login Attempt:');
       console.log(`   Full URL: ${loginUrl}`);
       console.log(`   Username: ${username}`);
@@ -111,7 +119,7 @@ export const apiService = {
       
       try {
         console.log(`📡 Sending POST request to: ${loginUrl}`);
-        const response = await axiosInstance.post('/login', loginPayload, {
+        const response = await axiosInstance.post('/auth/login', loginPayload, {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
@@ -135,7 +143,7 @@ export const apiService = {
         if (!error.response || error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED') {
           
           try {
-            const fallbackUrl = `${API_BASE_URL}/login`;
+            const fallbackUrl = `${API_BASE_URL}/auth/login`;
             console.log(`📡 Trying fallback URL: ${fallbackUrl}`);
             const fallbackResp = await axios.post(fallbackUrl, loginPayload, {
               headers: { 
@@ -186,13 +194,14 @@ export const apiService = {
         'birth_date': userData.birth_date,
         'password': userData.password,
         'password_confirmation': userData.password_confirmation,
-        'religion': userData.religion,
-        'caste': userData.caste,
+        'religion_id': userData.religion_id,
+        'caste_id': userData.caste_id,
         'username': userData.username,
         'mobile_code': userData.mobile_code,
         'country_code': userData.country_code,
         'country': userData.country,
         'agree': userData.agree,
+        'gender': userData.gender,
       };
       
       Object.keys(fieldsToSend).forEach(key => {
@@ -204,7 +213,7 @@ export const apiService = {
       });
 
 
-      const response = await axiosInstance.post('/register', formData, {
+      const response = await axiosInstance.post('/auth/register', formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -229,6 +238,13 @@ export const apiService = {
     }
   },
 
+  // ----------------------------
+  // Profile completion helpers
+  // ----------------------------
+  getProfileStep: async () => axiosInstance.get('/user/complete-profile'),
+  submitProfileStep: async (step: string, data: any) => axiosInstance.post(`/user/complete-profile/${step}`, data),
+  skipAllProfileSteps: async () => axiosInstance.post('/user/complete-profile/skip-all', { skip_all: true }),
+
   logout: async () => {
     const response = await axiosInstance.get('/logout');
     return response.data;
@@ -245,9 +261,37 @@ export const apiService = {
   getDashboard: async () => {
     try {
       const response = await axiosInstance.get('/dashboard');
-      console.log('📊 Dashboard API Response:', response.data);
-      console.log('📊 Limitation data:', response.data?.data?.limitation);
-      return response.data;
+      // Normalize limitation structure so frontend can rely on it
+      let data = response.data;
+      if (data?.status === 'success') {
+        const flat = data.data || {};
+        // If limitation missing but flat counts exist, convert
+        if (!flat.limitation) {
+          flat.limitation = {
+            interest_express_limit: flat.remaining_interests ?? flat.interest_express_limit ?? 0,
+            contact_view_limit: flat.remaining_contact_view ?? flat.contact_view_limit ?? 0,
+            image_upload_limit: flat.remaining_image_upload ?? flat.image_upload_limit ?? 0,
+            package_id: flat.package_id ?? 4,
+            package_name: flat.package_name ?? 'FREE MATCH',
+          };
+          data = { ...data, data: flat };
+        } else {
+          // ensure package fields present
+          flat.limitation.package_id = flat.limitation.package_id ?? flat.package_id ?? 4;
+          flat.limitation.package_name = flat.limitation.package_name ?? flat.package_name ?? 'FREE MATCH';
+        }
+      }
+      // Provide flat aliases so old screens using remaining_* won’t break
+      if (data?.data) {
+        const lim = data.data.limitation;
+        data.data.remaining_interests = lim.interest_express_limit;
+        data.data.remaining_contact_view = lim.contact_view_limit;
+        data.data.remaining_image_upload = lim.image_upload_limit;
+        data.data.package_id = lim.package_id;
+        data.data.package_name = lim.package_name;
+      }
+      console.log('📊 Normalized limitation:', data?.data?.limitation);
+      return data;
     } catch (error: any) {
       console.error('❌ Dashboard API Error:', error.message);
       return {
@@ -1426,6 +1470,49 @@ const transformMemberToProfile = (memberData: any) => {
     motherTongue: safeGet(memberData, 'basic_info.mother_tongue', 'N/A'),
     
     // Physical attributes
+    eyeColor: safeGet(memberData, 'physical_attributes.eye_color', 'N/A'),
+    hairColor: safeGet(memberData, 'physical_attributes.hair_color', 'N/A'),
+    disability: safeGet(memberData, 'physical_attributes.disability', 'N/A'),
+    languages: Array.isArray(safeGet(memberData, 'basic_info.language')) ? safeGet(memberData, 'basic_info.language').join(', ') : safeGet(memberData, 'basic_info.language', 'N/A'),
+
+    // Addresses
+    presentAddress: (() => {
+      const addr = safeGet(memberData, 'basic_info.present_address', null);
+      if (addr && typeof addr === 'object') {
+        const { city = '', state = '', country = '' } = addr;
+        return [city, state, country].filter(Boolean).join(', ') || 'N/A';
+      }
+      return addr || 'N/A';
+    })(),
+    permanentAddress: (() => {
+      const addr = safeGet(memberData, 'basic_info.permanent_address', null);
+      if (addr && typeof addr === 'object') {
+        const { city = '', state = '', country = '' } = addr;
+        return [city, state, country].filter(Boolean).join(', ') || 'N/A';
+      }
+      return addr || 'N/A';
+    })(),
+
+    // Family additional info
+    fatherContact: safeGet(memberData, 'family.father_contact', 'N/A'),
+    motherContact: safeGet(memberData, 'family.mother_contact', 'N/A'),
+    numberOfBrothers: safeGet(memberData, 'family.number_of_brothers', 'N/A'),
+    numberOfSisters: safeGet(memberData, 'family.number_of_sisters', 'N/A'),
+
+    // Career (take first entry)
+    company: safeGet(memberData, 'career_info.0.company', 'N/A'),
+    designation: safeGet(memberData, 'career_info.0.designation', 'N/A'),
+    careerStartYear: safeGet(memberData, 'career_info.0.start', 'N/A'),
+    careerEndYear: safeGet(memberData, 'career_info.0.end', 'N/A'),
+
+    // Education (first entry)
+    degree: safeGet(memberData, 'education_info.0.degree', 'N/A'),
+    fieldOfStudy: safeGet(memberData, 'education_info.0.field_of_study', 'N/A'),
+    institute: safeGet(memberData, 'education_info.0.institute', 'N/A'),
+    educationStartYear: safeGet(memberData, 'education_info.0.start', 'N/A'),
+    educationEndYear: safeGet(memberData, 'education_info.0.end', 'N/A'),
+
+    // Physical attributes
     complexion: safeGet(memberData, 'physical_attributes.complexion', 'N/A'),
     bodyType: safeGet(memberData, 'physical_attributes.body_type', 'N/A'),
     
@@ -1434,6 +1521,14 @@ const transformMemberToProfile = (memberData: any) => {
     partnerAgeMax: safeGet(memberData, 'partner_expectation.max_age', 35),
     partnerHeightMin: safeGet(memberData, 'partner_expectation.min_height', '150cm'),
     partnerHeightMax: safeGet(memberData, 'partner_expectation.max_height', '180cm'),
+
+    // Partner preference fields
+    preferredReligion: safeGet(memberData, 'partner_expectation.religion', 'N/A'),
+    preferredCaste: safeGet(memberData, 'partner_expectation.caste', 'N/A'),
+    preferredEducation: safeGet(memberData, 'partner_expectation.education', 'N/A'),
+    preferredProfession: safeGet(memberData, 'partner_expectation.profession', 'N/A'),
+    preferredLocation: safeGet(memberData, 'partner_expectation.location', 'N/A'),
+    preferredMaritalStatus: safeGet(memberData, 'partner_expectation.marital_status', 'N/A'),
     
     // Additional fields from API response
     gender: safeGet(memberData, 'basic_info.gender', 'N/A'),

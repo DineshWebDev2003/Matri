@@ -58,26 +58,20 @@ export const getGalleryImageUrl = (image: string | null | undefined): ImageUrls 
   }
   
   const trimmedImage = image.trim();
-  // If it's already a full URL (from API), use production URL directly
+  const devBase = process.env.EXPO_PUBLIC_IMAGE_GALLERY_BASE_URL || 'http://10.169.108.139/app_matri/matri_app/assets/images/user/gallery';
+  // If API already returns full URL, still prefer our dev server by filename
   if (trimmedImage.startsWith('http')) {
-    // If it's a local IP URL, convert to production URL
-    if (trimmedImage.includes('10.177.237.139') || trimmedImage.includes('localhost')) {
-      // Extract filename from URL
-      const filename = trimmedImage.split('/').pop();
-      const productionUrl = `https://90skalyanam.com/assets/images/user/gallery/${filename}`;
-      console.log('🔄 Converting local IP gallery URL to production:', { local: trimmedImage, production: productionUrl });
-      return { primary: productionUrl, fallback: null };
-    }
-    // If it's already a production URL, use it directly
-    return { primary: trimmedImage, fallback: null };
+    const filename = trimmedImage.split('/').pop();
+    const primaryUrl = `${devBase}/${filename}`;
+    return { primary: primaryUrl, fallback: trimmedImage };
   }
   
-  // If it's just a filename, construct URL with production server
-  const primaryUrl = `https://90skalyanam.com/assets/images/user/gallery/${trimmedImage}`;
-  // Fallback to environment variable (local IP)
-  const imageBaseUrl = process.env.EXPO_PUBLIC_IMAGE_GALLERY_BASE_URL || 'http://10.177.237.139:8000/Final%20Code/assets/assets/images/user/gallery';
-  const fallbackUrl = `${imageBaseUrl}/${trimmedImage}`;
-  
+  // If it's just a filename, construct URL with LOCAL first
+  const webBase = process.env.EXPO_PUBLIC_WEB_BASE_URL || 'http://10.169.108.139/app_matri/matri_app';
+  const imageBaseUrl = process.env.EXPO_PUBLIC_IMAGE_GALLERY_BASE_URL || `${webBase}/assets/images/user/gallery`;
+  const primaryUrl = `${imageBaseUrl}/${trimmedImage}`;
+  // Production fallback
+  const fallbackUrl = `https://90skalyanam.com/assets/images/user/gallery/${trimmedImage}`;
   return { primary: primaryUrl, fallback: fallbackUrl };
 };
 
