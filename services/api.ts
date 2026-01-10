@@ -3,12 +3,31 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { sendWelcomeNotification } from './fcmService';
 
-// Load environment variables
-const API_HOST = process.env.EXPO_PUBLIC_API_HOST || '10.169.108.139';
-const API_PORT = process.env.EXPO_PUBLIC_API_PORT || '8000';
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${API_HOST}:${API_PORT}/api/mobile`;
-const IMAGE_PROFILE_BASE_URL = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || `http://${API_HOST}:${API_PORT}/assets/images/user/profile`;
-const IMAGE_GALLERY_BASE_URL = process.env.EXPO_PUBLIC_IMAGE_GALLERY_BASE_URL || `http://${API_HOST}:${API_PORT}/assets/images/user/gallery`;
+// Load environment variables with robust fallback handling
+const DEFAULT_HOST = 'app.90skalyanam.com';
+const DEFAULT_PORT = '443';
+const DEFAULT_BASE_URL = 'https://app.90skalyanam.com/api/mobile';
+
+const API_HOST = process.env.EXPO_PUBLIC_API_HOST ?? DEFAULT_HOST;
+const API_PORT = process.env.EXPO_PUBLIC_API_PORT ?? DEFAULT_PORT;
+let API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+if (!API_BASE_URL || API_BASE_URL.trim() === '') {
+  const scheme = API_PORT === '443' ? 'https' : 'http';
+  const portSegment = API_PORT && !(scheme === 'https' && API_PORT === '443') ? `:${API_PORT}` : '';
+  API_BASE_URL = `${scheme}://${API_HOST}${portSegment}/api/mobile`;
+}
+// Ensure no trailing slash
+API_BASE_URL = API_BASE_URL.replace(/\/$/, '');
+const IMAGE_PROFILE_BASE_URL = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || (() => {
+  const scheme = API_PORT === '443' ? 'https' : 'http';
+  const portSegment = API_PORT && !(scheme === 'https' && API_PORT === '443') ? `:${API_PORT}` : '';
+  return `${scheme}://${API_HOST}${portSegment}/assets/images/user/profile`;
+})();
+const IMAGE_GALLERY_BASE_URL = process.env.EXPO_PUBLIC_IMAGE_GALLERY_BASE_URL || (() => {
+  const scheme = API_PORT === '443' ? 'https' : 'http';
+  const portSegment = API_PORT && !(scheme === 'https' && API_PORT === '443') ? `:${API_PORT}` : '';
+  return `${scheme}://${API_HOST}${portSegment}/assets/images/user/gallery`;
+})();
 
 // Log API configuration on startup
 console.log('🔧 API Configuration Loaded:');
