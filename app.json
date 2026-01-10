@@ -2,10 +2,9 @@
   "expo": {
     "name": "90skalyanam",
     "splash": {
-      "image": "./assets/splashscreen.json",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "animation": "lottie"
+      "backgroundColor": "#ffffff"
     },
     "slug": "90skalyanam",
     "version": "1.0.0",
@@ -35,8 +34,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splashscreen.json",
-          "animation": "lottie",
+          "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
