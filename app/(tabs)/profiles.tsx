@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Dimensions, Image, SafeAreaView, StatusBar, ScrollView, Modal, RefreshControl, Platform, ToastAndroid } from 'react-native';
+import { View, Text, StyleSheet, Animated, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Dimensions, Image, SafeAreaView, StatusBar, ScrollView, Modal, RefreshControl, Platform, ToastAndroid } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '../../context/ThemeContext';
@@ -8,10 +9,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { apiService, premiumUtils } from '../../services/api';
 import ProfileImage from '../../components/ProfileImage';
-import { Animated } from 'react-native';
 import HeartIcon from '../../components/HeartIcon';
 import UniversalHeader from '../../components/UniversalHeader';
-import WithSwipe from '../../components/WithSwipe';
+//import WithSwipe from '../../components/WithSwipe';
 import MenuModal from '../../components/MenuModal';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -54,11 +54,11 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
   isHorizontal?: boolean 
 }) => {
   // Safe access to profile properties
-  const profileName = item?.name || `${item?.firstname || 'Unknown'} ${item?.lastname || ''}`.trim();
+  const profileName = item?.name || item?.fullname || `${item?.firstname || 'Unknown'} ${item?.lastname || ''}`.trim();
   const isInterested = interestingProfiles.has(item.id?.toString()) || item?.isInterested || false;
   const age = calculateAge(item?.dateOfBirth || item?.dob) || item?.age;
   // Backend returns 'location' field which contains city
-  const location = item?.location || item?.city || item?.state || item?.district || item?.address || 'Location N/A';
+  const location = item?.location || item?.city || item?.state || item?.district || item?.presentAddress || item?.permanentAddress || item?.country || 'Location N/A';
   
   // Get gender and set default image
   const userGender = item?.gender?.toLowerCase();
@@ -68,12 +68,22 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
   
   // Get profile image from API if available
   // API returns full URLs from formatProfileResponse, use them directly
-  let profileImage = null;
+  // Resolve profile image
+  let profileImage: string | null = null;
+
+  // Helper to clean duplicates like ".../profile/https://"
+  const cleanImageUrl = (url: string) => {
+    const dup = 'https://90skalyanam.com/assets/images/user/profile/https://';
+    if (url.startsWith(dup)) {
+      return url.replace('https://90skalyanam.com/assets/images/user/profile/', '');
+    }
+    return url;
+  };
   
   if (item?.image) {
     // If image is already a full URL (from API), use it directly
     if (item.image.startsWith('http')) {
-      profileImage = item.image;
+      profileImage = cleanImageUrl(item.image);
     } else {
       // If it's just a filename, build the URL using env variable
       const cleanImageName = item.image.replace(/[}\])]$/g, '');
@@ -84,19 +94,24 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
   
   // Get package info
   const packageName = item?.packageName || item?.package_name || 'FREE MATCH';
-  const packageId = item?.packageId || item?.package_id || 1;
-  // Map package name to tag colours
-  const getPackageTagColors = (id: number) => {
-    switch(id){
-      case 2: // PREMIUM MATCH
-        return { bg: '#DDD6FE', text: '#6D28D9' };
-      case 3: // ELITE / PLATINUM
-        return { bg: '#DBEAFE', text: '#2563EB' };
-      case 1: // BASIC / GOLD-ish
-        return { bg: '#FEF9C3', text: '#D97706' };
-      default: // FREE or unknown
-        return { bg: '#E5E7EB', text: '#374151' };
+  // Map package name (string) to tag colours
+  const getPackageTagColors = (name: string) => {
+    if (!name) return { bg: '#E5E7EB', text: '#374151' };
+    const upper = name.toUpperCase();
+    if (upper.includes('PREMIUM')) {
+      return { bg: '#DDD6FE', text: '#6D28D9' }; // light purple bg, deep purple text
     }
+    if (upper.includes('BASIC')) {
+      return { bg: '#FEF9C3', text: '#D97706' }; // light gold bg, gold text
+    }
+    if (upper.includes('PLATINUM') || upper.includes('ELITE')) {
+      return { bg: '#DBEAFE', text: '#2563EB' }; // light blue bg, blue text
+    }
+    if (upper.includes('FREE')) {
+      return { bg: '#E5E7EB', text: '#374151' }; // gray bg/text
+    }
+    // default
+    return { bg: '#E5E7EB', text: '#374151' };
   };
   
   // Get gradient colors based on package type
@@ -173,8 +188,8 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
         />
         
         {/* Package Tag */}
-        <View style={[styles.packageTag, { backgroundColor: getPackageTagColors(packageId).bg }]}> 
-          <Text style={[styles.packageTagText, { color: getPackageTagColors(packageId).text }]} numberOfLines={1}>{packageName}</Text>
+        <View style={[styles.packageTag, { backgroundColor: getPackageTagColors(packageName).bg }]}> 
+          <Text style={[styles.packageTagText, { color: getPackageTagColors(packageName).text }]} numberOfLines={1}>{packageName}</Text>
         </View>
         
         {/* Gradient Overlay - Bottom Red */}
@@ -222,6 +237,19 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
 };
 
 export default function ProfilesScreen() {
+  const [showInterestAnimation, setShowInterestAnimation] = useState(false);
+  const [interestName,setInterestName]=useState<string>('Member');
+  const slideUpAnim = useState(new Animated.Value(500))[0];
+  const opacityAnim = useState(new Animated.Value(0))[0];
+  const playInterestSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require('../../assets/interest.wav'),
+        { shouldPlay: true }
+      );
+      sound.setOnPlaybackStatusUpdate((st)=>{if(st.isLoaded && st.didJustFinish) sound.unloadAsync();});
+    } catch {}
+  };
   const toastSlideAnim = useRef(new Animated.Value(500)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const [toastMessage, setToastMessage] = useState('');
@@ -502,8 +530,22 @@ export default function ProfilesScreen() {
       } else {
         // Express interest
         await apiService.expressHeart(profileId);
-        // Notify user
+        setInterestName(profile.name || 'Member');
+        await playInterestSound();
         triggerToast('Heart sent successfully');
+        // animation
+        setShowInterestAnimation(true);
+        Animated.parallel([
+          Animated.timing(slideUpAnim,{toValue:0,duration:500,useNativeDriver:true}),
+          Animated.timing(opacityAnim,{toValue:1,duration:500,useNativeDriver:true})
+        ]).start(()=>{
+          setTimeout(()=>{
+            Animated.parallel([
+              Animated.timing(slideUpAnim,{toValue:500,duration:500,useNativeDriver:true}),
+              Animated.timing(opacityAnim,{toValue:0,duration:500,useNativeDriver:true})
+            ]).start(()=>setShowInterestAnimation(false));
+          },3000);
+        });
         setInterestingProfiles(prev => new Set(prev).add(profileId));
       }
 
@@ -657,27 +699,47 @@ export default function ProfilesScreen() {
     }
   };
 
-  /**
-   * Fetch profiles from new members endpoint with gender and age
-   */
-  const fetchProfilesByType = async (type: 'all' | 'recommended' | 'newly_joined', pageNum: number = 1) => {
-    try {
-      console.log(`🔄 Fetching ${type} profiles (page ${pageNum})...`);
-      
-      // Get token directly from auth context
-      const authToken = auth?.token;
-      if (!authToken) {
+  // -------------------------------------------------------------
+  // Fetch profiles by type (all, recommended, newly_joined)
+  // -------------------------------------------------------------
+  const fetchProfilesByType = async (
+    type: 'all' | 'recommended' | 'newly_joined',
+    pageNum: number = 1,
+  ): Promise<{ profiles: any[]; hasMore: boolean; total: number; lastPage: number }> => {
+    // For recommended profiles, use the recommended-matches endpoint
+    if (type === 'recommended') {
+      // We'll handle this case separately after the auth check
+      type = 'recommended';
+    }
+
+    // Fallback to previous new-members endpoint for other types
+    const authToken = auth?.token;
+    if (!authToken) {
         console.error('❌ No authentication token available. Auth token:', authToken);
         return { profiles: [], hasMore: false, total: 0, lastPage: 1 };
       }
 
+    try {
       console.log(`🔑 Using token: ${authToken.substring(0, 20)}...`);
 
       // Build URL for new-members endpoint with type parameter
       const apiHost = process.env.EXPO_PUBLIC_API_HOST || '172.16.200.139';
       const apiPort = process.env.EXPO_PUBLIC_API_PORT || '8000';
       const apiBaseUrl = `http://${apiHost}:${apiPort}`;
-      const url = `${apiBaseUrl}/api/new-members?type=${type}&page=${pageNum}&per_page=12`;
+      
+      // Use different endpoints based on profile type
+      let endpoint: string;
+      let url: string;
+      if (type === 'recommended') {
+        endpoint = 'mobile/recommended-matches';
+        url = `${apiBaseUrl}/api/${endpoint}?page=${pageNum}&per_page=12`;
+      } else if (type === 'newly_joined') {
+        endpoint = 'mobile/new-matches';
+        url = `${apiBaseUrl}/api/${endpoint}?page=${pageNum}&per_page=12`;
+      } else {
+        endpoint = 'new-members';
+        url = `${apiBaseUrl}/api/${endpoint}?type=${type}&page=${pageNum}&per_page=12`;
+      }
       
       console.log(`📡 Fetching from: ${url}`);
 
@@ -694,8 +756,8 @@ export default function ProfilesScreen() {
       console.log(`📡 Response status for ${type}:`, response.status);
       console.log(`📡 Response for ${type}:`, JSON.stringify(data, null, 2).substring(0, 500));
 
-      if (data?.status === 'success' && data?.data?.profiles) {
-        const profiles = data.data.profiles;
+      if (data?.status === 'success' && (data?.data?.profiles || data?.data?.members || data?.data?.users)) {
+        const profiles = data.data.profiles || data.data.members || data.data.users;
         const pagination = data.data.pagination || {
           has_more: false,
           total: profiles.length,
@@ -768,8 +830,8 @@ export default function ProfilesScreen() {
             // Determine filter values
       const prefReligion = userInfo?.preferred_religion || userInfo?.partnerReligion || userInfo?.preferredReligion;
       const prefCaste = (userInfo?.preferred_caste || userInfo?.partnerCaste || userInfo?.preferredCaste || '').toString().toLowerCase();
-      const baseReligion = prefReligion || userInfo?.religion_id || userInfo?.religionId || userInfo?.religion;
-      const baseCaste = prefCaste || (userInfo?.caste || userInfo?.caste_id || '').toString().toLowerCase();
+      const baseReligion = prefReligion || null;
+      const baseCaste = prefCaste;
 
       // Filter recommended list
       let filteredRecommended = recommendedData.profiles || [];
@@ -856,8 +918,8 @@ export default function ProfilesScreen() {
 
             const prefReligion = userInfo?.preferred_religion || userInfo?.partnerReligion || userInfo?.preferredReligion;
       const prefCaste = (userInfo?.preferred_caste || userInfo?.partnerCaste || userInfo?.preferredCaste || '').toString().toLowerCase();
-      const baseReligion = prefReligion || userInfo?.religion_id || userInfo?.religionId || userInfo?.religion;
-      const baseCaste = prefCaste || (userInfo?.caste || userInfo?.caste_id || '').toString().toLowerCase();
+      const baseReligion = prefReligion || null;
+      const baseCaste = prefCaste;
 
       let filteredRecommended = recommendedData.profiles;
       if (baseReligion || baseCaste) {
@@ -1115,7 +1177,7 @@ export default function ProfilesScreen() {
   };
 
   return (
-    <WithSwipe toRight="/(tabs)/saved" toLeft="/(tabs)/index">
+    //<WithSwipe toRight="/(tabs)/saved" toLeft="/(tabs)/index">
       <View style={[styles.container, themeStyles.container, { flex: 1 }]}>
       <StatusBar 
         barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
@@ -1587,12 +1649,31 @@ export default function ProfilesScreen() {
         visible={menuModalVisible}
         onClose={() => setMenuModalVisible(false)}
       />
-    </View>
-  </WithSwipe>
+      {showInterestAnimation && (
+        <Animated.View style={[styles.interestAnimationContainer, { transform: [{ translateY: slideUpAnim }], opacity: opacityAnim }]}> 
+          <LinearGradient colors={['#DC2626', '#EF4444']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.interestAnimationGradient}>
+            <View style={styles.interestAnimationContent}>
+              <Feather name="heart" size={28} color="white" fill="white" />
+              <View style={styles.interestAnimationText}>
+                <Text style={styles.interestAnimationTitle}>Interest Sent!</Text>
+                <Text style={styles.interestAnimationSubtitle}>{interestName} will see your interest</Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      )}
+      </View>
+
   );
 }
 
 const styles = StyleSheet.create({
+  interestAnimationContainer:{position:'absolute',bottom:100,left:0,right:0,alignItems:'center',zIndex:50},
+  interestAnimationGradient:{paddingHorizontal:24,paddingVertical:14,borderRadius:30},
+  interestAnimationContent:{flexDirection:'row',alignItems:'center',gap:12},
+  interestAnimationText:{},
+  interestAnimationTitle:{color:'white',fontSize:16,fontWeight:'700'},
+  interestAnimationSubtitle:{color:'white',fontSize:12},
   container: { 
     flex: 1,
     marginTop: 0,

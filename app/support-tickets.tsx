@@ -4,24 +4,26 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import UniversalHeader from '../components/UniversalHeader';
+import TicketForm from '../components/TicketForm';
+import { apiService } from '../services/api';
 
 export default function SupportTicketsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    // Fetch tickets from API or local storage
+    // Fetch tickets from API
     fetchTickets();
   }, []);
 
   const fetchTickets = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call when backend is ready
-      // For now, show empty state
-      setTickets([]);
+      const data = await apiService.getSupportTickets();
+      setTickets(data);
     } catch (error) {
       console.error('Error fetching tickets:', error);
     } finally {
@@ -50,18 +52,25 @@ export default function SupportTicketsScreen() {
         </View>
       </View>
       <Text style={[styles.ticketDate, themeStyles.secondaryText]}>
-        {new Date(item.createdAt).toLocaleDateString()}
+        {(() => {
+            const dt = item.created_at ?? item.createdAt;
+            return dt ? new Date(dt).toLocaleDateString() : '';
+          })()}
       </Text>
     </TouchableOpacity>
   );
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
+  const getStatusColor = (status: any) => {
+    const s = (status ?? '').toString().toLowerCase();
+    switch (s) {
       case 'open':
+      case '1':
         return '#3B82F6';
       case 'in-progress':
+      case '2':
         return '#F59E0B';
       case 'closed':
+      case '0':
         return '#10B981';
       default:
         return '#6B7280';
@@ -90,7 +99,7 @@ export default function SupportTicketsScreen() {
           </Text>
           <TouchableOpacity 
             style={styles.createTicketButton}
-            onPress={() => router.push('/new-ticket')}
+            onPress={() => setModalVisible(true)}
           >
             <Feather name="plus" size={20} color="white" />
             <Text style={styles.createTicketButtonText}>Create Ticket</Text>
@@ -107,7 +116,7 @@ export default function SupportTicketsScreen() {
           />
           <TouchableOpacity 
             style={styles.floatingButton}
-            onPress={() => router.push('/new-ticket')}
+            onPress={() => setModalVisible(true)}
           >
             <Feather name="plus" size={24} color="white" />
           </TouchableOpacity>
@@ -117,10 +126,18 @@ export default function SupportTicketsScreen() {
       {tickets.length === 0 && !loading && (
         <TouchableOpacity 
           style={styles.floatingButton}
-          onPress={() => router.push('/new-ticket')}
+          onPress={() => setModalVisible(true)}
         >
           <Feather name="plus" size={24} color="white" />
         </TouchableOpacity>
+      )}
+      {modalVisible && (
+        <TicketForm
+          onClose={() => setModalVisible(false)}
+          onSuccess={(ticket) => {
+            setTickets([ticket, ...tickets]);
+          }}
+        />
       )}
     </SafeAreaView>
   );

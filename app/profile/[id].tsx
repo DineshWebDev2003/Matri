@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Dimensions, Alert, ActivityIndicator, FlatList, Modal, PanResponder, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import ImageViewing from 'react-native-image-viewing';
+import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
@@ -35,7 +37,8 @@ export default function ProfileDetailScreen() {
   const [isInterested, setIsInterested] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'preferences' | 'photos'>('details');
-  const [fullScreenPhoto, setFullScreenPhoto] = useState<any>(null);
+  const [fullScreenPhoto, setFullScreenPhoto] = useState<any[]>([]);
+  const [viewerVisible, setViewerVisible] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   // Remaining contact-view credits from limitation data
   const [remainingCredits, setRemainingCredits] = useState<number>(() => {
@@ -62,18 +65,22 @@ export default function ProfileDetailScreen() {
     fetchCredits();
   }, [showCreditPopup]);
   const [contactDetailsUnlocked, setContactDetailsUnlocked] = useState(false);
-
-  // Persist contact unlock status per profile
-  useEffect(() => {
-    if (!profile?.id) return;
-    const key = `contact_unlocked_${profile.id}`;
-    AsyncStorage.getItem(key).then((val) => {
-      if (val === 'true') setContactDetailsUnlocked(true);
-    });
-  }, [profile?.id]);
   const [isInIgnoredList, setIsInIgnoredList] = useState(false);
   const [showCreditPopup, setShowCreditPopup] = useState(false);
   const [showInterestAnimation, setShowInterestAnimation] = useState(false);
+
+  const playInterestSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require('../../assets/interest.wav'),
+        { shouldPlay: true }
+      );
+      // Optionally unload after play ends
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) sound.unloadAsync();
+      });
+    } catch {}
+  };
   const slideUpAnim = useState(new Animated.Value(500))[0];
   const opacityAnim = useState(new Animated.Value(0))[0];
   const [expandedSections, setExpandedSections] = useState({
@@ -121,7 +128,10 @@ export default function ProfileDetailScreen() {
           email: memberData.email || 'N/A',
           is_premium: (memberData.package_id && memberData.package_id !== 4) || false,
           packageId: memberData.package_id || 4,
-          image: memberData.image ? (memberData.image.startsWith('http') ? memberData.image : `https://90skalyanam.com/assets/images/user/profile/${memberData.image}`) : null,
+          image: (() => {
+            const urls = getImageUrl(memberData.image);
+            return urls.primary || memberData.image || null;
+          })(),
           bloodGroup: memberData.bloodGroup || 'N/A',
           maritalStatus: memberData.maritalStatus || 'N/A',
           birthPlace: memberData.birthPlace || 'N/A',
@@ -135,7 +145,19 @@ export default function ProfileDetailScreen() {
           preferredLocation: memberData.preferredLocation || 'N/A',
           preferredMaritalStatus: memberData.preferredMaritalStatus || 'N/A',
           gender: memberData.gender || (memberData.genderIdentity) || null,
-          galleries: (memberData.galleries && memberData.galleries.length>0) ? memberData.galleries : (Array.isArray(memberData.images) ? memberData.images.map((url:string)=>({ image: url })) : []),
+          galleries: (()=>{
+            const list:string[] = [];
+            if (memberData.image) list.push(memberData.image);
+            const raw = memberData.galleries && memberData.galleries.length ? memberData.galleries : (Array.isArray(memberData.images) ? memberData.images : []);
+            raw.forEach((it:any)=>{
+              let url = typeof it==='string' ? it : (it.url || it.image || it.img);
+              if(url && url.includes('/user/profile/')){
+                url = url.replace('/user/profile/','/user/gallery/');
+              }
+              if(url) list.push(url);
+            });
+            return list.map(u=>({ image:u }));
+          })(),
           complexion: memberData.complexion || memberData.faceColour || 'N/A',
           faceColour: memberData.faceColour || memberData.faceColor || memberData.complexion || 'N/A',
           eyeColor: memberData.eye_color || memberData.eyeColor || 'N/A',
@@ -159,6 +181,8 @@ export default function ProfileDetailScreen() {
           institute: (memberData.educations?.[0]?.institute || memberData.institute || 'N/A'),
           educationStartYear: (memberData.educations?.[0]?.start || memberData.educationStartYear || 'N/A'),
           educationEndYear: (memberData.educations?.[0]?.end || memberData.educationEndYear || 'N/A'),
+          educations: Array.isArray(memberData.educations) ? memberData.educations : [],
+          careers: Array.isArray(memberData.careers) ? memberData.careers : [],
         };
         
         console.log('✅ Processed Profile:', processedProfile);
@@ -225,7 +249,7 @@ export default function ProfileDetailScreen() {
       console.log('📡 viewContact API response:', resp);
       if (resp?.status === 'success' && (resp?.data?.mobile || resp?.data?.contact || resp?.data?.remaining_credits !== undefined || resp?.data?.remaining_contact_view !== undefined)) {
         setContactDetailsUnlocked(true);
-        await AsyncStorage.setItem(`contact_unlocked_${profile?.id}`, 'true');
+        // Removed persistence – always re-unlock to charge credit
         // Set credits from backend if provided, otherwise fallback to local decrement
         const newCredits = resp?.data?.remaining_credits ?? resp?.data?.remaining_contact_view ?? resp?.data?.contact_view_limit;
         if (newCredits !== undefined) {
@@ -254,7 +278,7 @@ export default function ProfileDetailScreen() {
       } else {
         // failure: keep locked and clear stored flag
         setContactDetailsUnlocked(false);
-        await AsyncStorage.removeItem(`contact_unlocked_${profile?.id}`);
+        // Removed persistence – keep as locked next time
         Alert.alert('Error', resp?.message || 'Failed to unlock contact');
         return;
       }
@@ -283,6 +307,7 @@ export default function ProfileDetailScreen() {
       // Sending interest - call API
       const response = await apiService.expressHeart(profile?.id);
       if (response.status === 'success') {
+        await playInterestSound();
         setIsInterested(true);
         // Show animation
         setShowInterestAnimation(true);
@@ -340,23 +365,39 @@ export default function ProfileDetailScreen() {
     }
   };
 
-  const handleIgnore = () => {
-    Alert.alert(
-      'Ignore Member',
-      'Are you sure you want to ignore this member?',
-      [
-        { text: 'Cancel' },
-        { 
-          text: 'Ignore', 
-          onPress: () => {
-            setIsBlocked(true);
-            Alert.alert('Success', 'Member blocked successfully');
-            setTimeout(() => router.back(), 1500);
-          },
-          style: 'destructive'
+  const [isShortlisted, setIsShortlisted] = useState(false);
+
+  // Fetch initial shortlist status once profile is loaded
+  useEffect(() => {
+    (async () => {
+      if (!profile?.id) return;
+      try {
+        const r = await apiService.getShortlistedProfiles();
+        if (r.status === 'success') {
+          const list = r.data?.profiles || [];
+          setIsShortlisted(list.some((p: any) => p.id === profile.id));
         }
-      ]
-    );
+      } catch (e) {
+        console.warn('Failed to fetch shortlist:', e);
+      }
+    })();
+  }, [profile?.id]);
+
+  const handleShortlist = async () => {
+    if (!profile?.id) return;
+    try {
+      const resp = await apiService.toggleShortlist(profile.id.toString());
+      if (resp.status === 'success') {
+        const newState = !isShortlisted;
+        setIsShortlisted(newState);
+        Alert.alert('Success', newState ? 'Member added to your shortlist' : 'Member removed from your shortlist');
+      } else {
+        Alert.alert('Error', resp.message || 'Failed to update shortlist');
+      }
+    } catch (e:any) {
+      console.error('toggleShortlist error:', e);
+      Alert.alert('Error', 'Network error. Please try again.');
+    }
   };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -471,16 +512,6 @@ export default function ProfileDetailScreen() {
                 </View>
               )}
               
-              {/* Profile Info Overlay */}
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)']}
-                style={styles.infoOverlay}
-              >
-                <View style={styles.profileInfo}>
-                  <Text style={styles.profileName}>{name}</Text>
-                  <Text style={styles.profileDetails}>Age: {age}  • {location}</Text>
-                </View>
-              </LinearGradient>
 
               {/* Premium Badge */}
               {(profile?.packageId && profile.packageId !== 4) && (
@@ -489,6 +520,17 @@ export default function ProfileDetailScreen() {
                 </View>
               )}
             </LinearGradient>
+          </View>
+
+          {/* Profile Info Section */}
+          <View style={styles.profileInfoRow}>
+            <View>
+              <View style={styles.nameRow}>
+                <Text style={styles.profileName}>{name}</Text>
+                <Feather name="check-circle" size={18} color="#10B981" style={styles.inlineBadge} />
+              </View>
+              <Text style={styles.profileDetails}>Age: {age}  • {location}</Text>
+            </View>
           </View>
 
           {/* Action Buttons - Bottom of Card */}
@@ -520,13 +562,13 @@ export default function ProfileDetailScreen() {
               />
             </TouchableOpacity>
 
-            {/* Ignore Button - X Icon - Small */}
+            {/* Shortlist Button */}
             <TouchableOpacity 
-              style={[styles.cardActionButton, styles.cardActionButtonSmall, theme === 'dark' ? styles.ignoreButtonDark : styles.ignoreButton, isBlocked && (theme === 'dark' ? styles.ignoreButtonActiveDark : styles.ignoreButtonActive)]}
-              onPress={handleIgnore}
+              style={[styles.cardActionButton, styles.cardActionButtonSmall, theme === 'dark' ? styles.shortlistButtonDark : styles.shortlistButton, isShortlisted && (theme === 'dark' ? styles.shortlistButtonActiveDark : styles.shortlistButtonActive)]}
+              onPress={handleShortlist}
               disabled={isBlocked}
             >
-              <Feather name="x-circle" size={22} color={isBlocked ? '#6B7280' : 'white'} />
+              <Feather name="bookmark" size={22} color={isBlocked ? '#6B7280' : 'white'} />
             </TouchableOpacity>
           </View>
 
@@ -610,23 +652,76 @@ export default function ProfileDetailScreen() {
                   )}
                 </CollapsibleSection>
 
+                {/* Contact Information - Locked Initially (Moved) */}
+                <TouchableOpacity 
+                  style={[styles.contactSection, themeStyles.cardBg]}
+                  onPress={handleViewContact}
+                >
+                  <View style={styles.contactHeader}>
+                    <Text style={[styles.contactTitle, theme === 'dark' && { color: '#FFFFFF' }]}>📞 Contact Info</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 11, color: '#9CA3AF' }}>
+                        {remainingCredits === Infinity ? 'Unlimited' : `${remainingCredits} left`}
+                      </Text>
+                      <Feather 
+                        name={contactDetailsUnlocked ? 'unlock' : 'lock'} 
+                        size={16} 
+                        color={contactDetailsUnlocked ? '#10B981' : '#DC2626'} 
+                      />
+                    </View>
+                  </View>
+                  
+                  {contactDetailsUnlocked ? (
+                    <>
+                      <View style={styles.contactRow}>
+                        <Feather name="phone" size={18} color="#3B82F6" />
+                        <Text style={[styles.contactValue, theme === 'dark' && { color: '#E5E7EB' }] }>
+                          {profile?.mobile || 'N/A'}
+                        </Text>
+                      </View>
+                      <View style={styles.contactRow}>
+                        <Feather name="mail" size={18} color="#3B82F6" />
+                        <Text style={[styles.contactValue, theme === 'dark' && { color: '#E5E7EB' }] }>
+                          {profile?.email || 'N/A'}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={[styles.lockedText, theme === 'dark' && { color: '#9CA3AF' }] }>
+                      🔒 Tap to view contact details
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
                 {/* Education Section */}
                 <CollapsibleSection title="Education" icon="book" section="education">
-                  <DetailRow label="Education" value={profile?.education || 'N/A'} theme={theme} />
-                  <DetailRow label="Degree" value={profile?.degree || 'N/A'} theme={theme} />
-                  <DetailRow label="Field of Study" value={profile?.fieldOfStudy || 'N/A'} theme={theme} />
-                  <DetailRow label="Institute" value={profile?.institute || 'N/A'} theme={theme} />
-                  <DetailRow label="Education Start Year" value={profile?.educationStartYear || 'N/A'} theme={theme} />
-                  <DetailRow label="Education End Year" value={profile?.educationEndYear || 'N/A'} theme={theme} />
+                  {profile?.educations?.length ? profile.educations.map((edu: any, idx: number) => (
+                    <View key={`edu-${idx}`} style={styles.groupBox}>
+                      <DetailRow label="Education" value={edu.education || edu.level || 'N/A'} theme={theme} />
+                      <DetailRow label="Degree" value={edu.degree || 'N/A'} theme={theme} />
+                      <DetailRow label="Field of Study" value={edu.field_of_study || edu.fieldOfStudy || 'N/A'} theme={theme} />
+                      <DetailRow label="Institute" value={edu.institute || 'N/A'} theme={theme} />
+                      <DetailRow label="Start Year" value={edu.start || 'N/A'} theme={theme} />
+                      <DetailRow label="End Year" value={edu.end || 'N/A'} theme={theme} />
+                    </View>
+                  )) : (
+                    <DetailRow label="Education" value="N/A" theme={theme} />
+                  )}
                 </CollapsibleSection>
 
                 {/* Career Section */}
                 <CollapsibleSection title="Career" icon="briefcase" section="career">
-                  <DetailRow label="Profession" value={profile?.profession || 'N/A'} theme={theme} />
-                  <DetailRow label="Company" value={profile?.company || 'N/A'} theme={theme} />
-                  <DetailRow label="Designation" value={profile?.designation || 'N/A'} theme={theme} />
-                  <DetailRow label="Career Start Year" value={profile?.careerStartYear || 'N/A'} theme={theme} />
-                  <DetailRow label="Career End Year" value={profile?.careerEndYear || 'N/A'} theme={theme} />
+                  {profile?.careers?.length ? profile.careers.map((car: any, idx: number) => (
+                    <View key={`car-${idx}`} style={styles.groupBox}>
+                      <DetailRow label="Profession" value={car.profession || 'N/A'} theme={theme} />
+                      <DetailRow label="Company" value={car.company || 'N/A'} theme={theme} />
+                      <DetailRow label="Designation" value={car.designation || 'N/A'} theme={theme} />
+                      <DetailRow label="Start Year" value={car.start || 'N/A'} theme={theme} />
+                      <DetailRow label="End Year" value={car.end || 'N/A'} theme={theme} />
+                    </View>
+                  )) : (
+                    <DetailRow label="Profession" value="N/A" theme={theme} />
+                  )}
                 </CollapsibleSection>
 
                 {/* Family Section */}
@@ -641,52 +736,7 @@ export default function ProfileDetailScreen() {
                   <DetailRow label="Number of Sisters" value={profile?.numberOfSisters || 'N/A'} theme={theme} />
                 </CollapsibleSection>
                 
-                {/* Contact Information - Locked Initially */}
-                <TouchableOpacity 
-                  style={[styles.contactSection, themeStyles.cardBg]}
-                  onPress={() => {
-                    if (!contactDetailsUnlocked) {
-                      // Show attractive credit popup
-                      setShowCreditPopup(true);
-                    }
-                  }}
-                >
-                  <View style={styles.contactHeader}>
-                    <Text style={[styles.contactTitle, theme === 'dark' && { color: '#FFFFFF' }]}>📞 Contact Info</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      {contactDetailsUnlocked && (
-                        <Text style={{ fontSize: 11, color: '#9CA3AF', fontStyle: 'italic' }}>Already opened</Text>
-                      )}
-                      <Feather 
-                        name={contactDetailsUnlocked ? 'unlock' : 'lock'} 
-                        size={16} 
-                        color={contactDetailsUnlocked ? '#10B981' : '#DC2626'} 
-                      />
-                    </View>
-                  </View>
-                  
-                  {contactDetailsUnlocked ? (
-                    <>
-                      <View style={styles.contactRow}>
-                        <Feather name="phone" size={18} color="#3B82F6" />
-                        <Text style={[styles.contactValue, theme === 'dark' && { color: '#E5E7EB' }]}>
-                          {profile?.mobile || 'N/A'}
-                        </Text>
-                      </View>
-                      <View style={styles.contactRow}>
-                        <Feather name="mail" size={18} color="#3B82F6" />
-                        <Text style={[styles.contactValue, theme === 'dark' && { color: '#E5E7EB' }]}>
-                          {profile?.email || 'N/A'}
-                        </Text>
-                      </View>
-                    </>
-                  ) : (
-                    <Text style={[styles.lockedText, theme === 'dark' && { color: '#9CA3AF' }]}>
-                      🔒 Tap to view contact details
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
+              
                 {/* Credit Popup Modal */}
                 {showCreditPopup && (
                   <Modal
@@ -801,6 +851,7 @@ export default function ProfileDetailScreen() {
                           onPress={() => {
                             setFullScreenPhoto(profile.galleries);
                             setPhotoIndex(index);
+                            setViewerVisible(true);
                           }}
                         >
                           {galleryImageUrls.primary ? (
@@ -914,6 +965,14 @@ export default function ProfileDetailScreen() {
       )}
 
       {/* Interest Animation Container */}
+      {/* Zoomable Image Viewer */}
+      <ImageViewing
+        images={profile?.galleries || []}
+        imageIndex={photoIndex}
+        visible={viewerVisible}
+        onRequestClose={() => setViewerVisible(false)}
+      />
+
       {showInterestAnimation && (
         <Animated.View
           style={[
@@ -1009,13 +1068,13 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1F2937',
     letterSpacing: 0.3,
   },
   profileDetails: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#E5E7EB',
+    color: '#4B5563',
   },
   blockedOverlay: {
     position: 'absolute',
@@ -1052,6 +1111,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#DC2626',
+  },
+
+  // New profile info container
+  profileInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inlineBadge: {
+    marginLeft: 6,
+  },
+  shortlistButton: {
+    backgroundColor: '#3B82F6',
+  },
+  shortlistButtonDark: {
+    backgroundColor: '#2563EB',
+  },
+  shortlistButtonActive: {
+    opacity: 0.6,
+  },
+  groupBox: {
+    marginBottom: 16,
   },
   detailsSection: {
     marginHorizontal: 10,

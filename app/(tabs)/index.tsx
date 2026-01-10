@@ -207,15 +207,15 @@ export default function HomeScreen() {
         interestReceivedCount = '0';
       }
       
-      // Fetch new matches count from profiles API
+      // Fetch new matches count using new endpoint
       let newMatchesCount = '0';
       try {
-        const newMatchesResponse = await apiService.getProfiles({ type: 'newly_joined', limit: 100 });
-        console.log('📊 New matches response:', newMatchesResponse);
-        if (newMatchesResponse.status === 'success' && newMatchesResponse.data?.pagination) {
-          newMatchesCount = (newMatchesResponse.data.pagination.total || 0).toString();
-        } else if (newMatchesResponse.data?.profiles) {
-          newMatchesCount = newMatchesResponse.data.profiles.length.toString();
+        const newMatchesResp = await apiService.getNewMatches({ limit: 1, page: 1 });
+        console.log('📊 New matches response:', newMatchesResp);
+        if (newMatchesResp.status === 'success') {
+          const list = newMatchesResp.data?.profiles || newMatchesResp.data?.members || newMatchesResp.data?.data?.profiles || [];
+          const total = newMatchesResp.data?.pagination?.total || list.length;
+          newMatchesCount = total.toString();
         }
       } catch (e) {
         console.log('⚠️ New matches fetch error:', e);
@@ -330,105 +330,86 @@ export default function HomeScreen() {
     } catch (e) {}
   };
 
-  // Fetch profiles
+  // Fetch profiles (Recommended & New Matches)
   const fetchProfiles = async () => {
-      try {
-        // Get current user's gender for filtering - check multiple possible locations
-        const currentUserGender = (userInfo?.gender || userInfo?.basicInfo?.gender || auth?.user?.gender)?.toLowerCase();
-        
-        // Determine opposite gender for filtering
-        const oppositeGender = currentUserGender === 'male' ? 'female' : 
-                              currentUserGender === 'female' ? 'male' : null;
-        
-        // Fetch newly joined profiles with increased limit to allow for gender filtering
-        const newlyJoinedResponse = await apiService.getProfiles({ type: 'newly_joined', limit: 10 });
-        console.log('🔍 Newly Joined Response:', newlyJoinedResponse);
-        if (newlyJoinedResponse.status === 'success') {
-          const profiles = newlyJoinedResponse.data.profiles || [];
-          console.log('📋 Newly Joined Profiles:', profiles);
-          console.log('👤 Current User Gender:', currentUserGender, 'Opposite:', oppositeGender);
-          
-          // Filter profiles by opposite gender if available
-          const filteredProfiles = oppositeGender 
-            ? profiles.filter((profile: any) => profile.gender?.toLowerCase() === oppositeGender)
-            : profiles;
-          console.log('✅ Filtered Profiles Count:', filteredProfiles.length);
-          
-          // Take only 5 profiles after filtering
-          const limitedProfiles = filteredProfiles.slice(0, 5);
-          
-          // Transform profiles to ensure proper image URLs and fallbacks
-          const transformedProfiles = limitedProfiles.map((profile: any) => {
-            const userGender = profile?.gender?.toLowerCase();
-            const defaultImage = userGender === 'female' 
-              ? require('../../assets/images/default-female.jpg')
-              : require('../../assets/images/default-male.jpg');
-            
-            // Get profile image URL - API already returns full URL from formatProfileResponse
-            let profileImage = null;
-            if (profile.image) {
-              // API returns full URL, use it directly
-              profileImage = profile.image;
-            } else if (profile.profileImage) {
-              profileImage = profile.profileImage;
-            }
-            
+    try {
+      const currentUserGender = (userInfo?.gender || userInfo?.basicInfo?.gender || auth?.user?.gender)?.toLowerCase();
+      const oppositeGender = currentUserGender === 'male' ? 'female' : currentUserGender === 'female' ? 'male' : null;
 
-            const location = profile?.location || 'Location N/A';
-            const age = profile?.age || calculateAge(profile?.dateOfBirth || profile?.dob);
-            const name = profile?.name || `${profile?.firstname || 'Unknown'} ${profile?.lastname || ''}`.trim();
-            const id = profile?.id || profile?.user_id;
-            
-            // Get package info for crown badge
-            const packageName = profile?.packageName || profile?.package_name || 'FREE MATCH';
-            
-            // Get crown colors based on package
-            const getCrownColor = () => {
-              if (packageName.includes('PREMIUM') || packageName.includes('PRO')) {
-                return '#8B5CF6'; // Purple
-              } else if (packageName.includes('GOLD')) {
-                return '#FFD700'; // Gold
-              } else if (packageName.includes('SILVER')) {
-                return '#C0C0C0'; // Silver
-              } else if (packageName.includes('PLATINUM')) {
-                return '#3B82F6'; // Blue
-              }
-              return '#6366F1'; // Indigo - Default
-            };
-            
-            const getCrownBackgroundColor = () => {
-              if (packageName.includes('PREMIUM') || packageName.includes('PRO')) {
-                return 'rgba(139, 92, 246, 0.15)';
-              } else if (packageName.includes('GOLD')) {
-                return 'rgba(255, 215, 0, 0.15)';
-              } else if (packageName.includes('SILVER')) {
-                return 'rgba(156, 163, 175, 0.15)';
-              } else if (packageName.includes('PLATINUM')) {
-                return 'rgba(59, 130, 246, 0.15)';
-              }
-              return 'rgba(99, 102, 241, 0.15)';
-            };
-            
-            return {
-              id,
-              name,
-              profileImage,
-              defaultImage,
-              location,
-              age,
-              gender: profile.gender,
-              dateOfBirth: profile.dateOfBirth || profile.date_of_birth,
-              dob: profile.dob || profile.date_of_birth,
-            };
-            
-          });
-          console.log('📸 All Transformed New Matches:', transformedProfiles);
-          setNewMatchesProfiles(transformedProfiles);
+      // Concurrent calls
+      const [recommendedResp, newMatchesResp] = await Promise.all([
+        apiService.getRecommendedMatches({ limit: 12, page: 1 }),
+        apiService.getNewMatches({ limit: 12, page: 1 }),
+      ]);
+
+      // Debug: log raw API responses
+      console.log('⭐ recommended API →', recommendedResp);
+      console.log('🆕 new-matches API →', newMatchesResp);
+
+      const sanitize = (list: any[]) => {
+        let filtered = list;
+        if (oppositeGender) {
+          filtered = list.filter((p: any) => (p.gender || '').toLowerCase() === oppositeGender);
+          if (filtered.length === 0) {
+            // fallback to original list if filtering removed all profiles
+            filtered = list;
+          }
         }
-      } catch (error) {
-        setNewlyJoinedProfiles([]);
-        setNewMatchesProfiles([]);
-      }
+        return filtered.slice(0, 5).map((profile: any) => {
+          const genderLower = (profile.gender || '').toLowerCase();
+          const defaultImage = genderLower === 'female'
+            ? require('../../assets/images/default-female.jpg')
+            : require('../../assets/images/default-male.jpg');
+
+          // Determine city: prefer city / present_city / city_name / location
+          const city = profile.city || profile.present_city || profile.city_name || profile.location || null;
+
+          // Derive age in years if not provided
+          const parsedDob = profile.dateOfBirth || profile.date_of_birth || profile.dob;
+          const derivedAge = parsedDob ? calculateAge(parsedDob) : null;
+
+          return {
+            id: profile.id || profile.user_id,
+            name: profile.name || `${profile.firstname || ''} ${profile.lastname || ''}`.trim(),
+            profileImage: profile.image || profile.profileImage || null,
+            defaultImage,
+            location: city || 'Location N/A',
+            age: profile.age || derivedAge,
+            gender: profile.gender,
+            dateOfBirth: profile.dateOfBirth || profile.date_of_birth,
+            dob: profile.dob || profile.date_of_birth,
+          };
+        });
+      };
+
+      const extractList = (resp: any) => {
+        if (!resp || resp.status !== 'success') return [];
+        const d = resp.data || {};
+        // Possible structures
+        return (
+          d.profiles ||
+          d.members ||
+          d.users ||
+          d.data?.profiles ||
+          d.data?.members ||
+          d.data?.users ||
+          d.data?.data?.profiles ||
+          d.data?.data?.members ||
+          d.data?.data?.users ||
+          []
+        );
+      };
+
+      const recommendedList = sanitize(extractList(recommendedResp));
+      const newMatchesList = sanitize(extractList(newMatchesResp));
+
+      setNewlyJoinedProfiles(recommendedList); // Recommended section
+      setNewMatchesProfiles(newMatchesList);   // New Matches section
+    } catch (error) {
+      console.error('❌ fetchProfiles error:', error);
+      setNewlyJoinedProfiles([]);
+      setNewMatchesProfiles([]);
+    }
   };
 
   // Main useEffect to fetch data on mount
@@ -617,13 +598,13 @@ export default function HomeScreen() {
             const profileImage = item?.profileImage;
             const defaultImage = item?.defaultImage;
             const age = item?.age || calculateAge(item?.dateOfBirth || item?.dob);
-            const location = item?.location || 'Location N/A';
+            const location = item?.city || item?.location || 'Location N/A';
             
             // Get package info for crown badge
             const packageName = item?.packageName || item?.package_name || 'FREE MATCH';
             
-            // Get crown colors based on package
-            const getCrownColor = () => {
+            // Package color helper
+            const getPackageColor = () => {
               if (packageName.includes('PREMIUM') || packageName.includes('PRO')) {
                 return '#8B5CF6'; // Purple
               } else if (packageName.includes('GOLD')) {
@@ -633,10 +614,10 @@ export default function HomeScreen() {
               } else if (packageName.includes('PLATINUM')) {
                 return '#3B82F6'; // Blue
               }
-              return '#6366F1'; // Indigo - Default
+              return '#6366F1';
             };
             
-            const getCrownBackgroundColor = () => {
+            const getPackageBgColor = () => {
               if (packageName.includes('PREMIUM') || packageName.includes('PRO')) {
                 return 'rgba(139, 92, 246, 0.15)';
               } else if (packageName.includes('GOLD')) {
@@ -673,8 +654,9 @@ export default function HomeScreen() {
                   )}
                   
                   {/* Crown Icon Badge - Top Left */}
-                  <View style={[styles.crownBadgeIndex, { backgroundColor: getCrownBackgroundColor() }]}>
-                    <Feather name="award" size={14} color={getCrownColor()} />
+                  {/* Package Tag */}
+                  <View style={[styles.packageTag, { backgroundColor: getPackageBgColor() }]}>
+                    <Text style={[styles.packageTagText,{color:getPackageColor()}]} numberOfLines={1}>{packageName}</Text>
                   </View>
                   
                   {/* Gradient Overlay with Profile Info */}
@@ -699,7 +681,7 @@ export default function HomeScreen() {
                   
                   {/* Heart Button - Bottom Right Corner */}
                   <TouchableOpacity 
-                    style={styles.justJoinedHeartButton}
+                    style={{position:'absolute',bottom:6,right:6,width:28,height:28,borderRadius:14,borderWidth:1,borderColor:'#FFFFFF',alignItems:'center',justifyContent:'center',backgroundColor:'rgba(0,0,0,0.4)'}}
                     onPress={() => expressHeart(item?.id)}
                   >
                     <Feather name="heart" size={18} color={interestingProfiles.has(item?.id?.toString()) ? '#DC2626' : 'white'} fill={interestingProfiles.has(item?.id?.toString()) ? '#DC2626' : 'white'} />
@@ -725,8 +707,24 @@ export default function HomeScreen() {
             const profileImage = item?.profileImage;
             const defaultImage = item?.defaultImage;
             const age = item?.age || calculateAge(item?.dateOfBirth || item?.dob);
-            const location = item?.location || 'Location N/A';
+            const location = item?.city || item?.location || 'Location N/A';
             
+            const packageName = item?.packageName || item?.package_name || 'FREE MATCH';
+            const getPackageColor = () => {
+              if (packageName.includes('PREMIUM') || packageName.includes('PRO')) return '#8B5CF6';
+              if (packageName.includes('GOLD')) return '#FFD700';
+              if (packageName.includes('SILVER')) return '#C0C0C0';
+              if (packageName.includes('PLATINUM')) return '#3B82F6';
+              return '#6366F1';
+            };
+            const getPackageBgColor = () => {
+              if (packageName.includes('PREMIUM') || packageName.includes('PRO')) return 'rgba(139,92,246,0.15)';
+              if (packageName.includes('GOLD')) return 'rgba(255,215,0,0.15)';
+              if (packageName.includes('SILVER')) return 'rgba(156,163,175,0.15)';
+              if (packageName.includes('PLATINUM')) return 'rgba(59,130,246,0.15)';
+              return 'rgba(99,102,241,0.15)';
+            };
+
             console.log('🖼️ New Match Card Image Debug:', {
               id: item?.id,
               name: profileName,
@@ -757,7 +755,7 @@ export default function HomeScreen() {
                   
                   {/* Heart Button - Bottom Right Corner */}
                   <TouchableOpacity 
-                    style={styles.newMatchHeartButton}
+                    style={{position:'absolute',bottom:6,right:6,width:28,height:28,borderRadius:14,borderWidth:1,borderColor:'#FFFFFF',alignItems:'center',justifyContent:'center',backgroundColor:'rgba(0,0,0,0.4)'}}
                     onPress={() => expressHeart(item?.id)}
                   >
                     <Feather name="heart" size={16} color={interestingProfiles.has(item?.id?.toString()) ? '#DC2626' : 'white'} fill={interestingProfiles.has(item?.id?.toString()) ? '#DC2626' : 'white'} />
@@ -1069,7 +1067,7 @@ const styles = StyleSheet.create({
   bannerInnerContent: {
     flexDirection: 'row',
     gap: 12,
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'flex-start',
     height: 100,
   },

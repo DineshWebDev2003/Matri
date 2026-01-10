@@ -47,7 +47,7 @@ const lightColors = {
 
 const darkColors = {
   // Background
-  background: '#1A1A2E',
+  background: '#000000',
   surfaceLight: '#2D2D44',
   surfaceDark: '#16213E',
   

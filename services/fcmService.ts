@@ -4,6 +4,7 @@ import { apiService } from './api';
 import { Platform } from 'react-native';
 
 // Configure notification handler
+
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     console.log('📬 Notification received:', notification);
@@ -19,6 +20,23 @@ Notifications.setNotificationHandler({
 export const initializeFCM = async () => {
   try {
     console.log('🔔 Initializing FCM...');
+
+    // Create channels on Android
+    if (Platform.OS === 'android') {
+      // Channel without sound (for silent notifications)
+      await Notifications.setNotificationChannelAsync('silent', {
+        name: 'Silent',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: undefined,
+      });
+
+      // Channel with custom welcome sound packed as res/raw/welcome.mp3
+      await Notifications.setNotificationChannelAsync('welcome', {
+        name: 'Welcome',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: 'welcome.mp3', // custom raw resource
+      });
+    }
 
     // Request notification permissions
     const { status } = await Notifications.requestPermissionsAsync();
@@ -163,6 +181,23 @@ export const handleNotificationResponse = (response: Notifications.NotificationR
     }
   } catch (error) {
     console.error('❌ Error handling notification response:', error);
+  }
+};
+
+// Send local welcome notification after login (OS handles sound via 'welcome' channel)
+export const sendWelcomeNotification = async (name: string) => {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `👋 Welcome, ${name}!`,
+        body: 'Glad to see you back on 90sKalyanam.',
+        data: { type: 'welcome' },
+      },
+      trigger: null, // immediately
+      android: { channelId: 'welcome' }
+    });
+      } catch (err) {
+    console.warn('Failed to schedule welcome notification', err);
   }
 };
 

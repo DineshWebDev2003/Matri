@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Dimensions, ScrollView, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -14,6 +15,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function MenuModal({ visible, onClose }: MenuModalProps) {
   const { theme, setThemeMode } = useTheme();
+  const auth = useAuth();
   const router = useRouter();
 
   const themeStyles = {
@@ -22,7 +24,22 @@ export default function MenuModal({ visible, onClose }: MenuModalProps) {
     subtitle: theme === 'dark' ? { color: '#B0B0B0' } : { color: 'rgba(255, 255, 255, 0.8)' },
   };
 
-  const menuItems = [
+  // Build menu items; insert Complete Profile if needed
+  const baseMenuItems = [
+    {
+      id:'ai-match',
+      title:'AI Match',
+      icon:'brain',
+      route:'/ai-match',
+      color:'#8B5CF6'
+    },
+    {
+      id:'support-ticket',
+      title:'Support Ticket',
+      icon:'life-buoy',
+      route:'/support-ticket',
+      color:'#F59E0B'
+    },
     {
       id: 'likes',
       title: 'Likes',
@@ -66,6 +83,21 @@ export default function MenuModal({ visible, onClose }: MenuModalProps) {
       color: '#06B6D4',
     },
   ];
+
+  const menuItems = React.useMemo(()=>{
+    const items = [...baseMenuItems];
+    const isProfileComplete = auth?.user?.profile_complete === 1 || auth?.user?.profile_complete === '1' || auth?.user?.profile_complete === true;
+    if(!isProfileComplete){
+      items.unshift({
+        id:'complete-profile',
+        title:'Complete Profile',
+        icon:'clipboard',
+        route:'/(auth)/profile-completion',
+        color:'#10B981'
+      });
+    }
+    return items;
+  },[auth?.user?.profile_complete]);
 
   const handleMenuItemPress = (route: string) => {
     onClose();

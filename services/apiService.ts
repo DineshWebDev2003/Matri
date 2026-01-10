@@ -267,6 +267,21 @@ export class APIService {
   }
 
   /**
+   * Complete basic info from mobile (city + profile image)
+   * POST /mobile/profile/basic-info
+   */
+  async completeBasicInfo(formData: FormData): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/profile/welcome-basic', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to complete basic info');
+    }
+  }
+
+  /**
    * Get current user info
    * GET /user-info
    */
@@ -283,12 +298,42 @@ export class APIService {
    * Get current user's complete details
    * GET /mobile/user/details
    */
+  /**
+   * Get current user's complete details (mobile)
+   * GET /mobile/user/details (baseURL=/api)
+   */
   async getUserDetails(): Promise<ApiResponse> {
     try {
-      const response = await this.api.get('/user/details');
+      const response = await this.api.get('/user/details'); // baseURL may already include /mobile
       return response.data;
     } catch (error: any) {
       throw this.handleError(error, 'Failed to fetch user details');
+    }
+  }
+
+  /**
+   * Get list of countries (location)
+   * GET /locations/countries
+   */
+  async getCountries(): Promise<Record<string,string>> {
+    try{
+      const response = await this.api.get('/locations/countries');
+      return response.data;
+    }catch(error:any){
+      throw this.handleError(error,'Failed to fetch countries');
+    }
+  }
+
+  /**
+   * Get list of states (location)
+   * GET /locations/states
+   */
+  async getStates(): Promise<ApiResponse> {
+    try {
+      const response = await this.api.get('/locations/states');
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to fetch states');
     }
   }
 
@@ -332,6 +377,32 @@ export class APIService {
       return response.data;
     } catch (error: any) {
       throw this.handleError(error, 'Failed to fetch profiles');
+    }
+  }
+
+  /**
+   * Get recommended matches (mobile)
+   * GET /mobile/recommended-matches
+   */
+  async getRecommendedMatches(params?: PaginationParams): Promise<ApiResponse<ProfilesResponse>> {
+    try {
+      const response = await this.api.get('/mobile/recommended-matches', { params });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to fetch recommended matches');
+    }
+  }
+
+  /**
+   * Get new matches (mobile)
+   * GET /mobile/new-matches
+   */
+  async getNewMatches(params?: PaginationParams): Promise<ApiResponse<ProfilesResponse>> {
+    try {
+      const response = await this.api.get('/mobile/new-matches', { params });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to fetch new matches');
     }
   }
 
@@ -640,6 +711,19 @@ export class APIService {
       return response.data;
     } catch (error: any) {
       throw this.handleError(error, 'Failed to fetch states');
+    }
+  }
+
+  /**
+   * Fetch list of cities for a given state
+   * GET /locations/cities/{stateId}
+   */
+  async getCities(stateId: string | number): Promise<Record<string, string>> {
+    try {
+      const response = await this.api.get(`/locations/cities/${stateId}`);
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to fetch cities');
     }
   }
 

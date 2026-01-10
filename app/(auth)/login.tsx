@@ -113,21 +113,40 @@ export default function LoginScreen() {
         >
           {/* Welcome text overlay */}
           <View style={styles.welcomeTextContainer}>
-          <Image
-                source={{ uri: 'https://90skalyanam.com/assets/images/logoIcon/logo.png' }}
-                style={styles.loginHeaderImage}
-              />
-              <Text style={styles.loginHeaderText}>Welcome Back</Text>
-              <Text style={styles.loginHeaderSubtext}>Find your perfect match</Text>
-         
+            <Image
+              source={{ uri: 'https://90skalyanam.com/assets/images/logoIcon/logo.png' }}
+              style={styles.loginHeaderImage}
+            />
+            <Text style={styles.loginHeaderText}>Welcome Back</Text>
+            <Text style={styles.loginHeaderSubtext}>Find your perfect match</Text>
+            <TouchableOpacity
+              style={{ marginTop: 12, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1.5, borderColor: '#FFFFFF', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)' }}
+              onPress={async () => {
+                try {
+                  setLoading(true);
+                  await auth?.loginAsGuest();
+                } catch (error: any) {
+                  Alert.alert('Error', error.message || 'Failed to login as guest');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Login as Guest</Text>
+            </TouchableOpacity>
           </View>
         </LinearGradient>
       </View>
     );
   };
 
-    const handleLogin = async () => {
-    if (!auth) return;
+  const handleLogin = async () => {
+    if (!auth) return (
+      <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <StatusBar hidden={true} />
+        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+      </View>
+    );
 
     if (!username || !password) {
       Alert.alert('Error', 'Please enter both username and password.');
@@ -195,6 +214,7 @@ export default function LoginScreen() {
           {/* Toggle Buttons - Right Side Horizontal with Login Text */}
           <View style={styles.toggleButtonsContainer}>
             <Text style={styles.screenTitleText}>Login</Text>
+
             <View style={styles.rightToggleButtonsRow}>
               {/* Theme Toggle Button */}
               <Animated.View style={{ transform: [{ rotate: themeRotateInterpolate }] }}>
@@ -226,7 +246,7 @@ export default function LoginScreen() {
 
           {/* Form Container */}
           <View style={[styles.formContainer, { backgroundColor: colors.background }]}>
-          
+        
             {/* Email Input */}
             <View style={styles.formSection}>
               <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('email')}</Text>
@@ -261,19 +281,27 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            {/* Sign In Button */}
-            <TouchableOpacity 
-              style={[styles.modernLoginButton, loading && styles.disabledButton]} 
-              onPress={handleLogin} 
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.modernLoginButtonText}>{t('sign_in')}</Text>
-              )}
-            </TouchableOpacity>
-
+            {/* Action Buttons Row */}
+            <View style={{ flexDirection: 'row', gap: 15, marginTop: 10 }}>
+              <TouchableOpacity
+                style={[styles.modernLoginButton, loading && styles.disabledButton, { flex: 1 }]}
+                onPress={handleLogin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modernLoginButtonText}>{t('login')}</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modernLoginButton, styles.registerButton, { flex: 1 }]}
+                onPress={() => router.push('/(auth)/register')}
+              >
+                <Text style={styles.registerButtonText}>{t('register')}</Text>
+              </TouchableOpacity>
+            </View>
+            
             {/* Social Login */}
             <View style={styles.socialContainer}>
               <Text style={[styles.socialLabel, { color: colors.textSecondary }]}>{t('or')}</Text>
@@ -288,41 +316,6 @@ export default function LoginScreen() {
                   <FontAwesome name="apple" size={24} color={colors.textPrimary} />
                 </TouchableOpacity>
               </View>
-            </View>
-
-            {/* Guest Login Button */}
-            <TouchableOpacity 
-              style={styles.guestButton}
-              onPress={async () => {
-                try {
-                  setLoading(true);
-                  await auth?.loginAsGuest();
-                } catch (error: any) {
-                  console.error('💥 Guest login failed:', error);
-                  Alert.alert('Error', error.message || 'Failed to login as guest');
-                  setLoading(false);
-                }
-              }}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.guestButtonText}>👤 Login as Guest</Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Register Link */}
-            <View style={styles.signupContainer}>
-              <Text style={[styles.signupText, { color: colors.textSecondary }]}>
-                {t('dont_have_account')}{' '}
-                <Text 
-                  style={styles.signupLink}
-                  onPress={() => router.push('/(auth)/register')}
-                >
-                  {t('signup')}
-                </Text>
-              </Text>
             </View>
           </View>
         </View>

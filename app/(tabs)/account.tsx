@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ColorValue, SafeAreaView, StatusBar, Alert, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ColorValue, SafeAreaView, StatusBar, Modal, Alert, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import RazorpayCheckout from 'react-native-razorpay';
+import ImageViewing from 'react-native-image-viewing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ComponentProps } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import styles from '../styles/accountStyles';
 
 type IconName = ComponentProps<typeof Feather>['name'];
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,7 +18,6 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import { apiService } from '../../services/api';
 import UniversalHeader from '../../components/UniversalHeader';
-import WithSwipe from '../../components/WithSwipe';
 
 // Custom Image component with fallback support
 const FallbackImage = ({ 
@@ -176,10 +177,14 @@ export default function AccountScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
   const [activeTab, setActiveTab] = useState<'photos' | 'actions'>('photos');
   const [galleryImages, setGalleryImages] = useState<any[]>([]);
-  // Remaining uploads from dashboardData
-  const remainingUploads = dashboardData?.remaining_image_upload ?? 0;
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  // Remaining uploads based on gallery images count (UI authoritative)
+  const MAX_GALLERY_IMAGES = 4;
+  const remainingUploads = Math.max(0, MAX_GALLERY_IMAGES - galleryImages.length);
 
   const handleThemeToggle = async () => {
     try {
@@ -201,7 +206,7 @@ export default function AccountScreen() {
         ...prev,
         remaining_interests: limitation.interest_express_limit ?? prev?.remaining_interests,
         remaining_contact_view: limitation.contact_view_limit ?? prev?.remaining_contact_view,
-        remaining_image_upload: limitation.image_upload_limit ?? prev?.remaining_image_upload,
+        // keep original dashboardData update (no change)
       }));
     }
   }, [limitation]);
@@ -214,6 +219,41 @@ export default function AccountScreen() {
       console.log('👤 User:', user?.id, user?.firstname);
       console.log('📋 Limitation from AuthContext:', limitation);
       
+      // 1. Fetch detailed profile from /user/details to get latest stats
+      try {
+        const detailsResp = await apiService.getUserDetails();
+        if(detailsResp.status==='success' && detailsResp.data?.profile){
+          const prof = detailsResp.data.profile;
+          console.log('📄 User details:', prof);
+          // Map image url
+          const imgUrl = getImageUrl(prof.image);
+          // derive premium
+          const isPrem = prof.plan_name && !['FREE MATCH','BASIC MATCH'].includes(prof.plan_name.toUpperCase());
+          // stats
+          const stats = prof.stats || {};
+          setDashboardData({
+            remaining_contact_view: stats.contact_view ?? 0,
+            remaining_interests: stats.interest_left ?? 0,
+            remaining_image_upload: Math.max(0, MAX_GALLERY_IMAGES - (stats.gallery_upload_used ?? 0)),
+          });
+          setUserProfile({
+            firstname: prof.firstname,
+            lastname: prof.lastname,
+            profile_id: prof.profile_id,
+            image: imgUrl,
+            id: prof.id,
+            packageId: prof.plan_name,
+            packageName: prof.plan_name,
+            premium: isPrem ? 1 : 0
+          });
+          // gallery list
+          if(Array.isArray(prof.gallery)){
+            setGalleryImages(prof.gallery.map((g:any)=>({image:g.url})));
+          }
+        }
+      }catch(e){console.log('⚠️ user/details fetch failed',e);} 
+
+      // Fallback: use AuthContext info if needed
       // First try to use user data from auth context
       if (user && user.id) {
         const imageUrl = getImageUrl(user.image);
@@ -271,52 +311,7 @@ export default function AccountScreen() {
         });
       }
       
-      // Try to get dashboard data for additional info (optional)
-      try {
-        const dashboardResponse = await apiService.getDashboard();
-        
-        console.log('📡 Dashboard API Response:', dashboardResponse?.data?.limitation);
-        
-        // If limitation present and differs, sync to AuthContext and state
-        if (auth?.updateLimitation) {
-          const lim = dashboardResponse?.data?.limitation ?? {
-            interest_express_limit: dashboardResponse?.data?.remaining_interests,
-            contact_view_limit: dashboardResponse?.data?.remaining_contact_view,
-            image_upload_limit: dashboardResponse?.data?.remaining_image_upload,
-          };
-          auth.updateLimitation(lim);
-          setDashboardData(prev => ({
-            ...prev,
-            remaining_interests: lim.interest_express_limit ?? prev?.remaining_interests,
-            remaining_contact_view: lim.contact_view_limit ?? prev?.remaining_contact_view,
-            remaining_image_upload: lim.image_upload_limit ?? prev?.remaining_image_upload,
-          }));
-        }
-        
-        // Check if profile is incomplete
-        if (dashboardResponse?.status === 'error' && dashboardResponse?.remark === 'profile_incomplete') {
-          Alert.alert(
-            'Complete Your Profile',
-            'Please complete your profile to view dashboard and access all features.',
-            [
-              {
-                text: 'Complete Profile',
-                onPress: () => router.push('/profile-setting'),
-                style: 'default'
-              },
-              {
-                text: 'Later',
-                onPress: () => {},
-                style: 'cancel'
-              }
-            ]
-          );
-          return;
-        }
-      } catch (dashboardError) {
-        console.log('⚠️ Dashboard API failed:', dashboardError);
-        // Dashboard API failed, but we still have user data from auth context with limitation data
-      }
+      // Dashboard data now derived from /user/details response
 
       // Fetch package information
       try {
@@ -379,18 +374,63 @@ export default function AccountScreen() {
     }
   };
 
+  const handleAddGalleryImage = async () => {
+    try {
+      if (uploadingGallery) return;
+      // Request permission
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please allow access to your photo library to upload images.');
+        return;
+      }
+      // Open gallery
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const imageAsset = result.assets[0];
+      // build multipart form
+      const formData = new FormData();
+      formData.append('gallery_image', {
+        uri: imageAsset.uri,
+        type: 'image/jpeg',
+        name: 'gallery.jpg',
+      } as any);
+      setUploadingGallery(true);
+      const resp = await apiService.uploadGalleryImage(formData);
+      if (resp.status === 'success') {
+        const newUrl = resp.data?.image_url || resp.data?.url || imageAsset.uri;
+        setGalleryImages(prev => [{ image: newUrl }, ...prev]);
+        // decrement remaining uploads
+        setDashboardData(prev => ({ ...prev, remaining_image_upload: (prev.remaining_image_upload ?? 1) - 1 }));
+        Alert.alert('Success', 'Photo uploaded');
+      } else {
+        Alert.alert('Error', resp.message || 'Upload failed');
+      }
+    } catch(e:any) {
+      console.error('Gallery upload error', e);
+      Alert.alert('Error', e.message || 'Failed to upload');
+    } finally {
+      setUploadingGallery(false);
+    }
+  };
+
   const fetchGalleryImages = async () => {
     try {
       const response = await apiService.getGalleryImages();
-      
       if (response?.status === 'success' && response?.data) {
-        const images = Array.isArray(response.data) ? response.data : response.data.galleries || [];
-        setGalleryImages(images);
-      } else {
-        setGalleryImages([]);
+        const raw = Array.isArray(response.data) ? response.data : response.data.galleries || response.data.images || [];
+        const imgs = raw.map((img:any)=> (typeof img === 'string' ? { image: img } : img));
+        // Only update state if API returned at least one image
+        if (imgs.length) {
+          setGalleryImages(imgs);
+        }
       }
+      // Do not clear gallery if API returns empty or error – keep existing images
     } catch (error) {
-      setGalleryImages([]);
+      console.log('⚠️ Gallery fetch failed, keeping existing images');
     }
   };
 
@@ -530,7 +570,7 @@ export default function AccountScreen() {
   ];
 
   return (
-    <WithSwipe toLeft="/(tabs)/index" toRight="/(tabs)/chats">
+    <>
       <StatusBar 
         barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={theme === 'dark' ? '#0F0F0F' : '#FFFFFF'}
@@ -598,7 +638,7 @@ export default function AccountScreen() {
         </View>
 
         {/* Premium Upgrade Banner - Only show for non-premium users */}
-        {userProfile && !(userProfile.premium === 1 || userProfile.premium === true || userProfile.packageId > 1) && (
+        {userProfile && (String(userProfile.packageName || '').toUpperCase().includes('FREE')) && (
           <LinearGradient
             colors={['#FCA5A5', '#EF4444']}
             start={{ x: 0, y: 0 }}
@@ -724,7 +764,7 @@ export default function AccountScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{dashboardData?.remaining_image_upload || '0'}</Text>
+              <Text style={styles.statValue}>{remainingUploads || '0'}</Text>
               <Text style={[styles.statLabel, theme === 'dark' && { color: '#9CA3AF' }]}>Gallery Upload</Text>
             </View>
           </View>
@@ -843,18 +883,26 @@ export default function AccountScreen() {
                               style={[styles.photoGridItem, theme === 'dark' && { backgroundColor: '#1A1A1A', justifyContent:'center', alignItems:'center' }]}
                               onPress={handleAddGalleryImage}
                             >
-                              <Feather name="plus" size={32} color="#DC2626" />
+                              {uploadingGallery ? (
+                                <ActivityIndicator size="small" color="#DC2626" />
+                              ) : (
+                                <Feather name="plus" size={32} color="#DC2626" />
+                              )}
                             </TouchableOpacity>
                           );
                         }
-                        const imageUrls = getGalleryImageUrl(item.image_url || item.image);
+                        const imageUrls = getGalleryImageUrl(item.image || item.url || item.image_url);
                         // skip for addButton index shift
-                        const remainingUploadsCount = dashboardData?.remaining_image_upload || 0;
+                        const remainingUploadsCount = remainingUploads || 0;
                         const showCount = (index === 1 || (index === 0 && remainingUploads === 0)) && remainingUploadsCount > 0;
                         return (
                           <TouchableOpacity 
                             style={[styles.photoGridItem, theme === 'dark' && { backgroundColor: '#1A1A1A' }]}
                             activeOpacity={0.8}
+                            onPress={() => {
+                              setViewerIndex(index);
+                              setViewerVisible(true);
+                            }}
                           >
                             {imageUrls.primary ? (
                               <>
@@ -886,8 +934,8 @@ export default function AccountScreen() {
                         No photos yet
                       </Text>
                       <Text style={[styles.emptyPhotosSubtext, theme === 'dark' && { color: '#6B7280' }]}>
-                        {dashboardData?.remaining_image_upload > 0 
-                          ? `You have ${dashboardData.remaining_image_upload} uploads left` 
+                        {remainingUploads > 0 
+                          ? `You have ${remainingUploads} uploads left` 
                           : 'No uploads remaining'}
                       </Text>
                       <TouchableOpacity 
@@ -965,7 +1013,7 @@ export default function AccountScreen() {
                                 {plan.name || plan.title || `Plan ${index + 1}`}
                               </Text>
                               <Text style={styles.planOptionPrice}>
-                                ₹{plan.price || plan.amount || '0'}
+                                ₹{Number(plan.price ?? plan.amount ?? 0).toFixed(0)}
                               </Text>
                             </View>
                             <Text style={[styles.planOptionDescription, theme === 'dark' && { color: '#9CA3AF' }]}>
@@ -1083,7 +1131,7 @@ export default function AccountScreen() {
                             {plan.name || plan.title || `Plan ${index + 1}`}
                           </Text>
                           <Text style={styles.planOptionPrice}>
-                            ₹{plan.price || plan.amount || '0'}
+                            ₹{Number(plan.price ?? plan.amount ?? 0).toFixed(0)}
                           </Text>
                         </View>
                         <Text style={[styles.planOptionDescription, theme === 'dark' && { color: '#9CA3AF' }]}>
@@ -1148,1309 +1196,52 @@ export default function AccountScreen() {
       
       <View style={styles.bottomPadding} />
     </ScrollView>
+    <ImageViewing
+      images={galleryImages}
+      imageIndex={viewerIndex}
+      visible={viewerVisible}
+      onRequestClose={() => setViewerVisible(false)}
+    />
+    <View style={styles.bottomPadding} />
   </SafeAreaView>
-</WithSwipe>
+</>
   );
-}
 
-const getSummaryStats = (dashboardData: any, loading: boolean): { title: string; value: string; icon: IconName; colors: readonly [ColorValue, ColorValue, ...ColorValue[]] }[] => {
-  if (loading) {
+  const getSummaryStats = (dashboardData: any, loading: boolean): { title: string; value: string; icon: IconName; colors: readonly [ColorValue, ColorValue, ...ColorValue[]] }[] => {
+    if (loading) {
+      return [
+        { title: 'Contact Views Left', value: '...', icon: 'eye', colors: ['#60A5FA', '#3B82F6'] as const },
+        { title: 'Interests Left', value: '...', icon: 'heart', colors: ['#FDE68A', '#FBBF24'] as const },
+        { title: ' Uploads Left', value: '...', icon: 'camera', colors: ['#EF4444', '#DC2626'] as const },
+      ];
+    }
+
+    // Handle unlimited values (-1) and format display
+    const formatValue = (value: number) => {
+      if (value === -1) return '∞';
+      return value?.toString() || '0';
+    };
+
     return [
-      { title: 'Contact Views Left', value: '...', icon: 'eye', colors: ['#60A5FA', '#3B82F6'] as const },
-      { title: 'Interests Left', value: '...', icon: 'heart', colors: ['#FDE68A', '#FBBF24'] as const },
-      { title: ' Uploads Left', value: '...', icon: 'camera', colors: ['#EF4444', '#DC2626'] as const },
+      { 
+        title: 'Contact Views Left', 
+        value: formatValue(dashboardData?.remaining_contact_view), 
+        icon: 'eye', 
+        colors: ['#60A5FA', '#3B82F6'] as const 
+      },
+      { 
+        title: 'Interests Left', 
+        value: formatValue(dashboardData?.remaining_interests), 
+        icon: 'heart', 
+        colors: ['#FDE68A', '#FBBF24'] as const 
+      },
+      { 
+        title: 'Uploads Left', 
+        value: formatValue(remainingUploads), 
+        icon: 'camera', 
+        colors: ['#EF4444', '#DC2626'] as const 
+      },
     ];
-  }
-
-  // Handle unlimited values (-1) and format display
-  const formatValue = (value: number) => {
-    if (value === -1) return '∞';
-    return value?.toString() || '0';
   };
 
-  return [
-    { 
-      title: 'Contact Views Left', 
-      value: formatValue(dashboardData?.remaining_contact_view), 
-      icon: 'eye', 
-      colors: ['#60A5FA', '#3B82F6'] as const 
-    },
-    { 
-      title: 'Interests Left', 
-      value: formatValue(dashboardData?.remaining_interests), 
-      icon: 'heart', 
-      colors: ['#FDE68A', '#FBBF24'] as const 
-    },
-    { 
-      title: 'Uploads Left', 
-      value: formatValue(dashboardData?.remaining_image_upload), 
-      icon: 'camera', 
-      colors: ['#EF4444', '#DC2626'] as const 
-    },
-  ];
 };
-
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#FFFFFF',
-  },
-  scrollContent: {
-    flex: 1,
-    width: '100%',
-  },
-
-  // Header without gradient (matches universal header padding style)
-  headerWithoutGradient: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  headerTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  settingsIconButton: {
-    padding: 8,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 40,
-  },
-  headerTopTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerRightToggleIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  toggleButton: {
-    padding: 8,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  languageToggleText: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  premiumBannerTop: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginHorizontal: 12,
-    marginVertical: 8,
-    borderRadius: 12,
-  },
-  premiumBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  premiumBannerText: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  premiumBannerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'white',
-  },
-  premiumBannerSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 2,
-  },
-  premiumBannerButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  premiumBannerButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'white',
-  },
-
-  // New Header with Icons
-  newHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    paddingTop: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  newHeaderTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1F2937',
-    flex: 1,
-    textAlign: 'center',
-  },
-  menuIconButton: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  headerRightIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  iconToggleButton: {
-    padding: 8,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Settings Dropdown Menu
-  settingsMenuOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 100,
-  },
-  settingsDropdown: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    maxHeight: 400,
-    marginTop: 50,
-    marginRight: 10,
-    marginLeft: 'auto',
-    borderRadius: 10,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    width: 180,
-  },
-  settingsMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  settingsMenuItemText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1F2937',
-    flex: 1,
-  },
-
-  // New Red Profile Card
-  newProfileCard: {
-    marginHorizontal: 16,
-    marginVertical: 20,
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-    gap: 16,
-  },
-
-  // Profile Card Top Section
-  profileCardTopSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  profileImageCircle: {
-    position: 'relative',
-    width: 70,
-    height: 70,
-  },
-  profileImageCircleImg: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cameraIconSmall: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileInfoRight: {
-    flex: 1,
-    gap: 4,
-  },
-  profileNameWhite: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  profileEmailWhite: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.85)',
-  },
-
-  // Profile Stats Row
-  profileStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-  },
-  profileStatItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  profileStatValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  profileStatLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-
-  // Profile Card Bottom Section
-  profileCardBottomSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-    gap: 10,
-  },
-  thankYouLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
-    flex: 1,
-  },
-  logoutButtonSmall: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  logoutButtonSmallText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-
-  // Current Plan Section
-  photosContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 16,
-  },
-  currentPlanSection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 10,
-  },
-  planLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  planLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  planName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  getPremiumButton: {
-    backgroundColor: '#A855F7',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  getPremiumButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-
-  payNowButton:{
-    backgroundColor:'#DC2626',
-    paddingVertical:10,
-    paddingHorizontal:20,
-    borderRadius:8,
-    alignSelf:'flex-start',
-    marginTop:12
-  },
-  payNowButtonDisabled:{
-    backgroundColor:'#9CA3AF'
-  },
-  payNowButtonText:{
-    color:'#FFFFFF',
-    fontWeight:'600'
-  },
-
-  // My Plan Tab
-  myPlanContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 16,
-  },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  availablePlansSection: {
-    gap: 10,
-  },
-  availablePlansTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  planOptionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 6,
-  },
-  planOptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  planOptionName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  planOptionPrice: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#DC2626',
-  },
-  planOptionDescription: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#9CA3AF',
-  },
-  planOptionDuration: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#9CA3AF',
-  },
-  planCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 10,
-  },
-  planCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  planCardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  planCardName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1F2937',
-  },
-  planCardDescription: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#9CA3AF',
-  },
-  planBenefitsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  planBenefitsTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  benefitsList: {
-    gap: 10,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  benefitText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  upgradePlanButton: {
-    backgroundColor: '#A855F7',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: 8,
-  },
-  upgradePlanButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  
-  // Attractive Header
-  attractiveHeader: {
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    paddingTop: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    position: 'relative',
-  },
-  gradientBackgroundOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0.1,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: 'white',
-    letterSpacing: 0.5,
-  },
-  headerRightIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  iconButton: {
-    padding: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-
-  // Profile Card
-  profileCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: 28,
-    padding: 28,
-    marginHorizontal: 12,
-    marginTop: -40,
-    marginBottom: 32,
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(220, 38, 38, 0.1)',
-  },
-  profileCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  profileImageWrapper: {
-    position: 'relative',
-  },
-  profileImageLarge: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 3,
-    borderColor: 'white',
-  },
-  avatarGradientLarge: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'white',
-  },
-  avatarTextLarge: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  editIconLarge: {
-    position: 'absolute',
-    bottom: -5,
-    right: -5,
-    backgroundColor: Colors.light.tint,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileNameLarge: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 4,
-  },
-  profileIdLarge: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginBottom: 10,
-  },
-  premiumBadgeLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-  },
-  premiumTextLarge: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '700',
-    marginLeft: 6,
-  },
-
-  // Stats Section - Simple Text and Counters
-  statsSection: {
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 12,
-    marginVertical: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  statsHeaderText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 16,
-    marginLeft: 4,
-  },
-  statsSimpleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  statSimpleItem: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  statSimpleLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6B7280',
-    textAlign: 'center',
-    maxWidth: 90,
-  },
-  statSimpleValue: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#DC2626',
-    letterSpacing: 0.5,
-  },
-
-  // Actions Section
-  actionsSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    backgroundColor: '#FFFFFF',
-  },
-  actionListContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  actionListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  actionListIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  actionListContent: {
-    flex: 1,
-  },
-  actionListTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  actionListSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-
-  // Menu Section
-  menuSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    backgroundColor: '#FFFFFF',
-  },
-  menuListContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  menuListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-  },
-  menuListIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  menuListContent: {
-    flex: 1,
-  },
-  menuListTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  menuGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  menuItemNew: {
-    width: '48%',
-    backgroundColor: 'white',
-    borderRadius: 18,
-    padding: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  menuIconNew: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  menuItemTextNew: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  logoutMenuItemNew: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-  },
-  logoutIconNew: {
-    backgroundColor: '#FEE2E2',
-  },
-  logoutMenuItemTextNew: {
-    color: '#DC2626',
-  },
-
-  // Tabs Section Styles
-  tabsSection: {
-    paddingVertical: 8,
-    paddingHorizontal: 0,
-    backgroundColor: '#FFFFFF',
-  },
-  tabButtonsContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    paddingHorizontal: 20,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  tabButtonActive: {
-    borderBottomColor: '#DC2626',
-  },
-  tabButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9CA3AF',
-  },
-  tabButtonTextActive: {
-    color: '#DC2626',
-  },
-  tabContent: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-  },
-
-  // Photos Grid Styles (Instagram-like)
-  photosGrid: {
-    minHeight: 300,
-    paddingHorizontal: 0,
-  },
-  photoColumnWrapper: {
-    justifyContent: 'space-between',
-    marginBottom: 2,
-    gap: 2,
-    paddingHorizontal: 12,
-  },
-  photoGridItem: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
-    position: 'relative',
-  },
-  photoGridImage: {
-    width: '100%',
-    height: '100%',
-  },
-  uploadCountBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  uploadCountText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  emptyPhotosContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    gap: 16,
-  },
-  emptyPhotosText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#9CA3AF',
-  },
-  emptyPhotosSubtext: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#9CA3AF',
-    marginTop: -8,
-  },
-  uploadPhotosButton: {
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  uploadPhotosButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  // Actions List Styles (List view instead of grid)
-  actionsGrid: {
-    flexDirection: 'column',
-    gap: 0,
-  },
-  actionGridItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  actionGridIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  actionGridTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    textAlign: 'left',
-    flex: 1,
-  },
-  
-  // Logout Button Special Style (List item)
-  logoutButton: {
-    borderBottomColor: '#FECACA',
-  },
-
-  // New Quick Actions Container
-  actionsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    gap: 24,
-  },
-
-  // Quick Actions Section
-  quickActionsSection: {
-    gap: 12,
-  },
-  sectionLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginLeft: 4,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  quickActionCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  quickActionIconBg: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickActionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1F2937',
-    textAlign: 'center',
-  },
-
-  // Menu Section
-  menuSection: {
-    gap: 12,
-  },
-  menuList: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  menuItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  menuIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuItemTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1F2937',
-    flex: 1,
-  },
-
-  // Logout Section
-  logoutSection: {
-    paddingHorizontal: 4,
-    paddingVertical: 8,
-  },
-  logoutButtonLarge: {
-    backgroundColor: '#FEE2E2',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    borderWidth: 1.5,
-    borderColor: '#FCA5A5',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  logoutButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#EF4444',
-  },
-
-  bottomPadding: {
-    height: 30,
-  },
-
-  // New Profile Card Styles (Redesigned)
-  profileCardContainer: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  profileCardHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 20,
-    alignItems: 'center',
-    gap: 12,
-  },
-  profileImageLarge: {
-    position: 'relative',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    overflow: 'hidden',
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  crownOverlay: {
-    position: 'absolute',
-    left: -8,
-    top: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  profileImageLargeImg: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cameraIconLarge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#DC2626',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  profileHeaderInfo: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  profileNameLarge: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: 'white',
-    textAlign: 'center',
-  },
-  premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  premiumBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'white',
-  },
-  profileIdText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  profileStatsSection: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#DC2626',
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#F3F4F6',
-    marginHorizontal: 12,
-  },
-  profileCardActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  actionButtonPrimary: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#DC2626',
-    borderRadius: 12,
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  actionButtonSecondary: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#FEE2E2',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'white',
-  },
-  actionButtonTextSecondary: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#DC2626',
-  },
-  avatarTextXL: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  planBenefitsInline: {
-    marginTop: 12,
-    gap: 8,
-  },
-  benefitItemInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  benefitTextInline: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-});

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import * as Notifications from 'expo-notifications';
+import { Audio } from 'expo-av';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -15,7 +17,26 @@ import { StyleSheet, View, SafeAreaView } from 'react-native';
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+// play app notification sound
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: false, shouldSetBadge: false }),
+});
+
 function RootLayoutNav() {
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener(async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          require('../assets/notification.wav'),
+          { shouldPlay: true }
+        );
+        sound.setOnPlaybackStatusUpdate((st) => {
+          if (st.isLoaded && st.didJustFinish) sound.unloadAsync();
+        });
+      } catch {}
+    });
+    return () => sub.remove();
+  }, []);
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   const { theme } = useTheme();

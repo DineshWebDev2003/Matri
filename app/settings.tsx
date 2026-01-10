@@ -13,6 +13,7 @@ const settingsMenuItems: { id: string; title: string; icon: IconName; section: s
   { id: '1', title: 'Personal Information', icon: 'user', section: 'personal' },
   { id: '2', title: 'Privacy Centre', icon: 'lock', section: 'personal' },
   { id: '3', title: 'Account Status', icon: 'check-circle', section: 'personal' },
+  { id: 'cp', title: 'Complete Profile', icon: 'clipboard', section: 'personal' },
   { id: '4', title: 'Link History', icon: 'link', section: 'personal' },
   { id: '5', title: 'Push Notification', icon: 'bell', section: 'notifications', hasToggle: true },
   { id: '6', title: 'Email Notification', icon: 'mail', section: 'notifications', hasToggle: true },
@@ -21,6 +22,7 @@ const settingsMenuItems: { id: string; title: string; icon: IconName; section: s
   { id: '9', title: 'Search History', icon: 'search', section: 'other' },
   { id: '10', title: 'Privacy Policy', icon: 'file-text', section: 'other' },
   { id: '11', title: 'About Us', icon: 'info', section: 'other' },
+    { id: '13', title: 'Support Tickets', icon: 'help-circle', section: 'other' },
   { id: '12', title: 'Customer Care', icon: 'phone', section: 'other' },
 ];
 
@@ -56,6 +58,9 @@ export default function SettingsScreen() {
       case 'Account Status':
         Alert.alert('Account Status', 'Your account is active and verified');
         break;
+      case 'Complete Profile':
+        router.push('/(auth)/profile-completion');
+        break;
       case 'Link History':
         Alert.alert('Link History', 'View your connection history');
         break;
@@ -64,6 +69,9 @@ export default function SettingsScreen() {
         break;
       case 'Privacy Policy':
         router.push('/privacy-policy');
+        break;
+      case 'Support Tickets':
+        router.push('/support-tickets');
         break;
       case 'About Us':
         setShowAboutModal(true);

@@ -78,8 +78,17 @@ const PartnerExpectationForm: React.FC<Props> = ({ options, stored }) => {
         max_height: (stored.max_height ?? stored.maximum_height)?.toString() ?? '',
         max_weight: (stored.max_weight ?? stored.maximum_weight)?.toString() ?? '',
         face_color: stored.face_color ?? stored.face_colour ?? stored.complexion ?? '',
+        general_requirement: stored.general_requirement ?? stored.requirements ?? '',
+        country: stored.country ?? '',
+        marital_status: stored.marital_status ?? '',
+        religion: stored.religion ?? '',
+        profession: stored.profession ?? '',
+        family_position: stored.family_position ?? '',
+        financial_condition: stored.financial_condition ?? '',
         annual_income: (stored.annual_income ?? stored.annualIncome ?? stored.financial_condition)?.toString() ?? '',
         languages: stored.languages ?? stored.language ?? [],
+        smoking_status: (stored.smoking_status ?? stored.smokingHabits ?? stored.smoking)?.toString() ?? '0',
+        drinking_status: (stored.drinking_status ?? stored.drinkingHabits ?? stored.drinking)?.toString() ?? '0',
       } as any;
 
       setForm({
@@ -277,7 +286,15 @@ const PartnerExpectationForm: React.FC<Props> = ({ options, stored }) => {
       <TouchableOpacity style={styles.submitButton} onPress={submit} disabled={submitting}>
         {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>Submit</Text>}
       </TouchableOpacity>
-    </View>, marginBottom: 4, fontSize: 13, fontWeight: '600', color: '#6B7280' },
+    </View>
+  );
+};
+
+export default PartnerExpectationForm;
+
+
+const styles = StyleSheet.create({
+  label: { marginTop: 12, marginBottom: 4, fontSize: 13, fontWeight: '600', color: '#6B7280' },
   input: {
     borderWidth: 1,
     borderColor: '#D1D5DB',

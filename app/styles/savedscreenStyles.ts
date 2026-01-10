@@ -1,0 +1,595 @@
+import { StyleSheet } from 'react-native';
+import { Colors } from '../../constants/Colors';
+  
+  const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    marginTop: 0
+  },
+  headerWithTabs: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  header: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  listContainer: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 80,
+  },
+  // Profile Card Styles
+  profileCard: {
+    borderRadius: 12,
+    marginBottom: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  cardImageContainer: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#F3F4F6',
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+  },
+  premiumBadgeCard: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#FCD34D',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  premiumBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#78350F',
+  },
+  verifiedBadgeCard: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: '#10B981',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  cardInfoSection: {
+    padding: 12,
+  },
+  cardNameRow: {
+    marginBottom: 6,
+  },
+  cardName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  cardLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 4,
+  },
+  cardLocation: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  cardDetailsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  detailBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  detailText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  cardFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardDate: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  statusBadgeCard: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  statusTextCard: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  removeButtonCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: '#FEE2E2',
+    gap: 6,
+  },
+  removeButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+  // Old styles (keeping for compatibility)
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+  },
+  profileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  profileLocation: {
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  profileDetails: {
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  statusText: {
+    fontSize: 11,
+    color: Colors.light.tint,
+    fontWeight: '600',
+  },
+  heartButton: {
+    padding: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: Colors.light.icon,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 30,
+  },
+  browseButton: {
+    backgroundColor: Colors.light.tint,
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  browseButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 12,
+    marginTop: 6,
+    marginBottom: 6,
+    borderRadius: 10,
+    padding: 4,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  activeTab: {
+    backgroundColor: Colors.light.tint,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
+    color: Colors.light.icon,
+  },
+  activeTabText: {
+    color: 'white',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: Colors.light.icon,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginHorizontal: 40,
+  },
+  profileImageContainer: {
+    marginRight: 15,
+  },
+  statusContainer: {
+    marginTop: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  actionContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 40,
+  },
+  removeButton: {
+    padding: 8,
+  },
+  premiumBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    marginVertical: 12,
+    borderRadius: 12,
+  },
+  premiumBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  premiumBannerText: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  premiumBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'white',
+  },
+  premiumBannerSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 2,
+  },
+  premiumBannerButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  premiumBannerButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'white',
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  acceptButton: {
+    backgroundColor: '#10B981',
+  },
+  acceptButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  ignoreButton: {
+    backgroundColor: '#EF4444',
+  },
+  ignoreButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    gap: 6,
+  },
+  removeButton: {
+    backgroundColor: '#EF4444',
+  },
+  removeButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  shortlistButton: {
+    backgroundColor: '#8B5CF6',
+  },
+  shortlistButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  // Filter Tabs Styles (matching profiles screen)
+  filterTabsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  filterTabsContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  filterTabActive: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  filterTabTextActive: {
+    color: 'white',
+  },
+  // Dark theme additions
+  filterTabsContainerDark: {
+    backgroundColor: '#1A1A1A',
+    borderBottomColor: '#2D2D2D',
+  },
+  filterTabDark: {
+    backgroundColor: '#2D2D2D',
+    borderColor: '#3A3A3A',
+  },
+  filterTabTextDark: {
+    color: '#D1D5DB',
+  },
+  filterTabTextActive: {
+    color: 'white',
+  },
+  // Profile Card Styles (matching profile screen)
+  profileCardContainer: {
+    marginHorizontal: 12,
+    marginVertical: 8,
+  },
+  mainCard: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  imageCardContainer: {
+    width: '100%',
+    height: 300,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  imageCard: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  infoOverlay: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    justifyContent: 'flex-end',
+  },
+  profileInfo: {
+    zIndex: 5,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
+    marginBottom: 4,
+  },
+  profileDetails: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.95)',
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    borderRadius: 20,
+    padding: 6,
+    zIndex: 10,
+  },
+  cardActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  cardActionButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 50,
+  },
+  cardActionButtonSmall: {
+    width: 50,
+    height: 50,
+  },
+  cardActionButtonLarge: {
+    width: 70,
+    height: 70,
+  },
+  removeActionButton: {
+    backgroundColor: '#EF4444',
+  },
+  acceptActionButton: {
+    backgroundColor: '#10B981',
+  },
+  ignoreActionButton: {
+    backgroundColor: '#EF4444',
+  },
+  shortlistActionButton: {
+    backgroundColor: '#8B5CF6',
+  },
+  viewProfileButton: {
+    backgroundColor: '#3B82F6',
+  },
+  infoSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  infoValue: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+});
+
+export default styles;

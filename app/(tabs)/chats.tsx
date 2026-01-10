@@ -12,7 +12,7 @@ import FallbackImage from '../../components/FallbackImage';
 import UniversalHeader from '../../components/UniversalHeader';
 import MenuModal from '../../components/MenuModal';
 import { LinearGradient } from 'expo-linear-gradient';
-import WithSwipe from '../../components/WithSwipe';
+//import WithSwipe from '../../components/WithSwipe';
 import { getImageUrl } from '../../utils/imageUtils';
 
 export default function ChatsScreen() {
@@ -460,7 +460,7 @@ export default function ChatsScreen() {
   }
 
   return (
-    <WithSwipe toLeft="/(tabs)/saved" toRight="/(tabs)/account">
+    //<WithSwipe toLeft="/(tabs)/saved" toRight="/(tabs)/account">
     <View style={[styles.container, themeStyles.container, { flex: 1 }]}>
       <UniversalHeader
         title="Messages"
@@ -514,7 +514,7 @@ export default function ChatsScreen() {
         onClose={() => setMenuModalVisible(false)}
       />
     </View>
-    </WithSwipe>
+    
   );
 }
 

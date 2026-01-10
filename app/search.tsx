@@ -12,11 +12,14 @@ import {
   Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '@/constants/Colors';
+import { LinearGradient } from 'expo-linear-gradient';
 import { apiService } from '../services/api';
+import { dropdowns } from '../services/dropdowns';
 import UniversalHeader from '../components/UniversalHeader';
 
 export default function SearchScreen() {
@@ -25,7 +28,11 @@ export default function SearchScreen() {
   const auth = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('all'); // all, name, caste, age
+  const [filterType, setFilterType] = useState('all'); // all, name, caste, age, location
+  const [religionOptions,setReligionOptions]=useState<{id:string;name:string}[]>([]);
+  const [casteOptions,setCasteOptions]=useState<{id:string;name:string}[]>([]);
+  const [selectedReligion,setSelectedReligion]=useState('');
+  const [selectedCaste,setSelectedCaste]=useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -35,6 +42,25 @@ export default function SearchScreen() {
     text: theme === 'dark' ? { color: '#FFFFFF' } : { color: '#1F2937' },
     secondaryText: theme === 'dark' ? { color: '#B0B0B0' } : { color: '#6B7280' },
     inputBg: theme === 'dark' ? { backgroundColor: '#2A2A2A' } : { backgroundColor: '#F3F4F6' },
+  };
+
+  // load religions once
+  useEffect(()=>{(async()=>{
+    try{
+      const res = await dropdowns.religions();
+      const relArr = Array.isArray(res)
+        ? res.map((r:any)=>({ id:String(r.id??r.value??r.key??r), name:r.name??r.label??r }))
+        : Object.entries(res||{}).map(([id,val]:any)=>({ id:String(id), name: String(val?.name??val) }));
+      setReligionOptions(relArr);
+    }catch(e){console.warn('religion fetch err',e);}}
+  )();},[]);
+
+  const handleReligionChange=async(id:string)=>{
+    setSelectedReligion(id);
+    setSelectedCaste('');
+    if(id){
+      try{const res=await dropdowns.castes(Number(id));setCasteOptions(res);}catch{setCasteOptions([]);}
+    }else{setCasteOptions([]);}
   };
 
   const performSearch = async () => {
@@ -62,8 +88,11 @@ export default function SearchScreen() {
         params.filters = { location: searchQuery };
         console.log('📍 Searching by location:', searchQuery);
       } else if (filterType === 'caste') {
-        params.filters = { caste: searchQuery };
-        console.log('👥 Searching by caste:', searchQuery);
+        // use dropdown selection if available else fallback to text
+        if(selectedReligion) params.religion = selectedReligion;
+        if(selectedCaste){ params.caste = selectedCaste; }
+        else { params.caste = searchQuery; }
+        console.log('👥 Searching by caste:', params);
       } else if (filterType === 'age') {
         const age = parseInt(searchQuery);
         if (isNaN(age)) {
@@ -120,6 +149,11 @@ export default function SearchScreen() {
   };
 
   const renderProfileCard = ({ item }: { item: any }) => {
+    const userGender = (item?.gender || '').toLowerCase();
+    const defaultImg = userGender === 'female'
+      ? require('../assets/images/default-female.jpg')
+      : require('../assets/images/default-male.jpg');
+
     const profileName = item?.name || `${item?.firstname || ''} ${item?.lastname || ''}`.trim() || 'User';
     const age = calculateAge(item?.dateOfBirth || item?.dob) || item?.age;
     const location = item?.city || item?.location || 'N/A';
@@ -130,17 +164,19 @@ export default function SearchScreen() {
       : 'https://via.placeholder.com/60';
 
     return (
+      <LinearGradient
+        colors={['#FCA5A5', '#F87171']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.profileCardGradient}
+      >
       <TouchableOpacity
-        style={[
-          styles.profileCard,
-          theme === 'dark' ? { backgroundColor: '#2A2A2A' } : { backgroundColor: '#F8F9FA' },
-        ]}
+        style={styles.profileCardInner}
         onPress={() => router.push(`/profile/${item.id}`)}
       >
         <Image
-          source={{ uri: imageUrl }}
+          source={imageUrl ? { uri: imageUrl } : defaultImg}
           style={styles.profileImage}
-          defaultSource={require('../assets/images/default-male.jpg')}
+          defaultSource={defaultImg}
         />
         <View style={styles.profileInfo}>
           <Text style={[styles.profileName, themeStyles.text]}>
@@ -159,6 +195,7 @@ export default function SearchScreen() {
           )}
         </View>
       </TouchableOpacity>
+      </LinearGradient>
     );
   };
 
@@ -216,6 +253,29 @@ export default function SearchScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Religion & Caste pickers (visible only when caste filter chosen) */}
+        {filterType==='caste' && (
+          <View style={{gap:8}}>
+            <Picker
+              selectedValue={selectedReligion}
+              onValueChange={(v)=>handleReligionChange(String(v))}
+              style={[styles.searchInputContainer,{height:48}]}
+            >
+              <Picker.Item label="Select Religion" value="" />
+              {religionOptions.map(r=>(<Picker.Item key={r.id} label={r.name} value={r.id} />))}
+            </Picker>
+            <Picker
+              enabled={selectedReligion!==''}
+              selectedValue={selectedCaste}
+              onValueChange={(v)=>setSelectedCaste(String(v))}
+              style={[styles.searchInputContainer,{height:48}]}
+            >
+              <Picker.Item label="Select Caste" value="" />
+              {casteOptions.map(c=>(<Picker.Item key={c.id} label={c.name} value={c.name} />))}
+            </Picker>
+          </View>
+        )}
 
         {/* Search Button */}
         <TouchableOpacity
@@ -356,13 +416,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  profileCard: {
+  profileCardGradient: {
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  profileCardInner: {
     flexDirection: 'row',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12,
-    marginBottom: 10,
     gap: 12,
+    alignItems: 'center',
   },
   profileImage: {
     width: 60,

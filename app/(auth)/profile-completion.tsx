@@ -22,21 +22,29 @@ import { apiService } from '../../services/api';
 import { Colors } from '../../constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
+import { SMOKING_STATUS, DRINKING_STATUS, MARITAL_STATUS } from '../../constants/dropdownOptions';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
 
-// Smoking Habits options
-const smokingHabits = [
-  { id: 'yes', name: 'Yes' },
-  { id: 'no', name: 'No' },
-  { id: 'occasionally', name: 'Occasionally' }
+// Smoking Habits options from shared constants
+const smokingHabits = SMOKING_STATUS.map(s => ({ id: String(s.id), name: s.label }));
+
+// Drinking Habits options from shared constants
+const drinkingHabits = DRINKING_STATUS.map(d => ({ id: String(d.id), name: d.label }));
+
+// Looking For options
+const lookingForOptions = [
+  { id: '1', name: 'Groom' },
+  { id: '2', name: 'Bride' },
 ];
 
-// Drinking Habits options
-const drinkingHabits = [
-  { id: 'yes', name: 'Yes' },
-  { id: 'no', name: 'No' },
-  { id: 'occasionally', name: 'Occasionally' }
+// Financial Condition options
+const financialConditions = [
+  { id: 'Struggling', name: 'Struggling' },
+  { id: 'Average', name: 'Average' },
+  { id: 'Stable', name: 'Stable' },
+  { id: 'Wealthy', name: 'Wealthy' },
 ];
 
 // Height options (in feet)
@@ -84,22 +92,22 @@ const complexions = [
 
 // Eye Color options
 const eyeColors = [
-  { id: 'black', name: 'Black', color: '#000000' },
-  { id: 'brown', name: 'Brown', color: '#8B4513' },
-  { id: 'hazel', name: 'Hazel', color: '#8B7355' },
-  { id: 'green', name: 'Green', color: '#228B22' },
-  { id: 'blue', name: 'Blue', color: '#4169E1' },
-  { id: 'gray', name: 'Gray', color: '#808080' }
+  { id: 'black', name: 'Black' },
+  { id: 'brown', name: 'Brown' },
+  { id: 'hazel', name: 'Hazel' },
+  { id: 'green', name: 'Green' },
+  { id: 'blue', name: 'Blue' },
+  { id: 'gray', name: 'Gray' }
 ];
 
 // Hair Color options
 const hairColors = [
-  { id: 'black', name: 'Black', color: '#000000' },
-  { id: 'brown', name: 'Brown', color: '#8B4513' },
-  { id: 'blonde', name: 'Blonde', color: '#FFD700' },
-  { id: 'red', name: 'Red', color: '#DC143C' },
-  { id: 'gray', name: 'Gray', color: '#808080' },
-  { id: 'white', name: 'White', color: '#FFFFFF' }
+  { id: 'black', name: 'Black' },
+  { id: 'brown', name: 'Brown' },
+  { id: 'blonde', name: 'Blonde' },
+  { id: 'red', name: 'Red' },
+  { id: 'gray', name: 'Gray' },
+  { id: 'white', name: 'White' }
 ];
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -133,36 +141,57 @@ const FormInput = ({ label, icon, containerStyle, fieldName, formData, onFieldCh
 };
 
 export default function ProfileCompletionScreen() {
+  // Helper to safely derive display name from country option shapes
+  const extractCountryName = (item:any):string=>{
+    if(!item) return '';
+    if(typeof item==='string') return item;
+    if(typeof item==='object'){
+      const cand = item.country || item.name || item.label || item.nicename || (item.name?.en) || Object.values(item).find(v=>typeof v==='string');
+      return cand ? String(cand) : 'Unknown';
+    }
+    return String(item);
+  };
   const [religionOptions, setReligionOptions] = useState<{id:string;name:string}[]>([]);
   const [casteOptions, setCasteOptions] = useState<{id:string;name:string}[]>([]);
   const getCasteName = (cid:string)=> casteOptions.find(c=>c.id===String(cid))?.name || cid;
   const [maritalStatusOptions, setMaritalStatusOptions] = useState<{id:string;name:string}[]>([]);
+  const [countryOptions, setCountryOptions]   = useState<{id:string;name:string}[]>([]);
+  const [stateOptions, setStateOptions]       = useState<{id:string;name:string}[]>([]);
+  const [cityOptions, setCityOptions]         = useState<{id:string;name:string}[]>([]);
   const getReligionName = (rid:string)=> religionOptions.find(r=>r.id===String(rid))?.name || rid;
   const router = useRouter();
   const auth = useAuth();
   const params = useLocalSearchParams();
   
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    // Initialize with current date or parsed birth_date if available
+    if (formData?.birth_date) {
+      return new Date(formData.birth_date);
+    }
+    return new Date();
+  });
+
   const [formData, setFormData] = useState({
     // ------ Step 1 required only (web parity) ------
+    firstname: '',
+    lastname: '',
     birth_date: '',          // YYYY-MM-DD
     religion_id: '',         // numeric id
     gender: '',              // m / f
-    looking_for: '',         // 1 = groom, 2 = Bride
+    looking_for: '',         // 1 = Groom, 2 = Bride
     marital_status: '',      // string title matching table
-
-    dateOfBirth: '',
-    religion: '',
+    mother_tongue: '',
+    languages: '',           // comma-separated string for now
     profession: '',
-    annualIncome: '',
-    smokingHabits: '',
-    drinkingHabits: '',
-    maritalStatus: '',
+    financial_condition: '',
+    smoking_status: '',      // 0/1/2 numeric (no/yes/occasionally)
+    drinking_status: '',     // 0/1/2
     caste: '',
-    spokenLanguages: '',
-    presentCountry: '',
-    presentState: '',
-    presentCity: '',
-    presentZipCode: '',
+    country: '',
+    state: '',
+    city: '',
+    zip: '',
     
     // Step 2: Physical Attributes
     height: '',
@@ -244,13 +273,50 @@ export default function ProfileCompletionScreen() {
     // fetch dropdown options once
     const fetchDropdowns = async () => {
       try {
-        const res = await apiService.getDropdownOptions(); // expects { religions:[], maritalStatuses:[] }
-        if(res.status==='success'){
-          setReligionOptions(res.data.religions || []);
-          setMaritalStatusOptions(res.data.maritalStatuses || []);
+        const dropRes = await apiService.getDropdownOptions();
+        if (dropRes.status === 'success') {
+          const opts = dropRes.data || {};
+          // Religions array may come as [{id,name}] or object {id:name}
+          const religionsArr: {id:string;name:string}[] = Array.isArray(opts.religions)
+            ? opts.religions.map((r: any) => ({ id: String(r.id ?? r.value ?? r.key ?? r), name: r.name ?? r.label ?? r }))
+            : Object.entries(opts.religions || {}).map(([id, name]: any) => ({ id: String(id), name: String((name as any).name ?? name) }));
+          setReligionOptions(religionsArr);
+
+          const maritalArr: {id:string;name:string}[] = Array.isArray(opts.marital_statuses)
+            ? opts.marital_statuses.map((m: any) => ({ id: String(m.id ?? m.value ?? m), name: m.name ?? m.label ?? m }))
+            : Object.entries(opts.marital_statuses || {}).map(([id, name]: any) => ({ id: String(id), name: extractCountryName(name) }));
+          setMaritalStatusOptions(maritalArr);
+
+          // Countries may come as object code:name
+          const countryArr: {id:string;name:string}[] = Array.isArray(opts.countries)
+            ? opts.countries.map((c:any)=>({id:String(c.id ?? c.code ?? c.key ?? extractCountryName(c)), name:extractCountryName(c)}))
+            : Object.entries(opts.countries || {}).map(([code, obj]:any)=>({id:String(code), name:extractCountryName(obj)}));
+          const seen=new Set<string>();
+          const filteredCountryArr = (countryArr.length?countryArr:[{id:'IN',name:'India'}]).filter(c=>c.name && c.name!=='Unknown' && !seen.has(c.name) && (seen.add(c.name),true));
+          setCountryOptions(filteredCountryArr);
+
+          // If no countries included, fetch separately
+          if(!countryArr.length){
+            try{
+              const cRes = await apiService.getCountries();
+              const cArr = Object.entries(cRes || {}).map(([id,val]:any)=>({id:String(id), name: extractCountryName(val)}));
+              const seen2=new Set<string>();
+              const filtered= (cArr.length?cArr:[{id:'IN',name:'India'}]).filter(c=>c.name && c.name!=='Unknown' && !seen2.has(c.name) && (seen2.add(c.name),true));
+              setCountryOptions(filtered);
+            }catch{/* ignore */}
+          }
+
+          // Fetch initial states list
+          try{
+            const statesRes = await apiService.getStates();
+            const statesArr = Object.entries(statesRes || {}).map(([id,name]:any)=>({id:String(id), name:String(name)}));
+            setStateOptions(statesArr);
+          }catch{ /* ignore */ }
         }
-      } catch(err){ console.error('dropdown fetch err', err);}
-    }
+      } catch (err) {
+        console.error('dropdown fetch err', err);
+      }
+    };
     fetchDropdowns();
     // Pre-fill from registration data if available
     if (params.registrationData) {
@@ -264,8 +330,8 @@ export default function ProfileCompletionScreen() {
             dateOfBirth: regData.birth_date || prev.dateOfBirth,
             religion: String(regData.religion_id || regData.religion || prev.religion),
             caste: String(regData.caste_id || regData.caste || prev.caste),
-            presentCountry: regData.country || prev.presentCountry,
-            presentState: regData.state || regData.present_state || prev.presentState,
+            country: regData.country || prev.country,
+            state: regData.state || regData.present_state || prev.state,
             // Auto-detect gender from looking_for (1 = Bridegroom/Male, 2 = Bride/Female)
             gender: regData.gender || (regData.looking_for === '1' ? 'male' : regData.looking_for === '2' ? 'female' : prev.gender),
           };
@@ -282,7 +348,36 @@ export default function ProfileCompletionScreen() {
     
     // We will fetch castes after setting the form data
     fetchUserProfile();
+    // Fetch countries separately if still empty
+    (async()=>{
+      if(!countryOptions.length){
+        try{
+          const cRes = await apiService.getCountries();
+          const cArr = Object.entries(cRes || {}).map(([id,val]:any)=>({id:String(id), name: extractCountryName(val)}));
+          const seen3=new Set<string>();
+          setCountryOptions(cArr.filter(c=>c.name && c.name!=='Unknown' && !seen3.has(c.name) && (seen3.add(c.name),true)));
+        }catch(err){console.warn('countries fetch err',err);}
+      }
+    })();
+
+    // When state changes, fetch cities list
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch cities when state changes
+  useEffect(()=>{
+    if(formData.state){
+      (async()=>{
+        try{
+          const citiesRes = await apiService.getCities(formData.state);
+          const cityArr = Array.isArray(citiesRes)
+            ? citiesRes.map((name:string,idx:number)=>({id:String(idx), name}))
+            : Object.entries(citiesRes||{}).map(([id,name]:any)=>({id:String(id), name:String(name)}));
+          setCityOptions(cityArr);
+        }catch(err){console.warn('cities fetch err',err);}
+      })();
+    }
+  },[formData.state]);
 
   // Fetch castes list by religion id helper
   const fetchCastes = async (religionId:string)=>{
@@ -308,32 +403,49 @@ export default function ProfileCompletionScreen() {
       }
 
       // Then fetch complete profile data from API
-      const response = await apiService.getUserInfo();
+      const response = await apiService.getUserDetails();
       console.log('👤 Complete profile response:', response);
       
       if (response && response.status === 'success' && response.data) {
         // Backend returns data.user, so extract it
-        const profileData = response.data.user || response.data;
+        const profileRoot = response.data.profile || response.data.user || response.data;
+        // If API returns nested sections, merge basic_info etc. onto a flat object
+        const profileData = {
+          ...profileRoot,
+          ...(profileRoot.basic_info || {}),
+          ...(profileRoot.physical_info || {}),
+          ...(profileRoot.family_info || {}),
+          ...(profileRoot.residence_info || {}),
+          ...(Array.isArray(profileRoot.education_info) ? profileRoot.education_info[0] || {} : profileRoot.education_info || {}),
+          ...(Array.isArray(profileRoot.career_info) ? profileRoot.career_info[0] || {} : profileRoot.career_info || {}),
+          ...(profileRoot.partner_preference || {}),
+        };
         
         setFormData(prev => ({
           ...prev,
           // Basic Information
-          dateOfBirth: profileData.dateOfBirth || profileData.date_of_birth || '',
-          religion: profileData.religion || prev.religion,
+          birth_date: profileData.birth_date || profileData.date_of_birth || '',
+          religion_id: String(profileData.religion_id || profileData.religion || prev.religion_id),
           gender: profileData.gender || '',
+          looking_for: profileData.looking_for === 'Bridegroom' ? '1' : profileData.looking_for === 'Bride' ? '2' : prev.looking_for,
           profession: profileData.profession || '',
-          smokingHabits: profileData.smokingHabits || profileData.smoking_habits || '',
-          drinkingHabits: profileData.drinkingHabits || profileData.drinking_habits || '',
-          maritalStatus: profileData.maritalStatus || profileData.marital_status || '',
+          smoking_status: String(profileData.smoking_status || profileData.smokingHabits || ''),
+          drinking_status: String(profileData.drinking_status || profileData.drinkingHabits || ''),
+          marital_status: (profileData.marital_status || '').toLowerCase(),
           caste: profileData.caste || prev.caste,
-          spokenLanguages: profileData.spokenLanguages || profileData.spoken_languages || '',
-          presentCountry: profileData.presentCountry || profileData.present_country || prev.presentCountry,
-          presentState: profileData.presentState || profileData.present_state || prev.presentState,
-          presentCity: profileData.presentCity || profileData.present_city || '',
-          presentZipCode: profileData.presentZipCode || profileData.present_zip_code || '',
+          mother_tongue: profileData.mother_tongue || '',
+          languages: Array.isArray(profileData.language) ? profileData.language.join(',') : (profileData.languages || ''),
+          country: profileData.country || '',
+          state: profileData.state || '',
+          city: profileData.city || '',
+          zip: profileData.zip || profileData.present_address?.zip || '',
+          firstname: profileData.firstname || '',
+          lastname: profileData.lastname || '',
+          numberOfBrothers: String(profileData.numberOfBrothers || ''),
+          numberOfSisters: String(profileData.numberOfSisters || ''),
           // Physical Attributes
-          height: profileData.height || '',
-          weight: profileData.weight || '',
+          height: profileData.height !== undefined ? String(profileData.height) : '',
+          weight: profileData.weight !== undefined ? String(profileData.weight) : '',
           bloodGroup: profileData.bloodGroup || profileData.blood_group || '',
           eyeColor: profileData.eyeColor || profileData.eye_color || '',
           hairColor: profileData.hairColor || profileData.hair_color || '',
@@ -346,25 +458,25 @@ export default function ProfileCompletionScreen() {
           motherName: profileData.motherName || profileData.mother_name || '',
           motherProfession: profileData.motherProfession || profileData.mother_profession || '',
           motherContact: profileData.motherContact || profileData.mother_contact || '',
-          numberOfBrothers: profileData.numberOfBrothers || '',
-          numberOfSisters: profileData.numberOfSisters || '',
+          numberOfBrothers: String(profileData.total_brother ?? profileData.numberOfBrothers ?? ''),
+          numberOfSisters: String(profileData.total_sister ?? profileData.numberOfSisters ?? ''),
           // Partner Expectations
-          partnerGeneralRequirement: profileData.partnerGeneralRequirement || '',
-          partnerCountry: profileData.partnerCountry || '',
-          partnerMinAge: profileData.partnerMinAge || '',
-          partnerMaxAge: profileData.partnerMaxAge || '',
-          partnerMinHeight: profileData.partnerMinHeight || '',
-          partnerMaxHeight: profileData.partnerMaxHeight || '',
-          partnerMaritalStatus: profileData.partnerMaritalStatus || '',
-          partnerReligion: profileData.partnerReligion || '',
-          partnerComplexion: profileData.partnerComplexion || '',
-          partnerSmokingHabits: profileData.partnerSmokingHabits || '',
-          partnerDrinkingHabits: profileData.partnerDrinkingHabits || '',
-          partnerSpokenLanguages: profileData.partnerSpokenLanguages || '',
-          partnerEducation: profileData.partnerEducation || '',
-          partnerProfession: profileData.partnerProfession || '',
-          partnerFinancialCondition: profileData.partnerFinancialCondition || '',
-          partnerFamilyValues: profileData.partnerFamilyValues || '',
+          partnerGeneralRequirement: profileData.requirements || profileData.partnerGeneralRequirement || '',
+          partnerCountry: profileData.country || profileData.partnerCountry || '',
+          partnerMinAge: String(profileData.min_age ?? profileData.partnerMinAge ?? ''),
+          partnerMaxAge: String(profileData.max_age ?? profileData.partnerMaxAge ?? ''),
+          partnerMinHeight: profileData.min_height || profileData.partnerMinHeight || '',
+          partnerMaxHeight: profileData.max_height || profileData.partnerMaxHeight || '',
+          partnerMaritalStatus: profileData.marital_status || profileData.partnerMaritalStatus || '',
+          partnerReligion: profileData.religion || profileData.partnerReligion || '',
+          partnerComplexion: profileData.complexion || profileData.partnerComplexion || '',
+          partnerSmokingHabits: String(profileData.smoking_status ?? profileData.partnerSmokingHabits ?? ''),
+          partnerDrinkingHabits: String(profileData.drinking_status ?? profileData.partnerDrinkingHabits ?? ''),
+          partnerSpokenLanguages: Array.isArray(profileData.language) ? profileData.language.join(',') : (profileData.partnerSpokenLanguages || ''),
+          partnerEducation: profileData.min_degree || profileData.partnerEducation || '',
+          partnerProfession: profileData.profession || profileData.partnerProfession || '',
+          partnerFinancialCondition: profileData.financial_condition || profileData.partnerFinancialCondition || '',
+          partnerFamilyValues: profileData.family_position || profileData.partnerFamilyValues || '',
           // Career Information
           company: profileData.company || '',
           designation: profileData.designation || '',
@@ -379,8 +491,9 @@ export default function ProfileCompletionScreen() {
         }));
 
         // --- Prefill multi-entry arrays ---
-        if (Array.isArray(profileData.educations) && profileData.educations.length) {
-          const mappedEdu = profileData.educations.map((e:any)=>({
+        const eduArr = profileRoot.education_info || profileData.educations;
+        if (Array.isArray(eduArr) && eduArr.length) {
+          const mappedEdu = eduArr.map((e:any)=>({
             institute: e.institute || '',
             degree: e.degree || '',
             fieldOfStudy: e.field_of_study || '',
@@ -389,8 +502,9 @@ export default function ProfileCompletionScreen() {
           }));
           setEducationList(mappedEdu);
         }
-        if (Array.isArray(profileData.careers) && profileData.careers.length) {
-          const mappedCareer = profileData.careers.map((c:any)=>({
+        const careerArr = profileRoot.career_info || profileData.careers;
+        if (Array.isArray(careerArr) && careerArr.length) {
+          const mappedCareer = careerArr.map((c:any)=>({
             company: c.company || '',
             designation: c.designation || '',
             start: c.start || '',
@@ -407,6 +521,36 @@ export default function ProfileCompletionScreen() {
   };
 
 
+  const handleDateChange = (event: any, date?: Date) => {
+    setShowDatePicker(false);
+    if (date) {
+      setSelectedDate(date);
+      const formattedDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+      handleInputChange('birth_date', formattedDate);
+    }
+  };
+
+  const handleSkipAll = async () => {
+    Alert.alert('Skip All', 'Are you sure you want to skip profile completion?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Skip',
+        onPress: async () => {
+          try {
+            setLoading(true);
+            await apiService.skipAllProfile();
+            router.replace('/(tabs)');
+          } catch (error) {
+            console.error('Error skipping profile:', error);
+            Alert.alert('Error', 'Failed to skip profile completion');
+          } finally {
+            setLoading(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -418,6 +562,7 @@ export default function ProfileCompletionScreen() {
     if (currentStep < 6) {
       setCurrentStep((currentStep + 1) as Step);
     } else {
+      // Final step, submit
       handleSubmit();
     }
   };
@@ -427,6 +572,7 @@ export default function ProfileCompletionScreen() {
       setCurrentStep((currentStep - 1) as Step);
     }
   };
+
 
   const handleSkip = () => {
     setShowSkipConfirm(true);
@@ -438,8 +584,10 @@ export default function ProfileCompletionScreen() {
     try {
       // Save minimal basic info before skipping
       const basicData = {
-        dateOfBirth: formData.dateOfBirth,
-        religion: formData.religion,
+        firstname: formData.firstname,
+        lastname: formData.lastname,
+        birth_date: formData.birth_date,
+        religion_id: formData.religion_id,
         gender: formData.gender,
       };
       
@@ -475,15 +623,32 @@ export default function ProfileCompletionScreen() {
             gender: formData.gender,
             religion_id: formData.religion,
             caste: formData.caste,
+            firstname: formData.firstname,
+            lastname: formData.lastname,
+            birth_date: formData.birth_date,
+            religion_id: formData.religion_id,
+            gender: formData.gender,
+            looking_for: formData.looking_for,
+            marital_status: formData.marital_status,
+            caste: formData.caste,
+            mother_tongue: formData.mother_tongue,
+            languages: formData.languages ? formData.languages.split(',').map(l=>l.trim()) : [],
             profession: formData.profession,
+            financial_condition: formData.financial_condition,
+            smoking_status: formData.smoking_status,
+            drinking_status: formData.drinking_status,
+            country: formData.country,
+            state: formData.state,
+            city: formData.city,
+            zip: formData.zip,
             smokingHabits: formData.smokingHabits,
             drinkingHabits: formData.drinkingHabits,
             maritalStatus: formData.maritalStatus,
-            spokenLanguages: formData.spokenLanguages,
-            presentCountry: formData.presentCountry,
-            presentState: formData.presentState,
-            presentCity: formData.presentCity,
-            presentZipCode: formData.presentZipCode,
+            languages: formData.languages,
+            country: formData.country,
+            state: formData.state,
+            city: formData.city,
+            zip: formData.zip,
           };
           break;
         case 2:
@@ -553,10 +718,29 @@ export default function ProfileCompletionScreen() {
           break;
       }
       
-      // Log payload then submit the current step
+      // Log payload then submit the current step using explicit endpoint helpers
       console.log('📦 Payload for step', currentStep, stepData);
-      // Submit the current step
-      const response = await apiService.submitProfileStep(currentStep, stepData);
+      let response: any = { status: 'error' };
+      switch (currentStep) {
+        case 1:
+          response = await apiService.postBasicInfo(stepData);
+          break;
+        case 2:
+          response = await apiService.postFamilyInfo(stepData);
+          break;
+        case 3:
+          response = await apiService.postEducationInfo(stepData);
+          break;
+        case 4:
+          response = await apiService.postCareerInfo(stepData);
+          break;
+        case 5:
+          response = await apiService.postPhysicalAttributes(stepData);
+          break;
+        case 6:
+          response = await apiService.postPartnerExpectation(stepData);
+          break;
+      }
       
       console.log('✅ Step submission response:', response);
       
@@ -589,7 +773,109 @@ export default function ProfileCompletionScreen() {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Basic Information</Text>
             <Text style={styles.stepDescription}>Complete your basic details</Text>
+
+            {/* Names */}
+            <FormInput 
+              label="First Name *" 
+              placeholder="Your First Name" 
+              icon="user"
+              fieldName="firstname"
+              formData={formData}
+              onFieldChange={handleInputChange}
+            />
+            <FormInput 
+              label="Last Name *" 
+              placeholder="Your Last Name" 
+              icon="user"
+              fieldName="lastname"
+              formData={formData}
+              onFieldChange={handleInputChange}
+            />
+
+            {/* Birth Date */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Date of Birth *</Text>
+              <TouchableOpacity 
+                style={[styles.input, { justifyContent: 'center' }]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={{ color: formData.birth_date ? colors.textPrimary : '#6B7280' }}>
+                  {formData.birth_date || 'Select your date of birth'}
+                </Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                  maximumDate={new Date()}
+                  themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
+                />
+              )}
+            </View>
+
+            {/* Religion */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Religion *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={formData.religion_id}
+                  onValueChange={(value) => handleInputChange('religion_id', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Religion" value="" />
+                  {religionOptions.map((rel) => (
+                    <Picker.Item key={rel.id} label={rel.name} value={rel.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Looking For */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Looking For *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={formData.looking_for}
+                  onValueChange={(value) => handleInputChange('looking_for', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select" value="" />
+                  {lookingForOptions.map((opt)=>(
+                    <Picker.Item key={opt.id} label={opt.name} value={opt.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
             
+            <FormInput 
+              label="Mother Tongue *" 
+              placeholder="e.g., Tamil" 
+              icon="message-circle"
+              fieldName="mother_tongue"
+              formData={formData}
+              onFieldChange={handleInputChange}
+            />
+
+            <FormInput 
+              label="Languages (comma separated) *" 
+              placeholder="English,Tamil" 
+              icon="globe"
+              fieldName="languages"
+              formData={formData}
+              onFieldChange={handleInputChange}
+            />
+
+            <FormInput 
+              label="Financial Condition *" 
+              placeholder="Select Condition" 
+              icon="dollar-sign"
+              fieldName="financial_condition"
+              formData={formData}
+              onFieldChange={handleInputChange}
+            />
+
             <FormInput 
               label="Profession *" 
               placeholder="Your Profession" 
@@ -603,8 +889,8 @@ export default function ProfileCompletionScreen() {
                 <Text style={styles.label}>Smoking Habits</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
-                    selectedValue={formData.smokingHabits}
-                    onValueChange={(value) => handleInputChange('smokingHabits', value)}
+                    selectedValue={formData.smoking_status}
+                    onValueChange={(value) => handleInputChange('smoking_status', value)}
                     style={styles.picker}
                   >
                     <Picker.Item label="Select" value="" />
@@ -618,8 +904,8 @@ export default function ProfileCompletionScreen() {
                 <Text style={[styles.label, { color: colors.textPrimary }]}>Drinking Status</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
-                    selectedValue={formData.drinkingHabits}
-                    onValueChange={(value) => handleInputChange('drinkingHabits', value)}
+                    selectedValue={formData.drinking_status}
+                    onValueChange={(value) => handleInputChange('drinking_status', value)}
                     style={styles.picker}
                   >
                     <Picker.Item label="Select" value="" />
@@ -635,8 +921,8 @@ export default function ProfileCompletionScreen() {
               <Text style={styles.label}>Marital Status *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
-                  selectedValue={formData.maritalStatus}
-                  onValueChange={(value) => handleInputChange('maritalStatus', value)}
+                  selectedValue={formData.marital_status}
+                  onValueChange={(value) => handleInputChange('marital_status', value)}
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Marital Status" value="" />
@@ -658,46 +944,59 @@ export default function ProfileCompletionScreen() {
               label="Spoken Languages *" 
               placeholder="e.g., English, Tamil" 
               icon="globe"
-              fieldName="spokenLanguages"
+              fieldName="languages"
               formData={formData}
               onFieldChange={handleInputChange}
             />
             
             
             <Text style={styles.subHeader}>Present Address</Text>
-            <FormInput 
-              label="Country *" 
-              placeholder="Select Country" 
-              icon="map-pin"
-              fieldName="presentCountry"
-              formData={formData}
-              onFieldChange={handleInputChange}
-            />
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Country *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={formData.country}
+                  onValueChange={(value)=>handleInputChange('country',value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Country" value="" />
+                  {countryOptions.map(c=>(<Picker.Item key={c.id} label={c.name} value={c.id} />))}
+                </Picker>
+              </View>
+            </View>
             <View style={styles.row}>
-              <FormInput 
-                label="State" 
-                placeholder="Your State" 
-                icon="map" 
-                containerStyle={styles.halfWidth}
-                fieldName="presentState"
-                formData={formData}
-                onFieldChange={handleInputChange}
-              />
-              <FormInput 
-                label="City *" 
-                placeholder="Your City" 
-                icon="map" 
-                containerStyle={styles.halfWidth}
-                fieldName="presentCity"
-                formData={formData}
-                onFieldChange={handleInputChange}
-              />
+              <View style={[styles.inputContainer, styles.halfWidth]}>
+                <Text style={styles.label}>State *</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.state}
+                    onValueChange={(value)=>handleInputChange('state',value)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select State" value="" />
+                    {stateOptions.map(s=>(<Picker.Item key={s.id} label={s.name} value={s.id} />))}
+                  </Picker>
+                </View>
+              </View>
+              <View style={[styles.inputContainer, styles.halfWidth]}>
+                <Text style={styles.label}>City *</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.city}
+                    onValueChange={(value)=>handleInputChange('city',value)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select City" value="" />
+                    {cityOptions.map(ct=>(<Picker.Item key={ct.id} label={ct.name} value={ct.name} />))}
+                  </Picker>
+                </View>
+              </View>
             </View>
             <FormInput 
               label="Zip Code" 
               placeholder="Your Zip Code" 
               icon="hash"
-              fieldName="presentZipCode"
+              fieldName="zip"
               formData={formData}
               onFieldChange={handleInputChange}
             />
@@ -710,36 +1009,9 @@ export default function ProfileCompletionScreen() {
             <Text style={styles.stepTitle}>Physical Attributes</Text>
             <Text style={styles.stepDescription}>Tell us about your physical characteristics</Text>
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Height *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={formData.height}
-                  onValueChange={(value) => handleInputChange('height', value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Height" value="" />
-                  {heights.map((h) => (
-                    <Picker.Item key={h.id} label={h.name} value={h.id} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Weight *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={formData.weight}
-                  onValueChange={(value) => handleInputChange('weight', value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Weight" value="" />
-                  {weights.map((w) => (
-                    <Picker.Item key={w.id} label={w.name} value={w.id} />
-                  ))}
-                </Picker>
-              </View>
+            <View style={styles.row}>
+              <FormInput label="Height *" placeholder="e.g., 5.8" icon="trending-up" containerStyle={styles.halfWidth} fieldName="height" formData={formData} onFieldChange={handleInputChange} />
+              <FormInput label="Weight *" placeholder="e.g., 70" icon="activity" containerStyle={styles.halfWidth} fieldName="weight" formData={formData} onFieldChange={handleInputChange} />
             </View>
             
             <FormInput label="Blood Group *" placeholder="Select Blood Group" icon="droplet" fieldName="bloodGroup" formData={formData} onFieldChange={handleInputChange} />
@@ -1001,6 +1273,9 @@ export default function ProfileCompletionScreen() {
         >
           <Text style={[styles.skipButtonText, { color: colors.textSecondary }]}>Skip for now</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.btn, { backgroundColor: '#6B7280', margin:16 }]} onPress={handleSkipAll}>
+          <Text style={styles.btnText}>Skip All</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1021,8 +1296,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 5,
+        marginBottom: 5,
   },
   headerSubtitle: {
     fontSize: 14,
@@ -1048,12 +1322,10 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 22,
     fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
+        marginBottom: 8,
   },
   stepDescription: {
     fontSize: 14,
-    color: '#6B7280',
     marginBottom: 20,
   },
   row: {
@@ -1069,7 +1341,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
     marginBottom: 8,
   },
   input: {
@@ -1079,8 +1350,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#1F2937',
-  },
+      },
   buttonContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -1138,8 +1408,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 16,
+        marginTop: 16,
     marginBottom: 12,
   },
   modalMessage: {
@@ -1191,8 +1460,7 @@ const styles = StyleSheet.create({
   subHeader: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 20,
+        marginTop: 20,
     marginBottom: 12,
   },
   pickerContainer: {
@@ -1204,6 +1472,5 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
-    color: '#1F2937',
-  },
+      },
 });

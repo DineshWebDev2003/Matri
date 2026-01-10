@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { sendWelcomeNotification } from './fcmService';
 
 // Load environment variables
 const API_HOST = process.env.EXPO_PUBLIC_API_HOST || '10.169.108.139';
@@ -104,6 +105,22 @@ export const apiService = {
   },
   api: axiosInstance,
 
+  // Support Tickets
+  async getSupportTickets() {
+    const res = await axiosInstance.get('/support-tickets');
+    return res.data?.data?.tickets?.data ?? [];
+  },
+  async createSupportTicket(formData: FormData) {
+    const res = await axiosInstance.post('/support-tickets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data?.data?.ticket;
+  },
+  async getSupportTicket(id: string | number){
+    const res = await axiosInstance.get(`/support-tickets/${id}`);
+    return res.data?.data?.ticket;
+  },
+
   // Authentication methods
   async login(username: string, password: string) {
     try {
@@ -130,6 +147,10 @@ export const apiService = {
         console.log('✅ Login successful!');
         if (response.data.status === 'success' && response.data.data?.access_token) {
           await SecureStore.setItemAsync('token', response.data.data.access_token);
+        try {
+          const firstName = response.data.data.user?.firstname || response.data.data.user?.name || 'User';
+          await sendWelcomeNotification(firstName);
+        } catch (e) { console.warn('welcome notif err', e);}
           console.log('🔑 Token saved to SecureStore');
         }
         
@@ -241,6 +262,14 @@ export const apiService = {
   // ----------------------------
   // Profile completion helpers
   // ----------------------------
+  // Explicit endpoints as per api-oc.md
+  postBasicInfo: async (payload:any)=> axiosInstance.post('/profile/basic-info', payload),
+  postPhysicalAttributes: async (payload:any)=> axiosInstance.post('/profile/physical-attributes', payload),
+  postFamilyInfo: async (payload:any)=> axiosInstance.post('/profile/family-info', payload),
+  postEducationInfo: async (payload:any)=> axiosInstance.post('/profile/education-info', payload),
+  postCareerInfo: async (payload:any)=> axiosInstance.post('/profile/career-info', payload),
+  postPartnerExpectation: async (payload:any)=> axiosInstance.post('/profile/partner-expectation', payload),
+  skipAllProfile: async ()=> axiosInstance.post('/profile/skip-all'),
   getProfileStep: async () => axiosInstance.get('/user/complete-profile'),
   submitProfileStep: async (step: string, data: any) => axiosInstance.post(`/user/complete-profile/${step}`, data),
   skipAllProfileSteps: async () => axiosInstance.post('/user/complete-profile/skip-all', { skip_all: true }),
@@ -257,6 +286,15 @@ export const apiService = {
       return response.data;
     });
   },
+
+  // Fetch detailed user profile for Account screen
+  getUserDetails: async () => {
+    return withFallback(async () => {
+      const response = await axiosInstance.get('/user/details');
+      return response.data;
+    });
+  },
+
 
   getDashboard: async () => {
     try {
@@ -683,10 +721,81 @@ export const apiService = {
     }
   },
 
+  // New Matches
+  getNewMatches: async (params?: { limit?: number; page?: number; filters?: any }) => {
+    try {
+      const queryParams = new URLSearchParams();
+      const limit = params?.limit || 20;
+      queryParams.append('per_page', limit.toString());
+      if (params?.page) queryParams.append('page', params.page.toString());
+      if (params?.filters) {
+        Object.keys(params.filters).forEach(key => {
+          if (params.filters[key] !== undefined && params.filters[key] !== null) {
+            queryParams.append(key, params.filters[key].toString());
+          }
+        });
+      }
+      const url = `/new-matches${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      console.log('📡 New matches URL:', url);
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error:any) {
+      console.error('❌ getNewMatches error:', error.message);
+      return { status:'error', data:{ profiles: [] } };
+    }
+  },
+
+  // Recommended Matches
+  getRecommendedMatches: async (params?: { limit?: number; page?: number; filters?: any }) => {
+    try {
+      const queryParams = new URLSearchParams();
+      const limit = params?.limit || 20;
+      queryParams.append('per_page', limit.toString());
+      if (params?.page) queryParams.append('page', params.page.toString());
+      if (params?.filters) {
+        Object.keys(params.filters).forEach(key => {
+          if (params.filters[key] !== undefined && params.filters[key] !== null) {
+            queryParams.append(key, params.filters[key].toString());
+          }
+        });
+      }
+      const url = `/recommended-matches${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      console.log('📡 Recommended matches URL:', url);
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ getRecommendedMatches error:', error.message);
+      return { status: 'error', data: { profiles: [] } };
+    }
+  },
+
   // Profiles/Users - Get real member data using new API endpoints
   getProfiles: async (params?: { type?: string; limit?: number; search?: string; page?: number; filters?: any }) => {
     try {
-      // Use the new API endpoints we created
+      const { type = 'all', limit = 20, page = 1, ...rest } = params || {};
+      // Map short-hands to backend routes
+      const routeMap: Record<string,string> = {
+        recommended: '/recommended-matches',
+        new: '/new-matches',
+        all: '/members'
+      };
+      const base = routeMap[type] || '/members';
+      const queryParams = new URLSearchParams({ limit: String(limit), page: String(page) });
+      Object.entries(rest).forEach(([k,v])=>{ if(v!==undefined) queryParams.append(k, String(v)); });
+      const url = `${base}?${queryParams.toString()}`;
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ getProfiles error:', error.message);
+      throw error;
+    }
+  },
+
+  // Removed obsolete duplicate block
+  /* 
+  },
+  getProfiles: async (params?: { type?: string; limit?: number; search?: string; page?: number; filters?: any }) => {
+    try {
       const queryParams = new URLSearchParams();
       
       // Add type parameter (only once!)
@@ -781,6 +890,7 @@ export const apiService = {
     }
   },
 
+  */
   getProfile: async (id: string) => {
     try {
       // Use the new getMember endpoint for individual profiles
@@ -829,17 +939,33 @@ export const apiService = {
     return response.data;
   },
 
-  // Fetch religions (and other dropdown values)
+  // Fetch dropdown values used in registration
   getDropdownOptions: async () => {
-    try {
-      // backend alias, try main endpoint first then fallback
-      let response = await axiosInstance.get('/options');
-      if (response?.data?.status !== 'success') {
-        // fallback endpoint name
-        response = await axiosInstance.get('/dropdown-options');
+    const endpoints = ['/user/user-data', '/options', '/dropdown-options'];
+
+    for (const ep of endpoints) {
+      try {
+        const res = await axiosInstance.get(ep);
+        if (res.data) {
+          const normalized = {
+            status: res.data.status ?? 'success',
+            data: res.data.data ?? res.data,
+          };
+          return normalized;
+        }
+      } catch (e: any) {
+        if (e?.response?.status !== 404) {
+          console.error(`⚠️ dropdown fetch ${ep} failed`, e);
+        }
+        // continue loop to try next endpoint
       }
-      return response.data;
-    } catch (error: any) {
+    }
+
+    // final fallback
+    try {
+      const fallbackResponse = await axiosInstance.get('/dropdown-options');
+      return fallbackResponse.data;
+    } catch (error) {
       console.error('❌ Error fetching dropdown options:', error);
       throw error;
     }
@@ -850,7 +976,6 @@ export const apiService = {
     const response = await axiosInstance.get('/authorization');
     return response.data;
   },
-
   verifyEmail: async (verificationData: any) => {
     const response = await axiosInstance.post('/verify-email', verificationData);
     return response.data;
@@ -1145,11 +1270,21 @@ export const apiService = {
     }
   },
 
+  async toggleShortlist(userId: string | number) {
+    try {
+      const response = await axiosInstance.post('/add-to-short-list', { profile_id: userId });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Toggle shortlist failed', error);
+      throw error;
+    }
+  },
+
   async getShortlistedProfiles() {
     try {
-      console.log('📌 Fetching shortlisted profiles...');
-      console.log('🔗 API URL:', axiosInstance.defaults.baseURL + '/shortlisted-profiles');
-      const response = await axiosInstance.get('/shortlisted-profiles');
+      console.log('📌 Fetching shortlisted profiles (hearts)...');
+      console.log('🔗 API URL:', axiosInstance.defaults.baseURL + '/shortlisted-hearts');
+      const response = await axiosInstance.get('/shortlisted-hearts');
       console.log('📌 Shortlisted profiles response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -1633,7 +1768,7 @@ export const premiumUtils = {
   // Check if user is premium based on package ID
   isPremiumUser: (packageId: number | string) => {
     const id = typeof packageId === 'string' ? parseInt(packageId) : packageId;
-    return id && id !== 4 && id > 0; // 4 is FREE MATCH, 1,2,3 are premium
+    return id && ![1,4].includes(id) && id > 0; // IDs 2 & 3 are premium tiers; 1 & 4 are free/basic
   },
 
   // Get package tier name

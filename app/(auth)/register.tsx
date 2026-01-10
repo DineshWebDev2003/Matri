@@ -3,13 +3,13 @@ import { useAuth } from '../../context/AuthContext';
 import { Dimensions, StyleSheet, View, TextInput, Text, TouchableOpacity, Image, SafeAreaView, ScrollView, ActivityIndicator, Alert, Platform, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
-import { Colors } from '@/constants/Colors';
-import { Picker } from '@react-native-picker/picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { apiService } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { Colors } from '@/constants/Colors';
+import { apiService } from '../../services/api';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -275,6 +275,7 @@ export default function RegisterScreen() {
       console.log('🔧 Generated username:', username);
 
       const registrationData = {
+        ...formData,
         looking_for: formData.looking_for || '',
         firstname: formData.firstname || '',
         lastname: formData.lastname || '',
@@ -312,10 +313,9 @@ export default function RegisterScreen() {
       
       // Navigate to profile completion screen with registration data
       router.replace({
-        pathname: '/(auth)/profile-completion',
+        pathname: '/(auth)/welcome-upload',
         params: {
-          registrationData: JSON.stringify(registrationData),
-          isNewUser: 'true'
+          name: registrationData.firstname || 'User'
         }
       });
       
@@ -392,7 +392,7 @@ export default function RegisterScreen() {
 
         {/* Toggle Buttons - Right Side Horizontal with Signup Text */}
         <View style={styles.toggleButtonsContainer}>
-          <Text style={styles.screenTitleText}>Signup</Text>
+          <Text style={styles.screenTitleText}>Register</Text>
           <View style={styles.rightToggleButtonsContainer}>
             {/* Theme Toggle Button */}
             <Animated.View style={{ transform: [{ rotate: themeRotateInterpolate }] }}>
@@ -481,17 +481,17 @@ export default function RegisterScreen() {
                   value={formData.lastname} 
                   onChangeText={(text) => handleInputChange('lastname', text)}
                 />
+              </View>
             </View>
           </View>
-        </View>
 
           {/* Email */}
           <View style={styles.formSection}>
             <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('email')}</Text>
-            <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
-              <TextInput 
+            <View style={[styles.modernInputContainer, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}> 
+              <TextInput
                 style={[styles.modernInput, { color: colors.textPrimary }]} 
-                placeholder="example@email.com" 
+                placeholder="example@email.com"
                 placeholderTextColor={colors.textTertiary}
                 keyboardType="email-address" 
                 value={formData.email} 
@@ -509,7 +509,7 @@ export default function RegisterScreen() {
                 mode="dropdown"
                 dropdownIconColor={colors.textPrimary}
                 selectedValue={formData.mobile_code}
-                style={[styles.modernInput, { color: colors.textPrimary, width: 90, height: 40 }]}
+                style={[styles.pickerDial, { color: colors.textPrimary }]}
                 onValueChange={(dialCode) => {
                   const sel = countries.find((c: any) => String(c.dial_code) === String(dialCode));
                   setFormData(prev => ({
@@ -522,7 +522,7 @@ export default function RegisterScreen() {
               >
                 <Picker.Item label="Select" value="" />
                 {countries.map((c:any) => (
-                  <Picker.Item key={c.country_code} label={`+${c.dial_code}`} value={String(c.dial_code)} />
+                  <Picker.Item key={c.country_code} label={`${c.country} (+${c.dial_code})`} value={String(c.dial_code)} />
                 ))}
               </Picker>
               <TextInput
@@ -574,6 +574,7 @@ export default function RegisterScreen() {
             maximumDate={new Date()}
           />
         )}
+
           {/* Religion & Caste */}
           <View style={styles.row}>
             <View style={[styles.formSection, styles.halfWidth]}>
@@ -621,7 +622,7 @@ export default function RegisterScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.registerButtonText}>{t('signup')}</Text>
+              <Text style={styles.registerButtonText}>{t('register')}</Text>
             )}
           </TouchableOpacity>
 
@@ -645,7 +646,7 @@ export default function RegisterScreen() {
           <View style={styles.loginContainer}>
             <Text style={[styles.loginText, { color: colors.textSecondary }]}>{t('have_account')}{' '}</Text>
             <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
-              <Text style={styles.loginLink}>{t('sign_in')}</Text>
+              <Text style={styles.loginLink}>{t('login')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -870,10 +871,6 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontWeight: 'bold',
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   registerButton: {
     backgroundColor: '#DC2626',
     paddingVertical: 15,
@@ -911,5 +908,9 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontWeight: 'bold',
     marginLeft: 4,
+  },
+  pickerDial: {
+    width: 140,
+    height: 40,
   },
 });
