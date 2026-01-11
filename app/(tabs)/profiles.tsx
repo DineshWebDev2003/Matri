@@ -706,89 +706,34 @@ export default function ProfilesScreen() {
     type: 'all' | 'recommended' | 'newly_joined',
     pageNum: number = 1,
   ): Promise<{ profiles: any[]; hasMore: boolean; total: number; lastPage: number }> => {
-    // For recommended profiles, use the recommended-matches endpoint
-    if (type === 'recommended') {
-      // We'll handle this case separately after the auth check
-      type = 'recommended';
-    }
+    try {
+      let resp: any;
+      if (type === 'recommended') {
+        resp = await apiService.getRecommendedMatches({ page: pageNum, limit: 12 });
+      } else if (type === 'newly_joined') {
+        resp = await apiService.getNewMatches({ page: pageNum, limit: 12 });
+      } else {
+        resp = await apiService.getMembers(pageNum, 12);
+      }
 
-    // Fallback to previous new-members endpoint for other types
-    const authToken = auth?.token;
-    if (!authToken) {
-        console.error('❌ No authentication token available. Auth token:', authToken);
+      if (resp?.status !== 'success') {
         return { profiles: [], hasMore: false, total: 0, lastPage: 1 };
       }
 
-    try {
-      console.log(`🔑 Using token: ${authToken.substring(0, 20)}...`);
+      const data = resp.data || {};
+      const profiles: any[] = data.profiles || data.members || data.users || [];
+      const pagination = data.pagination || { current_page: pageNum, last_page: 1, has_more: false, total: profiles.length };
 
-      // Build URL for new-members endpoint with type parameter
-      const apiHost = process.env.EXPO_PUBLIC_API_HOST || '172.16.200.139';
-      const apiPort = process.env.EXPO_PUBLIC_API_PORT || '8000';
-      const apiBaseUrl = `http://${apiHost}:${apiPort}`;
-      
-      // Use different endpoints based on profile type
-      let endpoint: string;
-      let url: string;
-      if (type === 'recommended') {
-        endpoint = 'mobile/recommended-matches';
-        url = `${apiBaseUrl}/api/${endpoint}?page=${pageNum}&per_page=12`;
-      } else if (type === 'newly_joined') {
-        endpoint = 'mobile/new-matches';
-        url = `${apiBaseUrl}/api/${endpoint}?page=${pageNum}&per_page=12`;
-      } else {
-        endpoint = 'new-members';
-        url = `${apiBaseUrl}/api/${endpoint}?type=${type}&page=${pageNum}&per_page=12`;
-      }
-      
-      console.log(`📡 Fetching from: ${url}`);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      console.log(`📡 Response status for ${type}:`, response.status);
-      console.log(`📡 Response for ${type}:`, JSON.stringify(data, null, 2).substring(0, 500));
-
-      if (data?.status === 'success' && (data?.data?.profiles || data?.data?.members || data?.data?.users)) {
-        const profiles = data.data.profiles || data.data.members || data.data.users;
-        const pagination = data.data.pagination || {
-          has_more: false,
-          total: profiles.length,
-          last_page: 1,
-          current_page: pageNum
-        };
-        
-        console.log(`✅ ${type} profiles fetched:`, profiles.length, 'Total:', pagination.total, 'Has More:', pagination.has_more);
-        if (profiles.length > 0) {
-          console.log('📋 Sample profile:', JSON.stringify(profiles[0], null, 2).substring(0, 300));
-        }
-        
-        return {
-          profiles: profiles,
-          hasMore: pagination.has_more || false,
-          total: pagination.total || profiles.length,
-          lastPage: pagination.last_page || 1
-        };
-      }
-      
-      console.log(`⚠️ No profiles found for ${type}. Response:`, data);
-      return { profiles: [], hasMore: false, total: 0, lastPage: 1 };
+      return {
+        profiles,
+        hasMore: pagination.has_more || (pagination.current_page < pagination.last_page),
+        total: pagination.total || profiles.length,
+      };
     } catch (error) {
-      console.error(`❌ Error fetching ${type} profiles:`, error);
+      console.error(`❌ fetchProfilesByType (${type}) error:`, error);
       return { profiles: [], hasMore: false, total: 0, lastPage: 1 };
     }
   };
-
-  /**
-   * Initial load - fetch all three profile types
-   */
   const fetchUserData = async (retryCount = 0) => {
     try {
       setLoading(true);

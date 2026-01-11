@@ -212,6 +212,7 @@ export default function AccountScreen() {
   }, [limitation]);
 
   const fetchDashboardData = async () => {
+      let apiProfileLoaded = false;
     try {
       setLoading(true);
       
@@ -255,7 +256,7 @@ export default function AccountScreen() {
 
       // Fallback: use AuthContext info if needed
       // First try to use user data from auth context
-      if (user && user.id) {
+      if (!apiProfileLoaded && user && user.id) {
         const imageUrl = getImageUrl(user.image);
         
         // Get package info from limitation data
@@ -942,8 +943,8 @@ export default function AccountScreen() {
                         style={styles.uploadPhotosButton}
                         onPress={() => {
                           // Check if user is premium
-                          const isPremium = userProfile?.premium === 1 || userProfile?.premium === true;
-                          if (!isPremium) {
+                          const isFreePackage = String(userProfile?.packageId) === '4';
+                          if (isFreePackage) {
                             console.log('📸 Non-premium user attempting to upload, showing upgrade prompt');
                             Alert.alert(
                               'Premium Feature',

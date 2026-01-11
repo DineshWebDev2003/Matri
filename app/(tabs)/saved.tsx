@@ -105,6 +105,7 @@ export default function InterestedScreen() {
             id: profile.id,
             name: profile.name || 'User',
             age: age,
+            gender: (profile.gender || profile.basicInfo?.gender || '').toString(),
             location: profile.location || 'N/A',
             profileImage: imageUrl,
             interestDate: interestDate,
@@ -174,6 +175,7 @@ export default function InterestedScreen() {
             id: profile.id,
             name: profile.name || 'User',
             age: age,
+            gender: (profile.gender || profile.basicInfo?.gender || '').toString(),
             location: profile.location || 'N/A',
             profileImage: imageUrl,
             interestDate: interestDate,
@@ -234,6 +236,7 @@ export default function InterestedScreen() {
             id: profile.id,
             name: profile.name || 'User',
             age: age,
+            gender: (profile.gender || profile.basicInfo?.gender || '').toString(),
             location: profile.location || 'N/A',
             profileImage: imageUrl,
             interestDate: interestDate,
@@ -448,6 +451,14 @@ export default function InterestedScreen() {
     );
   };
 
+  // Helper to resolve default avatar
+  const getDefaultAvatar = (gender?: string) => {
+    if ((gender || '').toLowerCase() === 'female') {
+      return require('../../assets/images/default-female.jpg');
+    }
+    return require('../../assets/images/default-male.jpg');
+  };
+
   const renderProfile = ({ item }: { item: any }) => {
     console.log(`🎨 Rendering profile card for: ${item.name} (ID: ${item.id})`);
     return (
@@ -463,7 +474,7 @@ export default function InterestedScreen() {
               style={styles.imageCard}
             >
               <Image
-                source={{ uri: item.profileImage || 'https://via.placeholder.com/400x600' }}
+                source={item.profileImage ? { uri: item.profileImage } : getDefaultAvatar(item.gender)}
                 style={styles.profileImage}
                 resizeMode="cover"
               />

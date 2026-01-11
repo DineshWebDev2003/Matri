@@ -15,6 +15,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 //import WithSwipe from '../../components/WithSwipe';
 import { getImageUrl } from '../../utils/imageUtils';
 
+// Resolve profile image, accept full URL or filename
+const resolveProfileImage = (img?: string): string | null => {
+  if (!img) return null;
+  if (img.startsWith('http')) return img;
+  const urls = getImageUrl(img);
+  return urls.primary;
+};
+
 export default function ChatsScreen() {
   const router = useRouter();
   const auth = useAuth();
@@ -304,7 +312,7 @@ export default function ChatsScreen() {
 
   const renderActiveChat = ({ item }: { item: any }) => {
     const imageBaseUrl = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || 'http://10.97.175.139:8000/assets/images/user/profile';
-    const profileImage = item?.images?.[0] || (item?.image ? getImageUrl(item.image).primary : null);
+    const profileImage = item?.images?.[0] || resolveProfileImage(item?.image);
     const profileName = item?.name || `${item?.firstname || ''} ${item?.lastname || ''}`.trim() || 'User';
     const isOnline = item?.is_online === true || item?.is_online === 1 || item?.online_status === true || item?.online_status === 1 || item?.online_status === 'online'; // Check if user is online
     const userGender = item?.gender?.toLowerCase();
@@ -337,12 +345,7 @@ export default function ChatsScreen() {
     
     // First try: other_user.image (full URL from API)
     if (item.other_user?.image) {
-      profileImage = item.other_user.image;
-      // If it's just a filename, build full URL
-      if (profileImage && !profileImage.startsWith('http')) {
-        const urls = getImageUrl(profileImage);
-        profileImage = urls.primary;
-      }
+      profileImage = resolveProfileImage(item.other_user.image);
     }
     // Second try: other_user_image (flattened structure)
     else if (item.other_user_image) {
@@ -354,8 +357,7 @@ export default function ChatsScreen() {
     }
     // Fourth try: use getImageUrl helper if we have a filename
     else if (item.other_user?.image) {
-      const imageUrls = getImageUrl(item.other_user.image);
-      profileImage = imageUrls.primary;
+      profileImage = resolveProfileImage(item.other_user.image);
     }
     
     const profileName = item.other_user?.name || item.other_user_name || 'User';

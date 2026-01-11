@@ -140,6 +140,30 @@ export const apiService = {
     return res.data?.data?.ticket;
   },
 
+  /* Razorpay */
+  createRazorpayOrder(planId: number) {
+    // try primary path, fallback to legacy path if 404
+    return axiosInstance.post('/payments/razorpay/order', { plan_id: planId })
+      .then(r => r.data)
+      .catch(async (err) => {
+        if (err.response?.status === 404) {
+          const res = await axiosInstance.post('/razorpay/order', { plan_id: planId });
+          return res.data;
+        }
+        throw err;
+      });
+  },
+  verifyRazorpayPayment(payload: any) {
+    return axiosInstance.post('/payments/razorpay/verify', payload).then(r => r.data)
+      .catch(async err => {
+        if (err.response?.status === 404) {
+          const res = await axiosInstance.post('/razorpay/verify', payload);
+          return res.data;
+        }
+        throw err;
+      });
+  },
+
   // Authentication methods
   async login(username: string, password: string) {
     try {
@@ -685,7 +709,7 @@ export const apiService = {
       console.log(`📋 Fetching members (page ${page}, ${perPage} per page)...`);
       
       // Use the /members endpoint from the API
-      const response = await axiosInstance.get(`/members?page=${page}&per_page=${perPage}`);
+      const response = await axiosInstance.get(`/new-members?page=${page}&per_page=${perPage}`);
 
       console.log('✅ Members fetched successfully!');
       
@@ -799,7 +823,7 @@ export const apiService = {
         all: '/members'
       };
       const base = routeMap[type] || '/members';
-      const queryParams = new URLSearchParams({ limit: String(limit), page: String(page) });
+      const queryParams = new URLSearchParams({ per_page: String(limit), page: String(page) });
       Object.entries(rest).forEach(([k,v])=>{ if(v!==undefined) queryParams.append(k, String(v)); });
       const url = `${base}?${queryParams.toString()}`;
       const response = await axiosInstance.get(url);
