@@ -13,7 +13,8 @@ export default function WelcomeUploadScreen() {
   const params = useLocalSearchParams<{ name?: string }>();
   const name = params.name || 'User';
 
-  const [countryId, setCountryId] = useState<string>('');
+  // Default to India (id 'IN'); user can change if needed
+  const [countryId, setCountryId] = useState<string>('IN');
   const [stateId, setStateId] = useState<string>('');
   const [city, setCity] = useState('');
   const [countries, setCountries] = useState<{id:string;name:string}[]>([]);
@@ -149,7 +150,8 @@ export default function WelcomeUploadScreen() {
       <Picker
         selectedValue={countryId}
         onValueChange={(v)=>setCountryId(String(v))}
-        style={[styles.cityInput,{height:50}]}
+        enabled={false}
+        style={[styles.cityInput,{height:50, backgroundColor:'#f0f0f0'}]}
       >
         <Picker.Item label="Select Country" value="" />
         {countries.map(c=> <Picker.Item key={c.id} label={c.name} value={c.id} />)}

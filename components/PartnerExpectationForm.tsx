@@ -21,7 +21,6 @@ interface Form {
   max_age: string;
   min_height: string;
   max_height: string;
-  max_weight: string;
   marital_status: string;
   religion: string;
   face_color: string;
@@ -29,8 +28,7 @@ interface Form {
   drinking_status: string;
   min_degree: string;
   profession: string;
-  personality: string;
-  family_position: string;
+    family_position: string;
   annual_income: string;
   languages: string[];
   eating_habits: string;
@@ -47,7 +45,6 @@ const defaultForm: Form = {
   max_age: '',
   min_height: '',
   max_height: '',
-  max_weight: '',
   marital_status: '',
   religion: '',
   face_color: '',
@@ -55,8 +52,7 @@ const defaultForm: Form = {
   drinking_status: '0',
   min_degree: '',
   profession: '',
-  personality: '',
-  family_position: '',
+    family_position: '',
   annual_income: '',
   languages: [],
 };
@@ -75,8 +71,7 @@ const PartnerExpectationForm: React.FC<Props> = ({ options, stored }) => {
         min_age: (stored.min_age ?? stored.minimum_age)?.toString() ?? '',
         max_age: (stored.max_age ?? stored.maximum_age)?.toString() ?? '',
         min_height: (stored.min_height ?? stored.minimum_height)?.toString() ?? '',
-        max_height: (stored.max_height ?? stored.maximum_height)?.toString() ?? '',
-        max_weight: (stored.max_weight ?? stored.maximum_weight)?.toString() ?? '',
+        max_height: (stored.max_height ?? stored.maximum_height ?? stored.height_max)?.toString() ?? '',
         face_color: stored.face_color ?? stored.face_colour ?? stored.complexion ?? '',
         general_requirement: stored.general_requirement ?? stored.requirements ?? '',
         country: stored.country ?? '',
@@ -94,7 +89,7 @@ const PartnerExpectationForm: React.FC<Props> = ({ options, stored }) => {
       setForm({
         ...defaultForm,
         ...stored,
-        ...mapped,
+        ...mapped, // mapped last so it overrides any conflicting keys from stored
       });
     }
   }, [stored]);
@@ -121,6 +116,15 @@ const PartnerExpectationForm: React.FC<Props> = ({ options, stored }) => {
       return Object.entries(options.countries).map(([code, obj]: any) => ({ id: code, name: obj.country || obj.name || code }));
     return [] as any[];
   })();
+
+  const maritalArr = (options?.marital_statuses && options.marital_statuses.length)
+    ? options.marital_statuses
+    : [
+        { id: 1, name: 'Unmarried' },
+        { id: 2, name: 'Married' },
+        { id: 3, name: 'Divorced' },
+        { id: 4, name: 'Widowed' },
+      ];
 
   const labelStyle = [styles.label, { color: colors.textSecondary }];
   const inputBase = { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary } as const;
@@ -164,22 +168,14 @@ const PartnerExpectationForm: React.FC<Props> = ({ options, stored }) => {
         </View>
       </View>
 
-      {/* Max Weight & Marital Status */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={labelStyle}>Maximum Weight</Text>
-          <TextInput style={styles.input} keyboardType="numeric" value={form.max_weight} onChangeText={(t) => handleChange('max_weight', t)} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={labelStyle}>Marital Status</Text>
-          <Picker selectedValue={form.marital_status} onValueChange={(v) => handleChange('marital_status', v)} style={[styles.picker, pickerBase]}>
-            <Picker.Item label="Select One" value="" />
-            {options?.marital_statuses?.map?.((m: any) => (
-              <Picker.Item key={m.id} label={m.name} value={m.name} />
-            ))}
-          </Picker>
-        </View>
-      </View>
+      {/* Marital Status */}
+      <Text style={labelStyle}>Marital Status</Text>
+      <Picker selectedValue={form.marital_status} onValueChange={(v) => handleChange('marital_status', v)} style={[styles.picker, pickerBase]}>
+        <Picker.Item label="Select One" value="" />
+        {maritalArr.map((m: any) => (
+          <Picker.Item key={m.id} label={m.name} value={m.name} />
+        ))}
+      </Picker>
 
       {/* Religion & Face Colour */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -212,8 +208,8 @@ const PartnerExpectationForm: React.FC<Props> = ({ options, stored }) => {
           <Text style={labelStyle}>Drinking Status</Text>
           <Picker selectedValue={form.drinking_status} onValueChange={(v) => handleChange('drinking_status', v)} style={[styles.picker, pickerBase]}>
             <Picker.Item label="Does not matter" value="0" />
-            <Picker.Item label="Drinker" value="1" />
-            <Picker.Item label="Non-Drinker" value="2" />
+            <Picker.Item label="Restraibed" value="2" />
+            <Picker.Item label="Drunker" value="1" />
           </Picker>
         </View>
       </View>
@@ -230,17 +226,9 @@ const PartnerExpectationForm: React.FC<Props> = ({ options, stored }) => {
         </View>
       </View>
 
-      {/* Personality & Family Position */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={labelStyle}>Personality</Text>
-          <TextInput style={styles.input} value={form.personality} onChangeText={(t) => handleChange('personality', t)} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={labelStyle}>Family Position</Text>
-          <TextInput style={styles.input} value={form.family_position} onChangeText={(t) => handleChange('family_position', t)} />
-        </View>
-      </View>
+      {/* Family Position */}
+      <Text style={labelStyle}>Family Position</Text>
+      <TextInput style={styles.input} value={form.family_position} onChangeText={(t) => handleChange('family_position', t)} />
 
       {/* Annual Income */}
       <Text style={labelStyle}>Annual Income</Text>

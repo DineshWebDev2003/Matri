@@ -153,11 +153,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Check if profile is complete (1 or '1' or true means complete)
-        const basicDone = (user?.image || user?.profile_image) && (user?.city || user?.present_city);
+        // Require photo, city, state and country
+        const basicDone = (user?.image || user?.profile_image) &&
+                          (user?.city || user?.present_city) &&
+                          (user?.state || user?.present_state) &&
+                          (user?.country || user?.present_country);
         const isProfileComplete = (user?.profile_complete === 1 || user?.profile_complete === '1' || user?.profile_complete === true) || basicDone;
         if (!isProfileComplete) {
-          console.log('⚠️ Profile incomplete, redirecting to profile-completion...');
-          router.replace('/(auth)/profile-completion');
+          console.log('⚠️ Basic profile info missing, redirecting to welcome-upload...');
+          router.replace({ pathname: '/(auth)/welcome-upload', params: { name: user?.firstname || user?.name || 'User' } });
         } else {
           console.log('🚀 Profile complete, redirecting to tabs...');
           router.replace('/(tabs)');
@@ -215,11 +219,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('📋 Profile complete:', user.profile_complete);
         
         // Check if profile is complete (1 or '1' or true means complete)
-        const basicDone = (user?.image || user?.profile_image) && (user?.city || user?.present_city);
+        // Require photo, city, state and country
+        const basicDone = (user?.image || user?.profile_image) &&
+                          (user?.city || user?.present_city) &&
+                          (user?.state || user?.present_state) &&
+                          (user?.country || user?.present_country);
         const isProfileComplete = (user?.profile_complete === 1 || user?.profile_complete === '1' || user?.profile_complete === true) || basicDone;
         if (!isProfileComplete) {
-          console.log('⚠️ Profile incomplete, redirecting to profile-completion...');
-          router.replace('/(auth)/profile-completion');
+          console.log('⚠️ Basic profile info missing, redirecting to welcome-upload...');
+          router.replace({ pathname: '/(auth)/welcome-upload', params: { name: user?.firstname || user?.name || 'User' } });
         } else {
           console.log('🚀 Profile complete, redirecting to tabs...');
           router.replace('/(tabs)');

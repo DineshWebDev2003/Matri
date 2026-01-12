@@ -24,7 +24,7 @@ interface UniversalHeaderProps {
 const getProfileImageUrl = (image: string | undefined) => {
   if (!image) return 'https://via.placeholder.com/40';
   if (image.startsWith('http')) return image;
-  const mainServerUrl = `https://90skalyanam.com/assets/images/user/profile/${image}`;
+  const mainServerUrl = `https://app.90skalyanam.com/assets/images/user/profile/${image}`;
   return mainServerUrl;
 };
 

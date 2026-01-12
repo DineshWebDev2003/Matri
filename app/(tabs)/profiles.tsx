@@ -930,6 +930,11 @@ export default function ProfilesScreen() {
   const loadMoreProfiles = async () => {
     if (loadingMore || !tabHasMore[activeTab as keyof typeof tabHasMore]) return;
     
+    // Map UI tab key to fetch type used in apiService
+    let fetchType: 'all' | 'recommended' | 'newly_joined' = 'all';
+    if (activeTab === 'recommended') fetchType = 'recommended';
+    else if (activeTab === 'new matches') fetchType = 'newly_joined';
+
     try {
       setLoadingMore(true);
       const currentPage = tabPages[activeTab as keyof typeof tabPages];
@@ -938,7 +943,7 @@ export default function ProfilesScreen() {
       console.log(`📄 Loading page ${nextPage} for ${activeTab}...`);
       
       // Fetch next page for current tab
-      const data = await fetchProfilesByType(activeTab as 'all' | 'recommended' | 'newly_joined', nextPage);
+      const data = await fetchProfilesByType(fetchType, nextPage);
       
       if (data.profiles.length > 0) {
         // Append new profiles to existing ones

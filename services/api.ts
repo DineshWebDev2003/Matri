@@ -142,26 +142,12 @@ export const apiService = {
 
   /* Razorpay */
   createRazorpayOrder(planId: number) {
-    // try primary path, fallback to legacy path if 404
-    return axiosInstance.post('/payments/razorpay/order', { plan_id: planId })
-      .then(r => r.data)
-      .catch(async (err) => {
-        if (err.response?.status === 404) {
-          const res = await axiosInstance.post('/razorpay/order', { plan_id: planId });
-          return res.data;
-        }
-        throw err;
-      });
+    // Mobile API: POST /api/mobile/razorpay/order
+    return axiosInstance.post('/razorpay/order', { plan_id: planId }).then(r => r.data);
   },
   verifyRazorpayPayment(payload: any) {
-    return axiosInstance.post('/payments/razorpay/verify', payload).then(r => r.data)
-      .catch(async err => {
-        if (err.response?.status === 404) {
-          const res = await axiosInstance.post('/razorpay/verify', payload);
-          return res.data;
-        }
-        throw err;
-      });
+    // Mobile API: POST /api/mobile/razorpay/verify
+    return axiosInstance.post('/razorpay/verify', payload).then(r => r.data);
   },
 
   // Authentication methods
@@ -404,7 +390,7 @@ export const apiService = {
 
   createRazorOrder: async (planId: number) => {
     try {
-      const response = await axiosInstance.post('/razorpay/order', { plan_id: planId });
+      const response = await axiosInstance.post('../payments/razorpay/order', { plan_id: planId });
       return response.data;
     } catch (e:any) {
       console.error('⚠️ Razor order error', e.message);
@@ -414,7 +400,7 @@ export const apiService = {
 
   verifyRazorPayment: async (payload:any) => {
     try {
-      const response = await axiosInstance.post('/razorpay/verify', payload);
+      const response = await axiosInstance.post('../payments/razorpay/verify', payload);
       return response.data;
     } catch(e:any){
       console.error('⚠️ Razor verify error', e.message);
@@ -818,13 +804,22 @@ export const apiService = {
       const { type = 'all', limit = 20, page = 1, ...rest } = params || {};
       // Map short-hands to backend routes
       const routeMap: Record<string,string> = {
-        recommended: '/recommended-matches',
-        new: '/new-matches',
+        recommended: '/mobile/recommended-matches',
+        new: '/mobile/new-matches',
         all: '/members'
       };
-      const base = routeMap[type] || '/members';
+      // If searching by name, use dedicated search endpoint
+      let base = routeMap[type] || '/mobile/members';
+      if (params?.search) {
+        // backend search endpoint
+        base = '/members/search';
+      }
       const queryParams = new URLSearchParams({ per_page: String(limit), page: String(page) });
       Object.entries(rest).forEach(([k,v])=>{ if(v!==undefined) queryParams.append(k, String(v)); });
+      if (params?.search) {
+        queryParams.append('search', params.search);
+        queryParams.append('name', params.search);
+      }
       const url = `${base}?${queryParams.toString()}`;
       const response = await axiosInstance.get(url);
       return response.data;
@@ -1318,6 +1313,16 @@ export const apiService = {
       const response = await axiosInstance.post('/add-to-short-list', { profile_id: userId });
       return response.data;
     } catch (error: any) {
+      if (error?.response?.status === 409) {
+        // Already shortlisted – attempt to remove instead to toggle
+        try {
+          const resp = await axiosInstance.post('/remove-from-short-list', { profile_id: userId });
+          return resp.data;
+        } catch (removeErr:any) {
+          console.error('❌ Remove from shortlist failed', removeErr);
+          throw removeErr;
+        }
+      }
       console.error('❌ Toggle shortlist failed', error);
       throw error;
     }

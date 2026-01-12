@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useRouter } from 'expo-router';
 import AccordionSection from '../components/AccordionSection';
 import { useColorScheme } from 'react-native';
@@ -83,43 +84,76 @@ export default function ProfileSettingScreen() {
   const [maritalStatuses, setMaritalStatuses] = useState<Option[]>([]);
   const [countries, setCountries] = useState<Option[]>([]);
   const [states, setStates] = useState<Option[]>([]);
+  const [cities, setCities] = useState<Option[]>([]);
   const [partnerExpectation, setPartnerExpectation] = useState<any | null>(null);
   const [optionsData, setOptionsData] = useState<any | null>(null);
   const [physicalAttrs, setPhysicalAttrs] = useState<any | null>(null);
   const [familyInfo, setFamilyInfo] = useState<any | null>(null);
 
-  // Load states list once
+  // Fetch states when country changes
   useEffect(() => {
-    (async () => {
+    if (!form.present_country) { setStates([]); return; }
+    const loadStates = async () => {
       try {
-        const res = await api.getStates();
-                const arr: Option[] = Object.entries(res).map(([id, name]: any) => ({ id: Number(id), name }));
-        setStates(arr);
-        // Auto-select stored state if not already set
-        setForm(prev => {
-          if (prev.present_state && arr.some(s => s.name === prev.present_state)) {
-            console.log('📌 Stored state matched (no change):', prev.present_state);
-            return prev;
-          }
-          // if basic_info had state id (number) matching arr id
-          const normalized = (prev.present_state || '').trim().toLowerCase();
-          const matchByName = arr.find(s => s.name.trim().toLowerCase() === normalized);
-          const matchById = arr.find(s => s.id?.toString() === normalized);
-          const match = matchByName || matchById;
-          if (match) {
-            console.log('📌 Stored state applied:', match.name);
-            return { ...prev, present_state: match.name };
-          }
-          return prev;
-        });
-      } catch (e) {
-        console.warn('Failed to load states', e);
+        const res = api.getStates ? await api.getStates(form.present_country) : await api.request?.(`/get-states/${form.present_country}`);
+        const arr = Array.isArray(res) ? res : (res?.data?.states ?? res ?? []);
+        const mapped: Option[] = Array.isArray(arr)
+          ? arr.map((s: any) => ({ id: s.id ?? s.name, name: s.name ?? s.state ?? s }))
+          : [];
+        let finalStates = mapped;
+        if (!finalStates.length && form.present_country.toLowerCase() === 'india') {
+          finalStates = [
+            { id: 'TN', name: 'Tamil Nadu' },
+            { id: 'KA', name: 'Karnataka' },
+            { id: 'KL', name: 'Kerala' },
+            { id: 'AP', name: 'Andhra Pradesh' },
+            { id: 'TS', name: 'Telangana' },
+            { id: 'MH', name: 'Maharashtra' },
+          ];
+        }
+        setStates(finalStates);
+        if (finalStates.length && !finalStates.find((s) => s.id.toString() === form.present_state)) {
+          handleChange('present_state', finalStates[0].id.toString());
+        }
+        if (mapped.length && !mapped.find((s) => s.id.toString() === form.present_state)) {
+          handleChange('present_state', mapped[0].id.toString());
+        }
+      } catch (err) {
+        console.warn('states load err', err);
       }
-    })();
-  }, []);
+    };
+    loadStates();
+  }, [form.present_country]);
+  const [showDob, setShowDob] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [languageInput, setLanguageInput] = useState('');
+
+  // Fetch cities when state changes
+  useEffect(()=>{
+    if(!form.present_state) { setCities([]); return; }
+    (async()=>{
+      try{
+        const res = api.getCities ? await api.getCities(form.present_state) : await api.request?.(`/get-cities/${form.present_state}`);
+        const arr = Array.isArray(res)? res : (res?.data?.cities ?? res ?? []);
+        let mapped: Option[] = Array.isArray(arr)? arr.map((c:any)=>({id:c.id||c.name, name:c.name||c.city||c})) : [];
+        if (!mapped.length && form.present_country.toLowerCase()==='india') {
+          const fallback: Record<string,string[]> = {
+            'TN':['Chennai','Coimbatore','Madurai','Tiruchirappalli'],
+            'KA':['Bengaluru','Mysuru','Mangaluru'],
+            'KL':['Thiruvananthapuram','Kochi','Kozhikode'],
+            'AP':['Vijayawada','Visakhapatnam'],
+            'TS':['Hyderabad','Warangal'],
+            'MH':['Mumbai','Pune','Nagpur']
+          };
+          const list = fallback[form.present_state] ?? [];
+          mapped = list.map((name,i)=>({id:i,name}));
+        }
+        setCities(mapped);
+        if(mapped.length && !mapped.find(c=>c.name===form.present_city)) handleChange('present_city', mapped[0].name);
+      }catch(e){ console.warn('cities load err',e);}  
+    })();
+  },[form.present_state]);
 
   // ---------------------------------------------------------------------------
   // Fetch Profile Settings
@@ -159,9 +193,23 @@ export default function ProfileSettingScreen() {
             }));
           }
 
+          // Always fetch dropdown options to ensure religions/marital arrays
+          try {
+            const drop = await api.getDropdownOptions();
+            if (drop.status === 'success') {
+              options = { ...options, ...(drop.data || {}) } as any;
+            }
+          } catch (e) { console.warn('dropdown fetch err', e); }
+
           // Ensure we have valid arrays before setting state
           const religionsData = Array.isArray(options?.religions) ? options.religions : [];
           const maritalStatusesData = Array.isArray(options?.marital_statuses) ? options.marital_statuses : [];
+          const maritalList = maritalStatusesData.length ? maritalStatusesData : [
+            { id: 1, name: 'Single', title: 'Single' },
+            { id: 2, name: 'Married', title: 'Married' },
+            { id: 3, name: 'Divorced', title: 'Divorced' },
+            { id: 4, name: 'Widowed', title: 'Widowed' },
+          ];
           let countriesData: Option[] = [];
           if (Array.isArray(options?.countries)) {
             countriesData = options.countries;
@@ -176,8 +224,18 @@ export default function ProfileSettingScreen() {
           
                     
           setReligions(religionsData);
-          setMaritalStatuses(maritalStatusesData);
-          setCountries(countriesData);
+          // Ensure current value present
+          const currentStatus = (basic_info?.marital_status || profile.marital_status || '').trim();
+          const finalMarital = currentStatus && !maritalList.some(ms => (ms.title||ms.name)===currentStatus)
+            ? [...maritalList, { id: 999, name: currentStatus, title: currentStatus }] : maritalList;
+          setMaritalStatuses(finalMarital);
+          // default country
+          if (!form.present_country && countriesData.some(c=> c.name.toLowerCase()==='india')) {
+            setForm(prev=>({...prev, present_country:'India'}));
+          }
+          const finalCountries = countriesData.length ? countriesData : [{ id: 356, name: 'India' }];
+          setCountries(finalCountries);
+          if (!form.present_country) setForm(prev=>({...prev, present_country:'India'}));
           setPartnerExpectation(partner_expectation || null);
           setPhysicalAttrs(physical_attributes || null);
           setFamilyInfo(family_info || null);
@@ -291,12 +349,24 @@ export default function ProfileSettingScreen() {
 
         {/* Date of Birth */}
         <Text style={styles.label}>Date of Birth *</Text>
-        <TextInput
-          style={styles.input}
-          value={form.birth_date}
-          onChangeText={(t) => handleChange('birth_date', t)}
-          placeholder="YYYY-MM-DD"
-        />
+        <TouchableOpacity onPress={() => setShowDob(true)} style={[styles.input, { justifyContent: 'center' }]}> 
+          <Text>{form.birth_date || 'Select date'}</Text>
+        </TouchableOpacity>
+        {showDob && (
+          <DateTimePicker
+            value={form.birth_date ? new Date(form.birth_date) : new Date()}
+            mode="date"
+            display="default"
+            maximumDate={new Date()}
+            onChange={(e, selectedDate) => {
+              setShowDob(false);
+              if (selectedDate) {
+                const iso = selectedDate.toISOString().split('T')[0];
+                handleChange('birth_date', iso);
+              }
+            }}
+          />
+        )}
 
         {/* Religion */}
         <Text style={styles.label}>Religion *</Text>
@@ -332,7 +402,7 @@ export default function ProfileSettingScreen() {
         >
           <Picker.Item label="Select Status" value="" />
           {maritalStatuses.map((m) => (
-            <Picker.Item key={m.id} label={m.name} value={m.name} />
+            <Picker.Item key={m.id} label={m.title || m.name} value={m.title || m.name} />
           ))}
         </Picker>
 
@@ -422,8 +492,8 @@ export default function ProfileSettingScreen() {
           onValueChange={(v) => handleChange('drinking_status', v)}
           style={styles.picker}
         >
-          <Picker.Item label="Non-Drinker" value="0" />
-          <Picker.Item label="Drinker" value="1" />
+          <Picker.Item label="Non-Drunker" value="0" />
+          <Picker.Item label="Drunker" value="1" />
         </Picker>
 
         {/* Present Country */}
@@ -439,30 +509,33 @@ export default function ProfileSettingScreen() {
           ))}
         </Picker>
 
+
         {/* State */}
         <Text style={styles.label}>State *</Text>
         <Picker
           selectedValue={form.present_state}
-          onValueChange={(v) => { console.log('▶️ State selected:', v); handleChange('present_state', v); }}
+          onValueChange={(v) => handleChange('present_state', v)}
           style={styles.picker}
         >
-          <Picker.Item label="Select State" value="" />
+          <Picker.Item label={form.present_country ? 'Select State' : 'Select Country first'} value="" />
           {states.map((s) => (
-            <Picker.Item key={s.id} label={s.name} value={s.name} />
+            <Picker.Item key={s.id} label={s.name} value={s.id.toString()} />
           ))}
         </Picker>
 
         {/* City */}
         <Text style={styles.label}>City *</Text>
-        <TextInput
-          style={styles.input}
-          value={form.present_city}
-          onChangeText={(t) => handleChange('present_city', t)}
-          placeholder="City"
-        />
+        <Picker
+          selectedValue={form.present_city}
+          onValueChange={(v)=>handleChange('present_city', v)}
+          style={styles.picker}
+        >
+          <Picker.Item label={form.present_state? 'Select City':'Select State first'} value="" />
+          {cities.map(c=> <Picker.Item key={c.id} label={c.name} value={c.name} />)}
+        </Picker>
 
-        {/* Zip */}
-        <Text style={styles.label}>Zip Code</Text>
+        {/* Pincode */}
+        <Text style={styles.label}>Pincode</Text>
         <TextInput
           style={styles.input}
           value={form.present_zip}
