@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     minWidth: 50,
   },
   tabItemFocused: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'transparent',
     shadowColor: '#DC2626',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,

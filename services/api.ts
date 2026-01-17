@@ -324,6 +324,13 @@ export const apiService = {
     });
   },
 
+  // Fetch another user's full details by ID (new endpoint)
+  getUserDetailsById: async (userId: string | number) => {
+    return withFallback(async () => {
+      const response = await axiosInstance.get(`/user/details/${userId}`);
+      return response.data;
+    });
+  },
 
   getDashboard: async () => {
     try {

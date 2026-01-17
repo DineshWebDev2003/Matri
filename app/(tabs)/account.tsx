@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ComponentProps } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import styles from '../styles/accountStyles';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 
 type IconName = ComponentProps<typeof Feather>['name'];
 import { LinearGradient } from 'expo-linear-gradient';
@@ -184,6 +186,30 @@ export default function AccountScreen() {
   const [viewerIndex, setViewerIndex] = useState(0);
   // Remaining uploads based on gallery images count (UI authoritative)
   const MAX_GALLERY_IMAGES = 4;
+  // Prepare images for ImageViewing component
+  const viewerImages = galleryImages.filter(g=>g && g.image).map(g=>({ uri: g.image }));
+  // Helper to download image to device
+  const downloadImage = async (url: string) => {
+    try {
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission Required', 'Please grant permission to save photos.');
+        return;
+      }
+      const filename = url.split('/').pop() ?? `img_${Date.now()}.jpg`;
+      const destPath = FileSystem.cacheDirectory + filename;
+
+      const { status } = await FileSystem.downloadAsync(url, destPath);
+      if (status !== 200) {
+        Alert.alert('Download failed', 'Server returned an error');
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(destPath);
+      Alert.alert('Saved', 'Photo downloaded to gallery');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to download image');
+    }
+  };
   const remainingUploads = Math.max(0, MAX_GALLERY_IMAGES - galleryImages.length);
 
   const handleThemeToggle = async () => {
@@ -771,29 +797,29 @@ export default function AccountScreen() {
           </View>
 
           {/* Action Buttons */}
-          <View style={[styles.profileCardActions, theme === 'dark' ? { backgroundColor: '#1A1A1A' } : { backgroundColor: '#FFFFFF' }, { flexDirection: 'column', gap: 10 }]}>
+          <View style={[styles.profileCardActions, theme === 'dark' ? { backgroundColor: '#1A1A1A' } : { backgroundColor: '#FFFFFF' }, { paddingHorizontal: 12, gap: 8 }]}>
             <TouchableOpacity 
               style={[styles.actionButtonPrimary, { 
-                width: '100%', 
+                flex: 1, 
                 flexDirection: 'row', 
                 justifyContent: 'center',
                 backgroundColor: theme === 'dark' ? '#DC2626' : '#DC2626',
-                paddingVertical: 12,
+                paddingVertical: 10,
                 borderRadius: 8,
               }]}
               onPress={() => router.push('/profile-setting')}
             >
               <Feather name="edit-3" size={18} color="white" style={{ marginRight: 8 }} />
-              <Text style={[styles.actionButtonText, { color: 'white' }]}>Edit Profile</Text>
+              <Text style={[styles.actionButtonText, { color: 'white' }]}>Edit </Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[{
-                width: '100%',
+                flex: 1,
                 flexDirection: 'row',
                 justifyContent: 'center',
                 alignItems: 'center',
-                paddingVertical: 12,
+                paddingVertical: 10,
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: theme === 'dark' ? '#3A3A3A' : '#E5E7EB',
@@ -806,16 +832,16 @@ export default function AccountScreen() {
                 fontSize: 16,
                 fontWeight: '500',
                 color: '#3B82F6',
-              }]}>Public Profile</Text>
+              }]}> Profile</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[{
-                width: '100%',
+                flex: 1,
                 flexDirection: 'row',
                 justifyContent: 'center',
                 alignItems: 'center',
-                paddingVertical: 12,
+                paddingVertical: 10,
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: theme === 'dark' ? '#3A3A3A' : '#FEE2E2',
@@ -1198,10 +1224,43 @@ export default function AccountScreen() {
       <View style={styles.bottomPadding} />
     </ScrollView>
     <ImageViewing
-      images={galleryImages}
+      images={viewerImages}
       imageIndex={viewerIndex}
       visible={viewerVisible}
+      onImageIndexChange={(i)=>setViewerIndex(i)}
       onRequestClose={() => setViewerVisible(false)}
+      HeaderComponent={({ imageIndex }) => (
+        <View style={{ position:'absolute', top:50, left:20, right:20, flexDirection:'row', justifyContent:'space-between', alignItems:'center', zIndex:20 }}>
+          <TouchableOpacity onPress={()=>setViewerVisible(false)} style={{ padding:6 }}>
+            <Feather name="x" size={26} color="white" />
+          </TouchableOpacity>
+          <Text style={{ color:'white', fontSize:16, fontWeight:'600' }}>{`${imageIndex+1} / ${viewerImages.length}`}</Text>
+          <TouchableOpacity onPress={()=>downloadImage && viewerImages[imageIndex] && downloadImage(viewerImages[imageIndex].uri)} style={{ padding:6 }}>
+            <Feather name="download" size={26} color="white" />
+          </TouchableOpacity>
+        </View>
+      )}
+      FooterComponent={({ imageIndex }) => (
+        <View style={{ position:'absolute', bottom:40, left:0, right:0, flexDirection:'row', alignItems:'center', justifyContent:'center' }}>
+          <TouchableOpacity onPress={()=>setViewerIndex(imageIndex>0 ? imageIndex-1 : viewerImages.length-1)} style={{ padding:10 }}>
+            <Feather name="chevron-left" size={32} color="white" />
+          </TouchableOpacity>
+          <FlatList
+            data={viewerImages}
+            horizontal
+            keyExtractor={(_,idx)=>`viewer-thumb-${idx}`}
+            renderItem={({ item, index })=> (
+              <TouchableOpacity onPress={()=>setViewerIndex(index)}>
+                <Image source={{ uri:item.uri }} style={{ width:50, height:50, marginHorizontal:4, borderRadius:6, borderWidth:2, borderColor: index===imageIndex ? '#DC2626':'transparent' }} />
+              </TouchableOpacity>
+            )}
+            showsHorizontalScrollIndicator={false}
+          />
+          <TouchableOpacity onPress={()=>setViewerIndex(imageIndex < viewerImages.length-1 ? imageIndex+1 : 0)} style={{ padding:10 }}>
+            <Feather name="chevron-right" size={32} color="white" />
+          </TouchableOpacity>
+        </View>
+      )}
     />
     <View style={styles.bottomPadding} />
   </SafeAreaView>

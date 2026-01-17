@@ -18,9 +18,12 @@ import { getImageUrl } from '../../utils/imageUtils';
 // Resolve profile image, accept full URL or filename
 const resolveProfileImage = (img?: string): string | null => {
   if (!img) return null;
-  if (img.startsWith('http')) return img;
+  // Convert insecure http to https when possible
+  if (img.startsWith('http://')) return img.replace('http://', 'https://');
+  if (img.startsWith('https://')) return img;
   const urls = getImageUrl(img);
-  return urls.primary;
+  // Prefer production (https) URL to avoid blocked insecure http images
+  return urls.fallback || urls.primary;
 };
 
 export default function ChatsScreen() {

@@ -303,13 +303,23 @@ export class APIService {
    * GET /mobile/user/details (baseURL=/api)
    */
   async getUserDetails(): Promise<ApiResponse> {
+    return this.getUserDetailsById('');
+  }
+
+  /**
+   * Get user details by ID (mobile)
+   * GET /mobile/user/details/{id}
+   */
+  async getUserDetailsById(userId: string | number): Promise<ApiResponse> {
     try {
-      const response = await this.api.get('/user/details'); // baseURL may already include /mobile
+      const url = userId ? `/mobile/user/details/${userId}` : '/mobile/user/details';
+      const response = await this.api.get(url);
       return response.data;
     } catch (error: any) {
       throw this.handleError(error, 'Failed to fetch user details');
     }
   }
+  
 
   /**
    * Get list of countries (location)

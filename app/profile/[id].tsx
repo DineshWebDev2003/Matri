@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Ima
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import ImageViewing from 'react-native-image-viewing';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,11 +13,36 @@ import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import FallbackImage from '../../components/FallbackImage';
 import UniversalHeader from '../../components/UniversalHeader';
-import { getImageUrl, getGalleryImageUrl } from '../../utils/imageUtils';
+import { getGalleryImageUrl } from '../../utils/imageUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-const DetailRow = ({ label, value, theme }: { label: string; value: string; theme?: string }) => {
+// Helper to download image with modern MediaLibrary flow
+  const downloadImage = async (url: string) => {
+    try {
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission required', 'Enable photo permissions to save images');
+        return;
+      }
+      const filename = url.split('/').pop() ?? `img_${Date.now()}.jpg`;
+      const destPath = FileSystem.cacheDirectory + filename;
+
+      const { status } = await FileSystem.downloadAsync(url, destPath);
+      if (status !== 200) {
+        Alert.alert('Download failed', 'Server returned an error');
+        return;
+      }
+      const asset = await MediaLibrary.createAssetAsync(destPath);
+      await MediaLibrary.createAlbumAsync('Downloads', asset, false).catch(() => {});
+      Alert.alert('Saved', 'Photo added to gallery');
+    } catch (e: any) {
+      console.log('📥 download error', e);
+      Alert.alert('Error', e.message || 'Failed to download image');
+    }
+  };
+
+  const DetailRow = ({ label, value, theme }: { label: string; value: string; theme?: string }) => {
   // Show all fields including N/A
   return (
     <View style={[styles.detailRow, theme === 'dark' && { backgroundColor: '#1A1A1A', paddingHorizontal: 8, paddingVertical: 6, marginVertical: 2, borderRadius: 6 }]}>
@@ -85,6 +112,7 @@ export default function ProfileDetailScreen() {
   const opacityAnim = useState(new Animated.Value(0))[0];
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
+    physical: true,
     family: true,
     education: true,
     career: true,
@@ -99,7 +127,7 @@ export default function ProfileDetailScreen() {
     try {
       setLoading(true);
       console.log('🔄 Fetching profile for ID:', id);
-      const response = await apiService.getProfile(id as string);
+      const response = await apiService.getUserDetailsById(id as string);
       
       console.log('📥 Profile API Response:', response);
       
@@ -113,46 +141,84 @@ export default function ProfileDetailScreen() {
         console.log(JSON.stringify(memberData, null, 2));
         console.log('📋 ===== END PROFILE JSON =====');
         
-        const processedProfile = {
+        const basic = memberData.basic_info || {};
+          const physical = memberData.physical_info || memberData.physical_attributes || {};
+          const residence = memberData.residence_info || {};
+          const presentAddr = residence.present_address || {};
+          const family = memberData.family_info || memberData.family || {};
+
+          const pref = memberData.partner_preference || {};
+          let langsRaw:any = basic.language;
+          if (typeof langsRaw === 'string') {
+            try { langsRaw = JSON.parse(langsRaw);} catch {}
+          }
+          const processedProfile = {
           id: memberData.id,
           name: `${memberData.firstname || ''} ${memberData.lastname || ''}`.trim(),
-          age: memberData.age || 'N/A',
-          location: memberData.location || memberData.city || 'N/A',
-          profession: memberData.profession || memberData.job || 'N/A',
-          education: memberData.education || 'N/A',
-          religion: memberData.religion || 'N/A',
-          caste: memberData.caste || 'N/A',
-          height: memberData.height || memberData.physical_attributes?.height || 'N/A',
-          weight: memberData.weight || memberData.physical_attributes?.weight || 'N/A',
+          age: (()=>{
+            if(memberData.age) return memberData.age;
+            const dob = basic.birth_date;
+            if(dob){
+              const diff = Math.floor((Date.now()- new Date(dob).getTime())/ (365.25*24*60*60*1000));
+              return diff.toString();
+            }
+            return 'N/A';
+          })(),
+          location: residence.city || residence.state || residence.country || memberData.location || 'N/A',
+          profession: basic.profession || (memberData.career_info?.[0]?.designation) || memberData.profession || 'N/A',
+          education: memberData.education || (memberData.education_info?.[0]?.degree) || 'N/A',
+          religion: basic.religion || memberData.religion || 'N/A',
+          caste: memberData.caste || basic.caste || 'N/A',
+          height: physical.height || memberData.height || 'N/A',
+          weight: physical.weight || memberData.weight || 'N/A',
           mobile: memberData.mobile || 'N/A',
           email: memberData.email || 'N/A',
-          is_premium: (memberData.package_id && memberData.package_id !== 4) || false,
+          is_premium: (memberData.package_id && memberData.package_id !== '4' && memberData.package_id !== 4) || false,
           packageId: memberData.package_id || 4,
-          image: (() => {
-            const urls = getImageUrl(memberData.image);
-            return urls.primary || memberData.image || null;
+          packageName: memberData.plan_name || memberData.package_name || '',
+          badgeColor: (()=>{
+            const map:any={SILVER:'#9CA3AF',GOLD:'#FACC15',PLATINUM:'#A855F7',DIAMOND:'#EF4444',ELITE:'#EF4444'};
+            const key=(memberData.plan_name||memberData.package_name||'').toUpperCase();
+            return map[key]||null;
           })(),
-          bloodGroup: memberData.bloodGroup || 'N/A',
-          maritalStatus: memberData.maritalStatus || 'N/A',
+          image: (()=>{
+            let u=memberData.image||null;
+            if(u && u.includes('/assets/images/user/') && !u.includes('/profile/')){
+              u = u.replace('/assets/images/user/','/assets/images/user/profile/');
+            }
+            return u;
+          })(),
+          bloodGroup: physical.blood_group || memberData.bloodGroup || 'N/A',
+          maritalStatus: basic.marital_status || memberData.maritalStatus || 'N/A',
           birthPlace: memberData.birthPlace || 'N/A',
           lookingFor: memberData.lookingFor || 'N/A',
-          ageRange: (memberData.partnerAgeMin && memberData.partnerAgeMax) ? `${memberData.partnerAgeMin}-${memberData.partnerAgeMax}` : (memberData.ageRange || 'N/A'),
-          heightRange: (memberData.partnerHeightMin && memberData.partnerHeightMax) ? `${memberData.partnerHeightMin}-${memberData.partnerHeightMax}` : (memberData.heightRange || 'N/A'),
-          preferredReligion: memberData.preferredReligion || 'N/A',
-          preferredCaste: memberData.preferredCaste || 'N/A',
-          preferredEducation: memberData.preferredEducation || 'N/A',
-          preferredProfession: memberData.preferredProfession || 'N/A',
-          preferredLocation: memberData.preferredLocation || 'N/A',
-          preferredMaritalStatus: memberData.preferredMaritalStatus || 'N/A',
+          ageRange: (pref.min_age && pref.max_age) ? `${pref.min_age}-${pref.max_age}` : 'N/A',
+          heightRange: (pref.min_height && pref.max_height) ? `${pref.min_height}-${pref.max_height}` : 'N/A',
+          preferredReligion: pref.religion || 'N/A',
+          preferredCaste: pref.caste || 'N/A',
+          preferredEducation: pref.min_degree || 'N/A',
+          preferredProfession: pref.profession || 'N/A',
+          preferredLocation: pref.country || 'N/A',
+          preferredMaritalStatus: pref.marital_status || 'N/A',
           gender: memberData.gender || (memberData.genderIdentity) || null,
           galleries: (()=>{
             const list:string[] = [];
-            if (memberData.image) list.push(memberData.image);
-            const raw = memberData.galleries && memberData.galleries.length ? memberData.galleries : (Array.isArray(memberData.images) ? memberData.images : []);
-            raw.forEach((it:any)=>{
+            if(memberData.image){
+              let main = memberData.image;
+              if(main.includes('/assets/images/user/') && !main.includes('/gallery/') && !main.includes('/profile/')){
+                main = main.replace('/assets/images/user/','/assets/images/user/profile/');
+              }
+              list.push(main);
+            }
+            const rawArr = memberData.galleries && memberData.galleries.length ? memberData.galleries : (memberData.gallery && memberData.gallery.length ? memberData.gallery : (Array.isArray(memberData.images) ? memberData.images : []));
+            rawArr.forEach((it:any)=>{
               let url = typeof it==='string' ? it : (it.url || it.image || it.img);
-              if(url && url.includes('/user/profile/')){
-                url = url.replace('/user/profile/','/user/gallery/');
+              if(url){
+                if(url.includes('/assets/images/user/') && !url.includes('/gallery/') && !url.includes('/profile/')){
+                  url = url.replace('/assets/images/user/','/assets/images/user/gallery/');
+                } else if(url.includes('/user/profile/')){
+                  url = url.replace('/user/profile/','/user/gallery/');
+                }
               }
               if(url) list.push(url);
             });
@@ -163,17 +229,17 @@ export default function ProfileDetailScreen() {
           eyeColor: memberData.eye_color || memberData.eyeColor || 'N/A',
           hairColor: memberData.hair_color || memberData.hairColor || 'N/A',
           disability: memberData.disability || 'N/A',
-          languages: Array.isArray(memberData.language) ? memberData.language.join(', ') : (memberData.languages || 'N/A'),
-          presentAddress: memberData.present_address || memberData.presentAddress || 'N/A',
-          permanentAddress: memberData.permanent_address || memberData.permanentAddress || 'N/A',
-          fatherName: (memberData.family?.father_name || memberData.fatherName || 'N/A'),
-          fatherProfession: (memberData.family?.father_profession || memberData.family?.father_occupation || memberData.fatherProfession || 'N/A'),
+          languages: Array.isArray(langsRaw) ? langsRaw.join(', ') : (memberData.languages || ''),
+          presentAddress: presentAddr.address || `${presentAddr.city||''} ${presentAddr.state||''} ${presentAddr.country||''}`.trim() || 'N/A',
+          permanentAddress: residence.permanent_address?.address || 'N/A',
+          fatherName: family.father_name || 'N/A',
+          fatherProfession: family.father_profession || family.father_occupation || 'N/A',
           fatherContact: (memberData.family?.father_contact || memberData.fatherContact || 'N/A'),
-          motherName: (memberData.family?.mother_name || memberData.motherName || 'N/A'),
-          motherProfession: (memberData.family?.mother_profession || memberData.family?.mother_occupation || memberData.motherProfession || 'N/A'),
+          motherName: family.mother_name || 'N/A',
+          motherProfession: family.mother_profession || family.mother_occupation || 'N/A',
           motherContact: (memberData.family?.mother_contact || memberData.motherContact || 'N/A'),
-          numberOfBrothers: (memberData.family?.number_of_brothers || memberData.family?.brothers || memberData.numberOfBrothers || memberData.brothers || 'N/A'),
-          numberOfSisters: (memberData.family?.number_of_sisters || memberData.family?.sisters || memberData.numberOfSisters || memberData.sisters || 'N/A'),
+          numberOfBrothers: family.total_brother || family.number_of_brothers || family.brothers || 'N/A',
+          numberOfSisters: family.total_sister || family.number_of_sisters || family.sisters || 'N/A',
           careerStartYear: (memberData.careers?.[0]?.start || memberData.careerStartYear || 'N/A'),
           careerEndYear: (memberData.careers?.[0]?.end || memberData.careerEndYear || 'N/A'),
           degree: (memberData.educations?.[0]?.degree || memberData.degree || 'N/A'),
@@ -181,8 +247,9 @@ export default function ProfileDetailScreen() {
           institute: (memberData.educations?.[0]?.institute || memberData.institute || 'N/A'),
           educationStartYear: (memberData.educations?.[0]?.start || memberData.educationStartYear || 'N/A'),
           educationEndYear: (memberData.educations?.[0]?.end || memberData.educationEndYear || 'N/A'),
-          educations: Array.isArray(memberData.educations) ? memberData.educations : [],
-          careers: Array.isArray(memberData.careers) ? memberData.careers : [],
+          educations: Array.isArray(memberData.education_info) ? memberData.education_info : (Array.isArray(memberData.educations)?memberData.educations:[]),
+          careers: Array.isArray(memberData.career_info) ? memberData.career_info : (Array.isArray(memberData.careers)?memberData.careers:[]),
+          galleryCount: memberData.stats?.gallery_count || (memberData.gallery?.length) || (memberData.galleries?.length) || 0,
         };
         
         console.log('✅ Processed Profile:', processedProfile);
@@ -455,6 +522,9 @@ export default function ProfileDetailScreen() {
   // Use image directly from API (already includes full URL from formatProfileResponse)
     const profileImagePrimary = profile?.image || 'https://via.placeholder.com/400x600';
   const genderLower = (profile?.gender || profile?.looking_for_gender || '').toLowerCase();
+  // Prepare images for ImageViewing component
+  const galleriesArr:any[] = (profile?.galleries || []).filter((g:any)=>g && g.image);
+  const viewerImages = galleriesArr.map((g)=>({ uri: g.image }));
   const profileImageFallback = genderLower === 'female'
     ? require('../../assets/images/default-female.jpg')
     : require('../../assets/images/default-male.jpg');
@@ -513,11 +583,9 @@ export default function ProfileDetailScreen() {
               )}
               
 
-              {/* Premium Badge */}
-              {(profile?.packageId && profile.packageId !== 4) && (
-                <View style={styles.premiumBadge}>
-                  <Text style={styles.premiumBadgeText}>⭐ Premium</Text>
-                </View>
+              {/* Package Badge */}
+              {profile.badgeColor && (
+                <Feather name="crown" size={24} color={profile.badgeColor} style={styles.packageBadge} />
               )}
             </LinearGradient>
           </View>
@@ -526,10 +594,10 @@ export default function ProfileDetailScreen() {
           <View style={styles.profileInfoRow}>
             <View>
               <View style={styles.nameRow}>
-                <Text style={styles.profileName}>{name}</Text>
-                <Feather name="check-circle" size={18} color="#10B981" style={styles.inlineBadge} />
+                <Text style={[styles.profileName, theme === 'dark' && { color: '#FFFFFF' }]}>{name}</Text>
+                <Image source={require('../../assets/images/verified.png')} style={[styles.inlineBadge, { width: 22, height: 22 }]} resizeMode="contain" />
               </View>
-              <Text style={styles.profileDetails}>Age: {age}  • {location}</Text>
+              <Text style={[styles.profileDetails, theme === 'dark' && { color: '#B0B0B0' }]}>Age: {age}  • {location}</Text>
             </View>
           </View>
 
@@ -652,6 +720,53 @@ export default function ProfileDetailScreen() {
                   )}
                 </CollapsibleSection>
 
+                {/* Physical Attributes */}
+                <CollapsibleSection title="Physical Attributes" icon="activity" section="physical">
+                  {profile?.height && (
+                    <DetailRow label="Height" value={profile.height} theme={theme} />
+                  )}
+                  {profile?.weight && (
+                    <DetailRow label="Weight" value={profile.weight} theme={theme} />
+                  )}
+                  {profile?.bloodGroup && (
+                    <DetailRow label="Blood Group" value={profile.bloodGroup} theme={theme} />
+                  )}
+                  {profile?.eyeColor && (
+                    <DetailRow label="Eye Color" value={profile.eyeColor} theme={theme} />
+                  )}
+                  {profile?.hairColor && (
+                    <DetailRow label="Hair Color" value={profile.hairColor} theme={theme} />
+                  )}
+                  {profile?.faceColour && (
+                    <DetailRow label="Complexion" value={profile.faceColour} theme={theme} />
+                  )}
+                  {profile?.disability && (
+                    <DetailRow label="Disability" value={profile.disability} theme={theme} />
+                  )}
+                </CollapsibleSection>
+
+                {/* Family Information */}
+                <CollapsibleSection title="Family Information" icon="users" section="family">
+                  {profile.fatherName && profile.fatherName !== 'N/A' && (
+                    <DetailRow label="Father's Name" value={profile.fatherName} theme={theme} />
+                  )}
+                  {profile.fatherProfession && profile.fatherProfession !== 'N/A' && (
+                    <DetailRow label="Father's Profession" value={profile.fatherProfession} theme={theme} />
+                  )}
+                  {profile.motherName && profile.motherName !== 'N/A' && (
+                    <DetailRow label="Mother's Name" value={profile.motherName} theme={theme} />
+                  )}
+                  {profile.motherProfession && profile.motherProfession !== 'N/A' && (
+                    <DetailRow label="Mother's Profession" value={profile.motherProfession} theme={theme} />
+                  )}
+                  {profile.numberOfBrothers && profile.numberOfBrothers !== 'N/A' && (
+                    <DetailRow label="Brothers" value={profile.numberOfBrothers} theme={theme} />
+                  )}
+                  {profile.numberOfSisters && profile.numberOfSisters !== 'N/A' && (
+                    <DetailRow label="Sisters" value={profile.numberOfSisters} theme={theme} />
+                  )}
+                </CollapsibleSection>
+
                 {/* Contact Information - Locked Initially (Moved) */}
                 <TouchableOpacity 
                   style={[styles.contactSection, themeStyles.cardBg]}
@@ -696,7 +811,7 @@ export default function ProfileDetailScreen() {
                 {/* Education Section */}
                 <CollapsibleSection title="Education" icon="book" section="education">
                   {profile?.educations?.length ? profile.educations.map((edu: any, idx: number) => (
-                    <View key={`edu-${idx}`} style={styles.groupBox}>
+                    <View key={`edu-${idx}`} style={[styles.groupBox, theme === 'dark' && styles.groupBoxDark]}>
                       <DetailRow label="Education" value={edu.education || edu.level || 'N/A'} theme={theme} />
                       <DetailRow label="Degree" value={edu.degree || 'N/A'} theme={theme} />
                       <DetailRow label="Field of Study" value={edu.field_of_study || edu.fieldOfStudy || 'N/A'} theme={theme} />
@@ -712,7 +827,7 @@ export default function ProfileDetailScreen() {
                 {/* Career Section */}
                 <CollapsibleSection title="Career" icon="briefcase" section="career">
                   {profile?.careers?.length ? profile.careers.map((car: any, idx: number) => (
-                    <View key={`car-${idx}`} style={styles.groupBox}>
+                    <View key={`car-${idx}`} style={[styles.groupBox, theme === 'dark' && styles.groupBoxDark]}>
                       <DetailRow label="Profession" value={car.profession || 'N/A'} theme={theme} />
                       <DetailRow label="Company" value={car.company || 'N/A'} theme={theme} />
                       <DetailRow label="Designation" value={car.designation || 'N/A'} theme={theme} />
@@ -737,17 +852,14 @@ export default function ProfileDetailScreen() {
                 </CollapsibleSection>
                 
               
-                {/* Credit Popup Modal */}
-                {showCreditPopup && (
-                  <Modal
-                    visible={showCreditPopup}
+{/* credit popup removed
                     transparent={true}
                     animationType="fade"
                     onRequestClose={() => setShowCreditPopup(false)}
                   >
                     <View style={styles.creditPopupOverlay}>
                       <View style={[styles.creditPopupContainer, theme === 'dark' && { backgroundColor: '#2A2A2A' }]}>
-                        {/* Header */}
+                        Header
                         <View style={styles.creditPopupHeader}>
                           <Feather name="star" size={32} color="#FCD34D" />
                           <Text style={[styles.creditPopupTitle, theme === 'dark' && { color: '#FFFFFF' }]}>
@@ -755,7 +867,7 @@ export default function ProfileDetailScreen() {
                           </Text>
                         </View>
 
-                        {/* Credit Info */}
+                        Credit Info
                         <View style={styles.creditInfoBox}>
                           <View style={styles.creditItem}>
                             <Text style={styles.creditLabel}>Your Credits</Text>
@@ -768,7 +880,7 @@ export default function ProfileDetailScreen() {
                           </View>
                         </View>
 
-                        {/* Cost Info */}
+                        Cost Info
                         <View style={[styles.costBox, theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>
                           <Feather name="info" size={20} color="#3B82F6" />
                           <Text style={[styles.costText, theme === 'dark' && { color: '#E5E7EB' }]}>
@@ -776,7 +888,7 @@ export default function ProfileDetailScreen() {
                           </Text>
                         </View>
 
-                        {/* Buttons */}
+                        Buttons
                         <View style={styles.creditPopupButtons}>
                           <TouchableOpacity 
                             style={[styles.creditButton, styles.cancelButton, theme === 'dark' && { backgroundColor: '#3A3A3A' }]}
@@ -793,9 +905,7 @@ export default function ProfileDetailScreen() {
                           </TouchableOpacity>
                         </View>
                       </View>
-                    </View>
-                  </Modal>
-                )}
+*/}
               </ScrollView>
             )}
 
@@ -813,62 +923,57 @@ export default function ProfileDetailScreen() {
                     </View>
                   </View>
                   <View style={[styles.sectionContent, theme === 'dark' && { backgroundColor: '#2A2A2A' }]}>
-                    <DetailRow label="Religion" value={profile?.preferredReligion || 'N/A'} theme={theme} />
-                    <DetailRow label="Caste" value={profile?.preferredCaste || 'N/A'} theme={theme} />
-                    <DetailRow label="Marital Status" value={profile?.preferredMaritalStatus || 'N/A'} theme={theme} />
-                    <DetailRow label="Age Range" value={profile?.ageRange || 'N/A'} theme={theme} />
-                    <DetailRow label="Height Range" value={profile?.heightRange || 'N/A'} theme={theme} />
-                    <DetailRow label="Education" value={profile?.preferredEducation || 'N/A'} theme={theme} />
-                    <DetailRow label="Profession" value={profile?.preferredProfession || 'N/A'} theme={theme} />
-                    <DetailRow label="Smoking Habits" value={profile?.preferredSmokingHabits || 'N/A'} theme={theme} />
-                    <DetailRow label="Drinking Status" value={profile?.preferredDrinkingStatus || 'N/A'} theme={theme} />
-                    <DetailRow label="General Requirement" value={profile?.generalRequirement || 'N/A'} theme={theme} />
+                    {profile?.preferredReligion && profile.preferredReligion!=='N/A' && (
+                      <DetailRow label="Religion" value={profile.preferredReligion} theme={theme} />
+                    )}
+                    {profile?.preferredCaste && profile.preferredCaste!=='N/A' && (
+                      <DetailRow label="Caste" value={profile.preferredCaste} theme={theme} />
+                    )}
+                    {profile?.preferredMaritalStatus && profile.preferredMaritalStatus!=='N/A' && (
+                      <DetailRow label="Marital Status" value={profile.preferredMaritalStatus} theme={theme} />
+                    )}
+                    {profile?.ageRange && profile.ageRange!=='N/A' && (
+                      <DetailRow label="Age Range" value={profile.ageRange} theme={theme} />
+                    )}
+                    {profile?.heightRange && profile.heightRange!=='N/A' && (
+                      <DetailRow label="Height Range" value={profile.heightRange} theme={theme} />
+                    )}
+                    {profile?.preferredEducation && profile.preferredEducation!=='N/A' && (
+                      <DetailRow label="Education" value={profile.preferredEducation} theme={theme} />
+                    )}
+                    {profile?.preferredProfession && profile.preferredProfession!=='N/A' && (
+                      <DetailRow label="Profession" value={profile.preferredProfession} theme={theme} />
+                    )}
+                                                            {profile?.generalRequirement && profile.generalRequirement!=='N/A' && (
+                      <DetailRow label="Requirement" value={profile.generalRequirement} theme={theme} />
+                    )}
                   </View>
                 </View>
-              </ScrollView>
-            )}
-
-            {/* Photos Tab */}
+              </ScrollView>)}
             {activeTab === 'photos' && (
-              <View style={styles.photosGrid}>
+              <View style={styles.photosGridWrapper}>
+                {profile?.galleryCount > 0 && (
+                  <Text style={[styles.galleryCountText, theme === 'dark' && { color: '#FFFFFF' }]}>{profile.galleryCount} Photos</Text>
+                )}
                 {profile?.galleries && profile.galleries.length > 0 ? (
                   <FlatList
                     data={profile.galleries}
                     numColumns={3}
-                    renderItem={({ item, index }) => {
-                      const galleryImageUrls = getGalleryImageUrl(item.image);
-                      console.log(`🖼️ Profile Gallery Image ${index + 1}:`, {
-                        profileId: profile?.id,
-                        galleryIndex: index,
-                        rawImage: item.image,
-                        primaryUrl: galleryImageUrls.primary,
-                        fallbackUrl: galleryImageUrls.fallback,
-                        hasImage: !!galleryImageUrls.primary,
-                      });
-                      return (
-                        <TouchableOpacity
-                          style={styles.photoGridItem}
-                          onPress={() => {
-                            setFullScreenPhoto(profile.galleries);
-                            setPhotoIndex(index);
-                            setViewerVisible(true);
-                          }}
-                        >
-                          {galleryImageUrls.primary ? (
-                            <FallbackImage
-                              source={{ uri: galleryImageUrls.primary }}
-                              fallbackSource={galleryImageUrls.fallback ? { uri: galleryImageUrls.fallback } : undefined}
-                              style={styles.photoGridImage}
-                              resizeMode="cover"
-                            />
-                          ) : (
-                            <View style={[styles.photoGridImage, { backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }]}>
-                              <Feather name="image" size={24} color="#9CA3AF" />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    }}
+                    renderItem={({ item, index }) => (
+                      <TouchableOpacity
+                        style={styles.photoGridItem}
+                        onPress={() => {
+                          setPhotoIndex(index);
+                          setViewerVisible(true);
+                        }}
+                      >
+                        <Image
+                          source={{ uri: item.image }}
+                          style={styles.photoGridImage}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    )}
                     keyExtractor={(item, index) => `photo-${index}`}
                     scrollEnabled={false}
                   />
@@ -886,91 +991,62 @@ export default function ProfileDetailScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Full Screen Photo Viewer Modal */}
-      {fullScreenPhoto && (
-        <Modal
-          visible={!!fullScreenPhoto}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setFullScreenPhoto(null)}
-        >
-          <SafeAreaView style={styles.fullScreenPhotoContainer}>
-            {/* Close Button */}
-            <TouchableOpacity
-              style={styles.closePhotoButton}
-              onPress={() => setFullScreenPhoto(null)}
-            >
-              <Feather name="x" size={28} color="white" />
-            </TouchableOpacity>
-
-            {/* Photo Counter */}
-            <View style={styles.photoCounter}>
-              <Text style={styles.photoCounterText}>
-                {photoIndex + 1} / {fullScreenPhoto.length}
-              </Text>
-            </View>
-
-            {/* Main Photo */}
-            <View style={styles.fullScreenPhotoContent}>
-              <Image
-                source={{ uri: fullScreenPhoto[photoIndex]?.image }}
-                style={styles.fullScreenPhoto}
-                resizeMode="contain"
-              />
-            </View>
-
-            {/* Navigation Buttons */}
-            <View style={styles.photoNavigation}>
-              <TouchableOpacity
-                style={styles.navButton}
-                onPress={() => setPhotoIndex(photoIndex > 0 ? photoIndex - 1 : fullScreenPhoto.length - 1)}
-              >
-                <Feather name="chevron-left" size={32} color="white" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.navButton}
-                onPress={() => setPhotoIndex(photoIndex < fullScreenPhoto.length - 1 ? photoIndex + 1 : 0)}
-              >
-                <Feather name="chevron-right" size={32} color="white" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Thumbnail Strip */}
-            <View style={styles.thumbnailStrip}>
-              <FlatList
-                data={fullScreenPhoto}
-                horizontal
-                renderItem={({ item, index }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.thumbnail,
-                      photoIndex === index && styles.thumbnailActive
-                    ]}
-                    onPress={() => setPhotoIndex(index)}
-                  >
-                    <Image
-                      source={{ uri: item.image }}
-                      style={styles.thumbnailImage}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
-                )}
-                keyExtractor={(item, index) => `thumb-${index}`}
-                showsHorizontalScrollIndicator={false}
-              />
-            </View>
-          </SafeAreaView>
-        </Modal>
-      )}
-
-      {/* Interest Animation Container */}
+      }
+*/}
       {/* Zoomable Image Viewer */}
       <ImageViewing
-        images={profile?.galleries || []}
+        images={viewerImages}
         imageIndex={photoIndex}
         visible={viewerVisible}
         onRequestClose={() => setViewerVisible(false)}
+        onImageIndexChange={(index)=>setPhotoIndex(index)}
+        HeaderComponent={({ imageIndex }) => (
+          <View style={styles.viewerHeader}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setViewerVisible(false)}
+            >
+              <Feather name="x" size={26} color="white" />
+            </TouchableOpacity>
+            <Text style={styles.headerCounter}>{`${imageIndex + 1} / ${viewerImages.length}`}</Text>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => downloadImage(galleriesArr[imageIndex].image)}
+            >
+              <Feather name="download" size={26} color="white" />
+            </TouchableOpacity>
+          </View>
+        )}
+        FooterComponent={({ imageIndex }) => (
+          <View style={styles.viewerFooter}>
+            <TouchableOpacity
+              style={styles.footerArrow}
+              onPress={() => setPhotoIndex(imageIndex > 0 ? imageIndex - 1 : viewerImages.length - 1)}
+            >
+              <Feather name="chevron-left" size={32} color="white" />
+            </TouchableOpacity>
+            <FlatList
+              data={galleriesArr}
+              horizontal
+              keyExtractor={(_, idx) => `modal-thumb-${idx}`}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity onPress={() => setPhotoIndex(index)}>
+                  <Image
+                    source={{ uri: item.image }}
+                    style={[styles.footerThumbnail, index === imageIndex && styles.footerThumbnailActive]}
+                  />
+                </TouchableOpacity>
+              )}
+              showsHorizontalScrollIndicator={false}
+            />
+            <TouchableOpacity
+              style={styles.footerArrow}
+              onPress={() => setPhotoIndex(imageIndex < viewerImages.length - 1 ? imageIndex + 1 : 0)}
+            >
+              <Feather name="chevron-right" size={32} color="white" />
+            </TouchableOpacity>
+          </View>
+        )}
       />
 
       {showInterestAnimation && (
@@ -1137,6 +1213,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   groupBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  groupBoxDark: {
+    backgroundColor: '#2A2A2A',
     marginBottom: 16,
   },
   detailsSection: {
@@ -1473,6 +1556,52 @@ const styles = StyleSheet.create({
   fullScreenPhoto: {
     width: '100%',
     height: '100%',
+  },
+  // ImageViewing custom header/footer
+  viewerHeader:{
+    position:'absolute',
+    top:40,
+    left:0,
+    right:0,
+    flexDirection:'row',
+    justifyContent:'space-between',
+    paddingHorizontal:20,
+    zIndex:20,
+  },
+  headerButton:{
+    padding:6,
+  },
+  viewerFooter:{
+    position:'absolute',
+    bottom:40,
+    left:0,
+    right:0,
+    flexDirection:'row',
+    justifyContent:'space-between',
+    paddingHorizontal:40,
+    zIndex:20,
+  },
+  footerButton:{
+    padding:10,
+  },
+  headerCounter:{
+    color:'#FFFFFF',
+    fontSize:16,
+    fontWeight:'600',
+  },
+  footerArrow:{
+    padding:10,
+  },
+  footerThumbnail:{
+    width:50,
+    height:50,
+    marginHorizontal:4,
+    borderRadius:6,
+    borderWidth:2,
+    borderColor:'transparent',
+  },
+  footerThumbnailActive:{
+    borderColor:'#DC2626',
   },
   photoNavigation: {
     flexDirection: 'row',
