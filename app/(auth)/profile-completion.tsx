@@ -926,8 +926,8 @@ export default function ProfileCompletionScreen() {
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Marital Status" value="" />
-                  {maritalStatusOptions.map((status) => (
-                    <Picker.Item key={status.id} label={status.name} value={status.id} />
+                  {MARITAL_STATUS.map((status) => (
+                    <Picker.Item key={status.id} label={status.label} value={status.id} />
                   ))}
                 </Picker>
               </View>
@@ -1033,35 +1033,11 @@ export default function ProfileCompletionScreen() {
             </View>
             
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Eye Color *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={formData.eyeColor}
-                  onValueChange={(value) => handleInputChange('eyeColor', value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Eye Color" value="" />
-                  {eyeColors.map((e) => (
-                    <Picker.Item key={e.id} label={e.name} value={e.id} />
-                  ))}
-                </Picker>
-              </View>
+              <FormInput label="Eye Color" placeholder="e.g., Brown" icon="eye" fieldName="eyeColor" formData={formData} onFieldChange={handleInputChange} />
             </View>
             
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Hair Color *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={formData.hairColor}
-                  onValueChange={(value) => handleInputChange('hairColor', value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Hair Color" value="" />
-                  {hairColors.map((h) => (
-                    <Picker.Item key={h.id} label={h.name} value={h.id} />
-                  ))}
-                </Picker>
-              </View>
+              <FormInput label="Hair Color" placeholder="e.g., Black" icon="eye" fieldName="hairColor" formData={formData} onFieldChange={handleInputChange} />
             </View>
             
             <FormInput label="Disability" placeholder="If any" icon="alert-circle" fieldName="disability" formData={formData} onFieldChange={handleInputChange} />
@@ -1103,12 +1079,71 @@ export default function ProfileCompletionScreen() {
               <FormInput label="Min Height" placeholder="e.g., 5.5" icon="trending-up" containerStyle={styles.halfWidth} fieldName="partnerMinHeight" formData={formData} onFieldChange={handleInputChange} />
               <FormInput label="Max Height" placeholder="e.g., 6.0" icon="trending-up" containerStyle={styles.halfWidth} fieldName="partnerMaxHeight" formData={formData} onFieldChange={handleInputChange} />
             </View>
-            <FormInput label="Marital Status" placeholder="Select Marital Status" icon="heart" fieldName="partnerMaritalStatus" formData={formData} onFieldChange={handleInputChange} />
-            <FormInput label="Religion" placeholder="Select Religion" icon="moon" fieldName="partnerReligion" formData={formData} onFieldChange={handleInputChange} />
-            <FormInput label="Complexion" placeholder="e.g., Fair, Wheatish" icon="sun" fieldName="partnerComplexion" formData={formData} onFieldChange={handleInputChange} />
+            {/* Marital Status Dropdown */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Marital Status</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={formData.partnerMaritalStatus}
+                  onValueChange={(value) => handleInputChange('partnerMaritalStatus', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Marital Status" value="" />
+                  {maritalStatusOptions.map((opt) => (
+                    <Picker.Item key={opt.id} label={opt.name} value={opt.name} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+            {/* Religion Dropdown */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Religion</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={formData.partnerReligion}
+                  onValueChange={(value) => handleInputChange('partnerReligion', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Religion" value="" />
+                  {religionOptions.map((opt) => (
+                    <Picker.Item key={opt.id} label={opt.name} value={opt.name} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+            <FormInput label="Face Colour" placeholder="e.g., Fair, Wheatish" icon="sun" fieldName="partnerComplexion" formData={formData} onFieldChange={handleInputChange} />
+            {/* Smoking & Drinking Dropdowns */}
             <View style={styles.row}>
-              <FormInput label="Smoking Habits" placeholder="Select" icon="wind" containerStyle={styles.halfWidth} fieldName="partnerSmokingHabits" formData={formData} onFieldChange={handleInputChange} />
-              <FormInput label="Drinking Habits" placeholder="Select" icon="droplet" containerStyle={styles.halfWidth} fieldName="partnerDrinkingHabits" formData={formData} onFieldChange={handleInputChange} />
+              <View style={[styles.inputContainer, styles.halfWidth]}>
+                <Text style={styles.label}>Smoking Habits</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.partnerSmokingHabits}
+                    onValueChange={(value) => handleInputChange('partnerSmokingHabits', value)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select" value="" />
+                    {smokingHabits.map((opt) => (
+                      <Picker.Item key={opt.id} label={opt.name} value={opt.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+              <View style={[styles.inputContainer, styles.halfWidth]}>
+                <Text style={styles.label}>Drinking Habits</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.partnerDrinkingHabits}
+                    onValueChange={(value) => handleInputChange('partnerDrinkingHabits', value)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select" value="" />
+                    {drinkingHabits.map((opt) => (
+                      <Picker.Item key={opt.id} label={opt.name} value={opt.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
             </View>
             <FormInput label="Spoken Languages" placeholder="e.g., English, Tamil" icon="globe" fieldName="partnerSpokenLanguages" formData={formData} onFieldChange={handleInputChange} />
             <FormInput label="Education" placeholder="e.g., Masters" icon="book-open" fieldName="partnerEducation" formData={formData} onFieldChange={handleInputChange} />

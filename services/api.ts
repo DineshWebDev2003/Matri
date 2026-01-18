@@ -142,12 +142,12 @@ export const apiService = {
 
   /* Razorpay */
   createRazorpayOrder(planId: number) {
-    // Mobile API: POST /api/mobile/razorpay/order
-    return axiosInstance.post('/razorpay/order', { plan_id: planId }).then(r => r.data);
+    // POST /api/payments/razorpay/order
+    return axiosInstance.post('/payments/razorpay/order', { plan_id: planId }).then(r => r.data);
   },
   verifyRazorpayPayment(payload: any) {
-    // Mobile API: POST /api/mobile/razorpay/verify
-    return axiosInstance.post('/razorpay/verify', payload).then(r => r.data);
+    // POST /api/payments/razorpay/verify
+    return axiosInstance.post('/payments/razorpay/verify', payload).then(r => r.data);
   },
 
   // Authentication methods

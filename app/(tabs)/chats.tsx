@@ -315,7 +315,8 @@ export default function ChatsScreen() {
 
   const renderActiveChat = ({ item }: { item: any }) => {
     const imageBaseUrl = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || 'http://10.97.175.139:8000/assets/images/user/profile';
-    const profileImage = item?.images?.[0] || resolveProfileImage(item?.image);
+    let profileImage = item?.images?.[0] || item?.image;
+    profileImage = resolveProfileImage(profileImage);
     const profileName = item?.name || `${item?.firstname || ''} ${item?.lastname || ''}`.trim() || 'User';
     const isOnline = item?.is_online === true || item?.is_online === 1 || item?.online_status === true || item?.online_status === 1 || item?.online_status === 'online'; // Check if user is online
     const userGender = item?.gender?.toLowerCase();
@@ -352,7 +353,7 @@ export default function ChatsScreen() {
     }
     // Second try: other_user_image (flattened structure)
     else if (item.other_user_image) {
-      profileImage = item.other_user_image;
+      profileImage = resolveProfileImage(item.other_user_image);
     }
     // Third try: images array
     else if (item.other_user?.images?.[0]) {

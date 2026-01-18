@@ -52,6 +52,18 @@ const { width: screenWidth } = Dimensions.get('window');
   );
 };
 
+// Component to show placeholder when a section has no real data
+const NoData = ({ theme }: { theme?: string }) => (
+  <View style={styles.noDataContainer}>
+    <Image
+      source={require('../../assets/images/no_data.png')}
+      style={styles.noDataImage}
+      resizeMode="contain"
+    />
+    <Text style={[styles.noDataText, theme === 'dark' && { color: '#9CA3AF' }]}>No data found</Text>
+  </View>
+);
+
 export default function ProfileDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -540,6 +552,17 @@ export default function ProfileDetailScreen() {
   const location = profile?.location || 'Location N/A';
   const name = profile?.name || 'User';
 
+  const hasPartnerPrefs = [
+    profile?.preferredReligion,
+    profile?.preferredCaste,
+    profile?.preferredMaritalStatus,
+    profile?.ageRange,
+    profile?.heightRange,
+    profile?.preferredEducation,
+    profile?.preferredProfession,
+    profile?.generalRequirement,
+  ].some((v) => v && v !== 'N/A');
+
   const themeStyles = {
     container: theme === 'dark' ? { backgroundColor: '#1A1A1A' } : { backgroundColor: '#FFFFFF' },
     text: theme === 'dark' ? { color: '#FFFFFF' } : { color: '#1A1A2E' },
@@ -597,7 +620,9 @@ export default function ProfileDetailScreen() {
                 <Text style={[styles.profileName, theme === 'dark' && { color: '#FFFFFF' }]}>{name}</Text>
                 <Image source={require('../../assets/images/verified.png')} style={[styles.inlineBadge, { width: 22, height: 22 }]} resizeMode="contain" />
               </View>
-              <Text style={[styles.profileDetails, theme === 'dark' && { color: '#B0B0B0' }]}>Age: {age}  • {location}</Text>
+                            <Text style={[styles.profileDetails, theme === 'dark' && { color: '#B0B0B0' }]}>Age: {age}  • City: {location}  </Text>
+
+              <Text style={[styles.profileDetails, theme === 'dark' && { color: '#B0B0B0' }]}>Maritial Status:{profile?.maritalStatus}</Text>
             </View>
           </View>
 
@@ -820,7 +845,7 @@ export default function ProfileDetailScreen() {
                       <DetailRow label="End Year" value={edu.end || 'N/A'} theme={theme} />
                     </View>
                   )) : (
-                    <DetailRow label="Education" value="N/A" theme={theme} />
+                    <NoData theme={theme} />
                   )}
                 </CollapsibleSection>
 
@@ -835,7 +860,7 @@ export default function ProfileDetailScreen() {
                       <DetailRow label="End Year" value={car.end || 'N/A'} theme={theme} />
                     </View>
                   )) : (
-                    <DetailRow label="Profession" value="N/A" theme={theme} />
+                    <NoData theme={theme} />
                   )}
                 </CollapsibleSection>
 
@@ -843,10 +868,8 @@ export default function ProfileDetailScreen() {
                 <CollapsibleSection title="Family" icon="home" section="family">
                   <DetailRow label="Father's Name" value={profile?.fatherName || 'N/A'} theme={theme} />
                   <DetailRow label="Father's Profession" value={profile?.fatherProfession || 'N/A'} theme={theme} />
-                  <DetailRow label="Father's Contact" value={profile?.fatherContact || 'N/A'} theme={theme} />
                   <DetailRow label="Mother's Name" value={profile?.motherName || 'N/A'} theme={theme} />
                   <DetailRow label="Mother's Profession" value={profile?.motherProfession || 'N/A'} theme={theme} />
-                  <DetailRow label="Mother's Contact" value={profile?.motherContact || 'N/A'} theme={theme} />
                   <DetailRow label="Number of Brothers" value={profile?.numberOfBrothers || 'N/A'} theme={theme} />
                   <DetailRow label="Number of Sisters" value={profile?.numberOfSisters || 'N/A'} theme={theme} />
                 </CollapsibleSection>
@@ -923,7 +946,9 @@ export default function ProfileDetailScreen() {
                     </View>
                   </View>
                   <View style={[styles.sectionContent, theme === 'dark' && { backgroundColor: '#2A2A2A' }]}>
-                    {profile?.preferredReligion && profile.preferredReligion!=='N/A' && (
+                    {hasPartnerPrefs ? (
+      <>
+        {profile?.preferredReligion && profile.preferredReligion!=='N/A' && (
                       <DetailRow label="Religion" value={profile.preferredReligion} theme={theme} />
                     )}
                     {profile?.preferredCaste && profile.preferredCaste!=='N/A' && (
@@ -947,7 +972,10 @@ export default function ProfileDetailScreen() {
                                                             {profile?.generalRequirement && profile.generalRequirement!=='N/A' && (
                       <DetailRow label="Requirement" value={profile.generalRequirement} theme={theme} />
                     )}
-                  </View>
+      </>
+    ) : (
+      <NoData theme={theme} />
+    )}                  </View>
                 </View>
               </ScrollView>)}
             {activeTab === 'photos' && (
@@ -1638,6 +1666,20 @@ const styles = StyleSheet.create({
   thumbnailImage: {
     width: '100%',
     height: '100%',
+  },
+  noDataContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  noDataImage: {
+    width: 120,
+    height: 120,
+    marginBottom: 8,
+  },
+  noDataText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   // Collapsible Section Styles
   collapsibleSection: {

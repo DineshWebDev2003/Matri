@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ColorValue, SafeAreaView, StatusBar, Modal, Alert, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import RazorpayCheckout from 'react-native-razorpay';
 import ImageViewing from 'react-native-image-viewing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ComponentProps } from 'react';
@@ -9,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import styles from '../styles/accountStyles';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
+// Razorpay inline code removed; payment handled via dedicated screen
 
 type IconName = ComponentProps<typeof Feather>['name'];
 import { LinearGradient } from 'expo-linear-gradient';
@@ -137,34 +137,9 @@ const getGalleryImageUrl = (image: string | null | undefined): { primary: string
 };
 
 export default function AccountScreen() {
-  const handlePayNow = async (planId:number) => {
-    try {
-      setLoadingPayment(true);
-      const orderResp = await apiService.createRazorOrder(planId);
-      if(orderResp.status!=='success') throw new Error('Order create failed');
-      const { order_id, amount, currency, razorpay_key, plan } = orderResp.data;
-      const options = {
-        key: razorpay_key,
-        amount: amount.toString(),
-        currency,
-        name: '90s Kalyanam',
-        description: plan.name,
-        order_id,
-        prefill: { email: user?.email, contact: user?.mobile },
-        theme: { color: '#DC2626' }
-      };
-      setLoadingPayment(false);
-      RazorpayCheckout.open(options).then(async (data:any)=>{
-        await apiService.verifyRazorPayment({ ...data, plan_id: plan.id });
-        Alert.alert('Success','Plan activated');
-        fetchDashboardData();
-      }).catch(()=>{});
-    } catch(e){
-      setLoadingPayment(false);
-      Alert.alert('Error','Payment failed');
-    }
+  const handlePayNow = (planId:number) => {
+    router.push({ pathname: '/payment', params: { planId: planId.toString() } });
   };
-    const [loadingPayment,setLoadingPayment]=useState(false);
   const router = useRouter();
   const profileCardRef = useRef<ProfileCardRef>(null);
   const auth = useAuth();
@@ -273,6 +248,7 @@ export default function AccountScreen() {
             packageName: prof.plan_name,
             premium: isPrem ? 1 : 0
           });
+          apiProfileLoaded = true;
           // gallery list
           if(Array.isArray(prof.gallery)){
             setGalleryImages(prof.gallery.map((g:any)=>({image:g.url})));
