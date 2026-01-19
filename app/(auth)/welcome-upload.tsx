@@ -17,30 +17,11 @@ export default function WelcomeUploadScreen() {
   const [countryId, setCountryId] = useState<string>('IN');
   const [stateId, setStateId] = useState<string>('');
   const [city, setCity] = useState('');
-  const [countries, setCountries] = useState<{id:string;name:string}[]>([]);
+  const [countries, setCountries] = useState<{id:string;name:string}[]>([{ id: 'IN', name: 'India' }]);
   const [states, setStates] = useState<{id:string;name:string}[]>([]);
   const [cities, setCities] = useState<{id:string;name:string}[]>([]);
 
   
-  // load countries once
-  useEffect(()=>{
-    (async()=>{
-      try{
-        const raw = await apiService.getCountries();
-        const res = raw?.data?.countries ?? raw;
-        console.log('🌍 countries raw =>', res);
-        const arr = Array.isArray(res)
-          ? res.map((c:any)=>({id:String(c.id||c.code||c.key||c), name:String(c.name||c.country||c.label||c)}))
-          : Object.entries(res||{}).map(([id,val]:any)=>{
-          const label = typeof val === 'string' ? val : (val.name||val.country||val);
-          return { id: String(id), name: String(label) };
-        });
-        console.log('🌍 parsed countries =>',arr.length);
-        setCountries(arr);
-      }catch(e){console.warn('countries fetch err',e);}
-    })();
-  },[]);
-
   // Load states when country changes (if API supports filtering)
   useEffect(()=>{
     if(!countryId){setStates([]);setStateId('');return;}
@@ -153,8 +134,7 @@ export default function WelcomeUploadScreen() {
         enabled={false}
         style={[styles.cityInput,{height:50, backgroundColor:'#f0f0f0'}]}
       >
-        <Picker.Item label="Select Country" value="" />
-        {countries.map(c=> <Picker.Item key={c.id} label={c.name} value={c.id} />)}
+        <Picker.Item label="India" value="IN" />
       </Picker>
 
       {/* State Picker */}

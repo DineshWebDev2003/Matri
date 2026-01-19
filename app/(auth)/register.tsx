@@ -107,10 +107,10 @@ export default function RegisterScreen() {
     firstname: '',
     lastname: '',
     email: '',
-    mobile_code: '',
+    mobile_code: '91',
     mobile: '',
-    country_code: '',
-    country: '',
+    country_code: 'IN',
+    country: 'India',
     birth_date: '',
     password: '',
     religion: '',
@@ -505,26 +505,7 @@ export default function RegisterScreen() {
           <View style={styles.formSection}>
             <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>{t('mobile_number')}</Text>
             <View style={[styles.modernInputContainer, { flexDirection: 'row', alignItems: 'center', borderColor: '#DC2626', borderWidth: 2, backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(220, 38, 38, 0.05)' }]}>
-              <Picker
-                mode="dropdown"
-                dropdownIconColor={colors.textPrimary}
-                selectedValue={formData.mobile_code}
-                style={[styles.pickerDial, { color: colors.textPrimary }]}
-                onValueChange={(dialCode) => {
-                  const sel = countries.find((c: any) => String(c.dial_code) === String(dialCode));
-                  setFormData(prev => ({
-                    ...prev,
-                    mobile_code: String(dialCode),
-                    country_code: sel?.country_code || '',
-                    country: sel?.country || '',
-                  }));
-                }}
-              >
-                <Picker.Item label="Select" value="" />
-                {countries.map((c:any) => (
-                  <Picker.Item key={c.country_code} label={`${c.country} (+${c.dial_code})`} value={String(c.dial_code)} />
-                ))}
-              </Picker>
+              <Text style={[styles.pickerDial, { color: colors.textPrimary, paddingHorizontal: 4 }]}>+91</Text>
               <TextInput
                 style={[styles.modernInput, { color: colors.textPrimary, flex: 1, marginLeft: 8 }]} 
                 placeholder="Mobile Number" 

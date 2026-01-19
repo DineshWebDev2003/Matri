@@ -82,6 +82,9 @@ const weights = Array.from({ length: 81 }, (_, i) => ({
   name: `${40 + i} kg`
 }));
 
+// Blood group options
+const bloodGroups = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+
 // Complexion options
 const complexions = [
   { id: 'fair', name: 'Fair', color: '#F5DEB3' },
@@ -188,7 +191,7 @@ export default function ProfileCompletionScreen() {
     smoking_status: '',      // 0/1/2 numeric (no/yes/occasionally)
     drinking_status: '',     // 0/1/2
     caste: '',
-    country: '',
+    country: 'IN',
     state: '',
     city: '',
     zip: '',
@@ -214,7 +217,6 @@ export default function ProfileCompletionScreen() {
     
     // Step 4: Partner Expectation
     partnerGeneralRequirement: '',
-    partnerCountry: '',
     partnerMinAge: '',
     partnerMaxAge: '',
     partnerMinHeight: '',
@@ -462,7 +464,6 @@ export default function ProfileCompletionScreen() {
           numberOfSisters: String(profileData.total_sister ?? profileData.numberOfSisters ?? ''),
           // Partner Expectations
           partnerGeneralRequirement: profileData.requirements || profileData.partnerGeneralRequirement || '',
-          partnerCountry: profileData.country || profileData.partnerCountry || '',
           partnerMinAge: String(profileData.min_age ?? profileData.partnerMinAge ?? ''),
           partnerMaxAge: String(profileData.max_age ?? profileData.partnerMaxAge ?? ''),
           partnerMinHeight: profileData.min_height || profileData.partnerMinHeight || '',
@@ -699,7 +700,6 @@ export default function ProfileCompletionScreen() {
           // Partner Expectation
           stepData = {
             partnerGeneralRequirement: formData.partnerGeneralRequirement,
-            partnerCountry: formData.partnerCountry,
             partnerMinAge: formData.partnerMinAge,
             partnerMaxAge: formData.partnerMaxAge,
             partnerMinHeight: formData.partnerMinHeight,
@@ -955,6 +955,7 @@ export default function ProfileCompletionScreen() {
               <Text style={styles.label}>Country *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
+                  enabled={false}
                   selectedValue={formData.country}
                   onValueChange={(value)=>handleInputChange('country',value)}
                   style={styles.picker}
@@ -1014,23 +1015,24 @@ export default function ProfileCompletionScreen() {
               <FormInput label="Weight *" placeholder="e.g., 70" icon="activity" containerStyle={styles.halfWidth} fieldName="weight" formData={formData} onFieldChange={handleInputChange} />
             </View>
             
-            <FormInput label="Blood Group *" placeholder="Select Blood Group" icon="droplet" fieldName="bloodGroup" formData={formData} onFieldChange={handleInputChange} />
-            
+            {/* Blood Group Dropdown */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Complexion *</Text>
+              <Text style={styles.label}>Blood Group *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
-                  selectedValue={formData.complexion}
-                  onValueChange={(value) => handleInputChange('complexion', value)}
+                  selectedValue={formData.bloodGroup}
+                  onValueChange={(value) => handleInputChange('bloodGroup', value)}
                   style={styles.picker}
                 >
-                  <Picker.Item label="Select Complexion" value="" />
-                  {complexions.map((c) => (
-                    <Picker.Item key={c.id} label={c.name} value={c.id} />
+                  <Picker.Item label="Select Blood Group" value="" />
+                  {bloodGroups.map((bg) => (
+                    <Picker.Item key={bg} label={bg} value={bg} />
                   ))}
                 </Picker>
               </View>
             </View>
+            
+            <FormInput label="Face Colour *" placeholder="e.g., Fair" icon="sun" fieldName="complexion" formData={formData} onFieldChange={handleInputChange} />
             
             <View style={styles.inputContainer}>
               <FormInput label="Eye Color" placeholder="e.g., Brown" icon="eye" fieldName="eyeColor" formData={formData} onFieldChange={handleInputChange} />
@@ -1070,7 +1072,6 @@ export default function ProfileCompletionScreen() {
             <Text style={styles.stepDescription}>What are you looking for?</Text>
             
             <FormInput label="General Requirement" placeholder="e.g., Educated, Family-oriented" icon="file-text" fieldName="partnerGeneralRequirement" formData={formData} onFieldChange={handleInputChange} />
-            <FormInput label="Country" placeholder="Select Country" icon="map-pin" fieldName="partnerCountry" formData={formData} onFieldChange={handleInputChange} />
             <View style={styles.row}>
               <FormInput label="Min Age" placeholder="e.g., 25" icon="user" containerStyle={styles.halfWidth} fieldName="partnerMinAge" formData={formData} onFieldChange={handleInputChange} />
               <FormInput label="Max Age" placeholder="e.g., 30" icon="user" containerStyle={styles.halfWidth} fieldName="partnerMaxAge" formData={formData} onFieldChange={handleInputChange} />
@@ -1089,8 +1090,8 @@ export default function ProfileCompletionScreen() {
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Marital Status" value="" />
-                  {maritalStatusOptions.map((opt) => (
-                    <Picker.Item key={opt.id} label={opt.name} value={opt.name} />
+                  {MARITAL_STATUS.map((status) => (
+                    <Picker.Item key={status.id} label={status.label} value={status.id} />
                   ))}
                 </Picker>
               </View>
@@ -1122,10 +1123,10 @@ export default function ProfileCompletionScreen() {
                     onValueChange={(value) => handleInputChange('partnerSmokingHabits', value)}
                     style={styles.picker}
                   >
-                    <Picker.Item label="Select" value="" />
-                    {smokingHabits.map((opt) => (
-                      <Picker.Item key={opt.id} label={opt.name} value={opt.id} />
-                    ))}
+                    <Picker.Item label="Select One" value="" />
+                    <Picker.Item label="Non-smoker" value="0" />
+                    <Picker.Item label="Smoker" value="1" />
+                    <Picker.Item label="Occasionally" value="2" />
                   </Picker>
                 </View>
               </View>
@@ -1137,10 +1138,10 @@ export default function ProfileCompletionScreen() {
                     onValueChange={(value) => handleInputChange('partnerDrinkingHabits', value)}
                     style={styles.picker}
                   >
-                    <Picker.Item label="Select" value="" />
-                    {drinkingHabits.map((opt) => (
-                      <Picker.Item key={opt.id} label={opt.name} value={opt.id} />
-                    ))}
+                    <Picker.Item label="Select One" value="" />
+                    <Picker.Item label="Non-drinker" value="0" />
+                    <Picker.Item label="Drinker" value="1" />
+                    <Picker.Item label="Occasionally" value="2" />
                   </Picker>
                 </View>
               </View>
