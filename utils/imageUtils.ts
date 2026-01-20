@@ -62,8 +62,13 @@ export const getGalleryImageUrl = (image: string | null | undefined): ImageUrls 
   // If API already returns full URL, still prefer our dev server by filename
   if (trimmedImage.startsWith('http')) {
     const filename = trimmedImage.split('/').pop();
-    const primaryUrl = `${devBase}/${filename}`;
-    return { primary: primaryUrl, fallback: trimmedImage };
+    // ensure production url contains /core/public/ segment
+    let fixedProd = trimmedImage;
+    if(fixedProd.includes('app.90skalyanam.com') && !fixedProd.includes('/core/public/')){
+      fixedProd = fixedProd.replace('app.90skalyanam.com','app.90skalyanam.com/core/public');
+    }
+    const devUrl = `${devBase}/${filename}`;
+    return { primary: fixedProd, fallback: devUrl };
   }
   
   // If it's just a filename, construct URL with LOCAL first

@@ -231,6 +231,10 @@ export default function ProfileDetailScreen() {
                 } else if(url.includes('/user/profile/')){
                   url = url.replace('/user/profile/','/user/gallery/');
                 }
+                // ensure /core/public segment exists for production domain
+                if(url.startsWith('https://app.90skalyanam.com') && !url.includes('/core/public/')){
+                  url = url.replace('app.90skalyanam.com','app.90skalyanam.com/core/public');
+                }
               }
               if(url) list.push(url);
             });

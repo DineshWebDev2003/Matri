@@ -11,6 +11,8 @@ interface ThemeContextType {
   colors: typeof lightColors;
 }
 
+import { Colors } from '../constants/Colors';
+
 const lightColors = {
   // Background
   background: '#FFFFFF',
@@ -28,9 +30,9 @@ const lightColors = {
   inputPlaceholder: '#9CA3AF',
   
   // Buttons
-  primary: '#FFA500',
-  primaryHover: '#FF9500',
-  primaryLight: '#FFE5CC',
+  primary: Colors.light.tint,
+  primaryHover: '#b91c1c',
+  primaryLight: '#FEE2E2',
   
   // Status
   success: '#10B981',
@@ -62,9 +64,9 @@ const darkColors = {
   inputPlaceholder: '#9CA3AF',
   
   // Buttons
-  primary: '#FFA500',
-  primaryHover: '#FF9500',
-  primaryLight: 'rgba(255, 165, 0, 0.2)',
+  primary: Colors.light.tint,
+  primaryHover: '#f87171',
+  primaryLight: 'rgba(220,38,38,0.2)',
   
   // Status
   success: '#10B981',

@@ -54,6 +54,16 @@ const axiosInstance = axios.create({
   }
 });
 
+// Axios instance without /api/mobile prefix for public endpoints
+const ROOT_URL = API_BASE_URL.replace(/\/api\/.*/, '');
+const rootAxios = axios.create({
+  baseURL: ROOT_URL,
+  timeout: 20000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
 
 // Add token to requests automatically - ensure headers object exists
 // Note: Using a promise-based approach to properly handle async token retrieval
@@ -123,6 +133,25 @@ export const apiService = {
     return axiosInstance.get('/user-plan').then(r => r.data);
   },
   api: axiosInstance,
+
+  /**
+   * Get list of Indian states
+   * GET /locations/states -> { "24": "Tamil Nadu", ... }
+   */
+  async getStates(): Promise<Record<string, string>> {
+    const res = await rootAxios.get('/locations/states');
+    return res.data || {};
+  },
+
+  /**
+   * Get cities under a state
+   * GET /locations/cities/{stateId} -> ["Chennai", "Coimbatore", ...]
+   */
+  async getCities(stateId: string): Promise<{ id: string; name: string }[]> {
+    const res = await rootAxios.get(`/locations/cities/${stateId}`);
+    const arr: string[] = res.data || [];
+    return arr.map((name, idx) => ({ id: String(idx), name }));
+  },
 
   // Support Tickets
   async getSupportTickets() {
@@ -298,6 +327,20 @@ export const apiService = {
   postEducationInfo: async (payload:any)=> axiosInstance.post('/profile/education-info', payload),
   postCareerInfo: async (payload:any)=> axiosInstance.post('/profile/career-info', payload),
   postPartnerExpectation: async (payload:any)=> axiosInstance.post('/profile/partner-expectation', payload),
+  // Skip endpoints for each profile-completion step
+  skipBasicInfo: async () => axiosInstance.post('/profile/basic-info/skip'),
+  skipPhysicalAttributes: async () => axiosInstance.post('/profile/physical-attributes/skip'),
+  skipFamilyInfo: async () => axiosInstance.post('/profile/family-info/skip'),
+  skipEducationInfo: async () => axiosInstance.post('/profile/education-info/skip'),
+  skipCareerInfo: async () => axiosInstance.post('/profile/career-info/skip'),
+  skipPartnerExpectation: async () => axiosInstance.post('/profile/partner-expectation/skip'),
+  /**
+   * Complete basic info right after registration (state, city, image)
+   * POST /profile/welcome-basic
+   */
+  completeBasicInfo: async (formData: FormData) => axiosInstance.post('/profile/welcome-basic', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   skipAllProfile: async ()=> axiosInstance.post('/profile/skip-all'),
   getProfileStep: async () => axiosInstance.get('/user/complete-profile'),
   submitProfileStep: async (step: string, data: any) => axiosInstance.post(`/user/complete-profile/${step}`, data),

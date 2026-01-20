@@ -373,13 +373,31 @@ export default function ProfileCompletionScreen() {
         try{
           const citiesRes = await apiService.getCities(formData.state);
           const cityArr = Array.isArray(citiesRes)
-            ? citiesRes.map((name:string,idx:number)=>({id:String(idx), name}))
-            : Object.entries(citiesRes||{}).map(([id,name]:any)=>({id:String(id), name:String(name)}));
+            ? citiesRes.map((itm:any,idx:number)=>{
+                if(typeof itm==='string') return {id:String(idx), name:itm};
+                if(typeof itm==='object') return {id:String(itm.id ?? idx), name:String(itm.name ?? itm.label ?? Object.values(itm)[0] ?? 'Unknown')};
+                return {id:String(idx), name:String(itm)};
+              })
+            : Object.entries(citiesRes||{}).map(([id,val]:any)=>({id:String(id), name:String(val?.name ?? val?.label ?? val)}));
           setCityOptions(cityArr);
         }catch(err){console.warn('cities fetch err',err);}
       })();
     }
   },[formData.state]);
+
+  // Fetch castes when religion changes
+  useEffect(() => {
+    if(formData.religion_id){
+      fetchCastes(formData.religion_id);
+    }
+      // Align existing caste value (name) to id once options loaded
+    if(formData.caste && casteOptions.length){
+      const found = casteOptions.find(c=>c.name.toLowerCase()===String(formData.caste).toLowerCase());
+      if(found && found.id!==formData.caste){
+        setFormData(prev=>({...prev, caste: found.id}));
+      }
+    }
+  }, [formData.religion_id, casteOptions]);
 
   // Fetch castes list by religion id helper
   const fetchCastes = async (religionId:string)=>{
@@ -560,12 +578,8 @@ export default function ProfileCompletionScreen() {
   };
 
   const handleNext = () => {
-    if (currentStep < 6) {
-      setCurrentStep((currentStep + 1) as Step);
-    } else {
-      // Final step, submit
-      handleSubmit();
-    }
+    if (loading) return;
+    handleSubmit();
   };
 
   const handlePrevious = () => {
@@ -583,28 +597,32 @@ export default function ProfileCompletionScreen() {
     setShowSkipConfirm(false);
     setLoading(true);
     try {
-      // Save minimal basic info before skipping
-      const basicData = {
-        firstname: formData.firstname,
-        lastname: formData.lastname,
-        birth_date: formData.birth_date,
-        religion_id: formData.religion_id,
-        gender: formData.gender,
-      };
-      
-      console.log('💾 Saving basic profile before skip:', basicData);
-      const response = await apiService.updateProfile(basicData);
-      
-      if (response.status === 'success') {
-        console.log('✅ Basic profile saved successfully before skip');
+      let skipFn: ()=>Promise<any> = async() => {};
+      switch(currentStep){
+        case 1:
+          skipFn = apiService.skipBasicInfo;break;
+        case 2:
+          skipFn = apiService.skipFamilyInfo;break;
+        case 3:
+          skipFn = apiService.skipEducationInfo;break;
+        case 4:
+          skipFn = apiService.skipCareerInfo;break;
+        case 5:
+          skipFn = apiService.skipPhysicalAttributes;break;
+        case 6:
+          skipFn = apiService.skipPartnerExpectation;break;
+      }
+      console.log('⏭️ Skipping step', currentStep);
+      await skipFn().catch(err=>console.warn('skip step err',err));
+      if(currentStep<6){
+        setCurrentStep((currentStep+1) as Step);
+      }else{
+        router.replace('/(tabs)/index');
       }
     } catch (error) {
-      console.error('⚠️ Error saving basic profile before skip:', error);
-      // Still navigate even if save fails
+      console.error('⚠️ Error skipping basic info:', error);
     } finally {
       setLoading(false);
-      // Navigate to index page
-      router.replace('/(tabs)/index');
     }
   };
 
@@ -618,12 +636,8 @@ export default function ProfileCompletionScreen() {
       
       switch (currentStep) {
         case 1:
-          // Basic Information
+          // Basic Information – payload matches /profile/basic-info API
           stepData = {
-            birth_date: formData.dateOfBirth,
-            gender: formData.gender,
-            religion_id: formData.religion,
-            caste: formData.caste,
             firstname: formData.firstname,
             lastname: formData.lastname,
             birth_date: formData.birth_date,
@@ -642,84 +656,7 @@ export default function ProfileCompletionScreen() {
             state: formData.state,
             city: formData.city,
             zip: formData.zip,
-            smokingHabits: formData.smokingHabits,
-            drinkingHabits: formData.drinkingHabits,
-            maritalStatus: formData.maritalStatus,
-            languages: formData.languages,
-            country: formData.country,
-            state: formData.state,
-            city: formData.city,
-            zip: formData.zip,
           };
-          break;
-        case 2:
-          // Family Information
-          stepData = {
-            fatherName: formData.fatherName,
-            fatherProfession: formData.fatherProfession,
-            fatherContact: formData.fatherContact,
-            motherName: formData.motherName,
-            motherProfession: formData.motherProfession,
-            motherContact: formData.motherContact,
-            numberOfBrothers: formData.numberOfBrothers,
-            numberOfSisters: formData.numberOfSisters,
-          };
-          break;
-        case 3:
-          // Education Information
-          stepData = {
-            institute: educationList.map(e=>e.institute),
-            degree: educationList.map(e=>e.degree),
-            field_of_study: educationList.map(e=>e.fieldOfStudy),
-            start: educationList.map(e=>e.start),
-            end: educationList.map(e=>e.end),
-          };
-          break;
-        case 4:
-          // Career Information
-          stepData = {
-            company: careerList.map(c=>c.company),
-            designation: careerList.map(c=>c.designation),
-            start: careerList.map(c=>c.start),
-            end: careerList.map(c=>c.end),
-          };
-          break;
-        case 5:
-          // Physical Attributes
-          stepData = {
-            height: formData.height,
-            weight: formData.weight,
-            bloodGroup: formData.bloodGroup,
-            eyeColor: formData.eyeColor,
-            hairColor: formData.hairColor,
-            complexion: formData.complexion,
-            disability: formData.disability,
-          };
-          break;
-        case 6:
-          // Partner Expectation
-          stepData = {
-            partnerGeneralRequirement: formData.partnerGeneralRequirement,
-            partnerMinAge: formData.partnerMinAge,
-            partnerMaxAge: formData.partnerMaxAge,
-            partnerMinHeight: formData.partnerMinHeight,
-            partnerMaxHeight: formData.partnerMaxHeight,
-            partnerMaritalStatus: formData.partnerMaritalStatus,
-            partnerReligion: formData.partnerReligion,
-            partnerComplexion: formData.partnerComplexion,
-            partnerSmokingHabits: formData.partnerSmokingHabits,
-            partnerDrinkingHabits: formData.partnerDrinkingHabits,
-            partnerSpokenLanguages: formData.partnerSpokenLanguages,
-            partnerEducation: formData.partnerEducation,
-            partnerProfession: formData.partnerProfession,
-            partnerFinancialCondition: formData.partnerFinancialCondition,
-            partnerFamilyValues: formData.partnerFamilyValues,
-          };
-          break;
-      }
-      
-      // Log payload then submit the current step using explicit endpoint helpers
-      console.log('📦 Payload for step', currentStep, stepData);
       let response: any = { status: 'error' };
       switch (currentStep) {
         case 1:
@@ -756,6 +693,7 @@ export default function ProfileCompletionScreen() {
       } else {
         Alert.alert('Error', response.message?.error?.[0] || 'Failed to submit step. Please try again.');
       }
+    }
     } catch (error: any) {
       console.error('❌ Error submitting profile step:', error);
       Alert.alert('Error', error.message || 'Failed to submit step. Please try again.');
@@ -771,7 +709,7 @@ export default function ProfileCompletionScreen() {
       case 1:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Basic Information</Text>
+            <Text style={[styles.stepTitle,{ color: colors.primary }]}>Basic Information</Text>
             <Text style={styles.stepDescription}>Complete your basic details</Text>
 
             {/* Names */}
@@ -799,7 +737,7 @@ export default function ProfileCompletionScreen() {
                 style={[styles.input, { justifyContent: 'center' }]}
                 onPress={() => setShowDatePicker(true)}
               >
-                <Text style={{ color: formData.birth_date ? colors.textPrimary : '#6B7280' }}>
+                <Text style={{ color: formData.birth_date ? colors.textPrimary : colors.textSecondary }}>
                   {formData.birth_date || 'Select your date of birth'}
                 </Text>
               </TouchableOpacity>
@@ -932,14 +870,21 @@ export default function ProfileCompletionScreen() {
                 </Picker>
               </View>
             </View>
-            <FormInput 
-              label="Caste" 
-              placeholder="Your Caste" 
-              icon="users"
-              fieldName="caste"
-              formData={formData}
-              onFieldChange={handleInputChange}
-            />
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Caste *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={String(casteOptions.find(c=>String(c.id)===String(formData.caste) || c.name===formData.caste)?.id ?? formData.caste ?? '')}
+                  onValueChange={(value) => handleInputChange('caste', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Caste" value="" />
+                  {casteOptions.map((c) => (
+                    <Picker.Item key={c.id} label={c.name} value={c.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
             <FormInput 
               label="Spoken Languages *" 
               placeholder="e.g., English, Tamil" 
@@ -956,8 +901,8 @@ export default function ProfileCompletionScreen() {
               <View style={styles.pickerContainer}>
                 <Picker
                   enabled={false}
-                  selectedValue={formData.country}
-                  onValueChange={(value)=>handleInputChange('country',value)}
+                  selectedValue={countryOptions.find(c => c.id === formData.country || c.name === formData.country)?.id ?? formData.country}
+                  onValueChange={(value) => handleInputChange('country', value)}
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Country" value="" />
@@ -1007,7 +952,7 @@ export default function ProfileCompletionScreen() {
       case 5:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Physical Attributes</Text>
+            <Text style={[styles.stepTitle,{ color: colors.primary }]}>Physical Attributes</Text>
             <Text style={styles.stepDescription}>Tell us about your physical characteristics</Text>
             
             <View style={styles.row}>
@@ -1049,7 +994,7 @@ export default function ProfileCompletionScreen() {
       case 2:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Family Information</Text>
+            <Text style={[styles.stepTitle,{ color: colors.primary }]}>Family Information</Text>
             <Text style={styles.stepDescription}>Tell us about your family</Text>
             
             <FormInput label="Father's Name *" placeholder="Father's Name" icon="user" fieldName="fatherName" formData={formData} onFieldChange={handleInputChange} />
@@ -1068,7 +1013,7 @@ export default function ProfileCompletionScreen() {
       case 6:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Partner Expectation</Text>
+            <Text style={[styles.stepTitle,{ color: colors.primary }]}>Partner Expectation</Text>
             <Text style={styles.stepDescription}>What are you looking for?</Text>
             
             <FormInput label="General Requirement" placeholder="e.g., Educated, Family-oriented" icon="file-text" fieldName="partnerGeneralRequirement" formData={formData} onFieldChange={handleInputChange} />
@@ -1157,7 +1102,7 @@ export default function ProfileCompletionScreen() {
       case 4:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Career Information</Text>
+            <Text style={[styles.stepTitle,{ color: colors.primary }]}>Career Information</Text>
             <Text style={styles.stepDescription}>Add your career history (multiple allowed)</Text>
             {careerList.map((job, idx)=>(
               <View key={idx} style={{ marginBottom:20 }}>
@@ -1186,7 +1131,7 @@ export default function ProfileCompletionScreen() {
       case 3:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Education Information</Text>
+            <Text style={[styles.stepTitle,{ color: colors.primary }]}>Education Information</Text>
             <Text style={styles.stepDescription}>Add your education details (multiple allowed)</Text>
 
             {educationList.map((edu, idx) => (
@@ -1224,7 +1169,7 @@ export default function ProfileCompletionScreen() {
       <ScrollView contentContainerStyle={styles.container} style={{ backgroundColor: colors.background }}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Complete Your Profile</Text>
+          <Text style={[styles.headerTitle, { color: colors.primary }]}>Complete Your Profile</Text>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Step {currentStep} of 6</Text>
         </View>
 
@@ -1350,6 +1295,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressBarActive: {
+    backgroundColor: Colors.light.tint,
     backgroundColor: Colors.light.tint,
   },
   stepContent: {

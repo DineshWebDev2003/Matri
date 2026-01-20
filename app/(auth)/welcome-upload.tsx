@@ -22,50 +22,31 @@ export default function WelcomeUploadScreen() {
   const [cities, setCities] = useState<{id:string;name:string}[]>([]);
 
   
-  // Load states when country changes (if API supports filtering)
-  useEffect(()=>{
-    if(!countryId){setStates([]);setStateId('');return;}
-    (async ()=>{
-      try{
-        let res: any;
-        if (apiService.getStates) {
-          try {
-            res = await apiService.getStates(countryId);
-          } catch { /* ignore */ }
-          if (!res) {
-            // fallback to generic states list
-            try { res = await apiService.getStates(); } catch { /* ignore */ }
-          }
-          if (!res) {
-            // final fallback via dropdown options
-            try {
-              const drop = await apiService.getDropdownOptions();
-              res = drop?.data?.states ?? drop?.states;
-            } catch {/* ignore */ }
-          }
-        } else {
-          res = await apiService.request?.(`/get-states/${countryId}`);
-        }
-        console.log('🏳️ states raw =>', res);
-        const data = (res?.data?.states ?? res) || {};
-        const arr = Array.isArray(data)
-          ? data.map((s:any)=>({id:String(s.id||s.code||s.key||s), name:String(s.name||s.state||s.label||s)}))
-          : Object.entries(data).map(([id,name]:any)=>({id:String(id),name:String((name?.name)||name)}));
+  // Load states once (country is fixed to India)
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await apiService.getStates();
+        const arr = Array.isArray(raw)
+          ? raw
+          : Object.entries(raw).map(([id,name]:any)=>({id:String(id), name:String((name as any).name ?? name)}));
         setStates(arr);
-      }catch(e){console.warn('states fetch err',e);}
+      } catch (e) {
+        console.warn('states fetch err', e);
+      }
     })();
-  },[countryId]);
+  }, []);
 
-  // load cities when state changes
-  useEffect(()=>{
-    if(!stateId){setCities([]);setCity('');return;}
-    (async()=>{
-      try{
-        const res = apiService.getCities ? await apiService.getCities(stateId) : await apiService.request?.(`/get-cities/${stateId}`);
-        console.log('🏙️ cities raw =>', res);
-        const arr = Object.entries(res||{}).map(([id,name]:any)=>({id:String(id),name:String(name)}));
-        setCities(arr);
-      }catch(e){console.warn('cities fetch err',e);}  
+  // Load cities when state changes
+  useEffect(() => {
+    if (!stateId) { setCities([]); setCity(''); return; }
+    (async () => {
+      try {
+        const res = await apiService.getCities(stateId);
+        setCities(res);
+      } catch (e) {
+        console.warn('cities fetch err', e);
+      }
     })();
   },[stateId]);
   const [imageUri, setImageUri] = useState<string | null>(null);

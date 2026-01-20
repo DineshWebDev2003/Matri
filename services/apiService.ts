@@ -335,13 +335,15 @@ export class APIService {
   }
 
   /**
-   * Get list of states (location)
-   * GET /locations/states
+   * Get list of Indian states
+   * GET /states  -> { "24": "Tamil Nadu", ... }
    */
-  async getStates(): Promise<ApiResponse> {
+  async getStates(): Promise<{ id: string; name: string }[]> {
     try {
-      const response = await this.api.get('/locations/states');
-      return response.data;
+      const response = await this.api.get('/states');
+      // convert object mapping to array of {id,name}
+      const data: Record<string, string> = response.data || {};
+      return Object.entries(data).map(([id, name]) => ({ id, name }));
     } catch (error: any) {
       throw this.handleError(error, 'Failed to fetch states');
     }
