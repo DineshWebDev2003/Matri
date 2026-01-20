@@ -503,7 +503,7 @@ export default function HomeScreen() {
               showProfileImage={true}
               userImage={userInfo?.image}
               onProfilePress={() => router.push('/account')}
-              onMenuPress={() => setFeaturesModalVisible(true)}
+              /* onMenuPress removed to disable popup */
               showFilter={false}
             />
 

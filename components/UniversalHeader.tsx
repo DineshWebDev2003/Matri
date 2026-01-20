@@ -21,11 +21,16 @@ interface UniversalHeaderProps {
   onLeftIconsPress?: ((icon: string) => void)[];
 }
 
-const getProfileImageUrl = (image: string | undefined) => {
-  if (!image) return 'https://via.placeholder.com/40';
-  if (image.startsWith('http')) return image;
-  const mainServerUrl = `https://app.90skalyanam.com/assets/images/user/profile/${image}`;
-  return mainServerUrl;
+const getProfileSource = (image?: string, gender?: string) => {
+  if (!image) {
+    const g = (gender || '').toLowerCase();
+    const isFemale = g === 'female' || g === 'f';
+    return isFemale
+      ? require('../assets/images/default-female.jpg')
+      : require('../assets/images/default-male.jpg');
+  }
+  if (image.startsWith('http')) return { uri: image };
+  return { uri: `https://app.90skalyanam.com/assets/images/user/profile/${image}` };
 };
 
 export default function UniversalHeader({
@@ -99,7 +104,7 @@ export default function UniversalHeader({
             style={styles.profileIconButtonPink}
           >
             <Image
-              source={{ uri: getProfileImageUrl(userImage) }}
+              source={getProfileSource(userImage, auth?.user?.gender)}
               style={styles.profileIconImage}
               onError={() => console.log('Profile image failed to load')}
             />

@@ -999,11 +999,17 @@ export default function ProfileDetailScreen() {
                           setViewerVisible(true);
                         }}
                       >
-                        <Image
-                          source={{ uri: item.image }}
-                          style={styles.photoGridImage}
-                          resizeMode="cover"
-                        />
+                        {(() => {
+                          const { primary, fallback } = getGalleryImageUrl(item.image);
+                          return (
+                            <FallbackImage
+                              source={{ uri: primary || fallback }}
+                              fallbackSource={fallback ? { uri: fallback } : undefined}
+                              style={styles.photoGridImage}
+                              resizeMode="cover"
+                            />
+                          );
+                        })()}
                       </TouchableOpacity>
                     )}
                     keyExtractor={(item, index) => `photo-${index}`}

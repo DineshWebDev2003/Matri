@@ -1143,7 +1143,7 @@ export default function ProfilesScreen() {
           showProfileImage={true}
           userImage={auth?.user?.image}
           onProfilePress={() => router.push('/account')}
-          onMenuPress={() => setMenuModalVisible(true)}
+          /* onMenuPress removed */
           leftIcon="menu"
         />
         

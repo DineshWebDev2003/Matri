@@ -67,8 +67,8 @@ export const getGalleryImageUrl = (image: string | null | undefined): ImageUrls 
     if(fixedProd.includes('app.90skalyanam.com') && !fixedProd.includes('/core/public/')){
       fixedProd = fixedProd.replace('app.90skalyanam.com','app.90skalyanam.com/core/public');
     }
-    const devUrl = `${devBase}/${filename}`;
-    return { primary: fixedProd, fallback: devUrl };
+    const legacyUrl = trimmedImage;
+    return { primary: fixedProd, fallback: legacyUrl };
   }
   
   // If it's just a filename, construct URL with LOCAL first
