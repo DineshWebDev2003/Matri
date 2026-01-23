@@ -13,6 +13,7 @@ import { ThemeProvider as CustomThemeProvider, useTheme } from '../context/Theme
 import { LanguageProvider } from '../context/LanguageContext';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, View, SafeAreaView } from 'react-native';
+import { registerForPushToken } from '../utils/pushNotifications';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -37,6 +38,11 @@ function RootLayoutNav() {
     });
     return () => sub.remove();
   }, []);
+
+  useEffect(() => {
+    registerForPushToken();
+  }, []);
+
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   const { theme } = useTheme();

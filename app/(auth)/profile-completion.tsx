@@ -558,7 +558,7 @@ export default function ProfileCompletionScreen() {
           try {
             setLoading(true);
             await apiService.skipAllProfile();
-            router.replace('/(tabs)');
+            router.replace('/');
           } catch (error) {
             console.error('Error skipping profile:', error);
             Alert.alert('Error', 'Failed to skip profile completion');
@@ -617,7 +617,7 @@ export default function ProfileCompletionScreen() {
       if(currentStep<6){
         setCurrentStep((currentStep+1) as Step);
       }else{
-        router.replace('/(tabs)/index');
+        router.replace('/');
       }
     } catch (error) {
       console.error('⚠️ Error skipping basic info:', error);
@@ -688,7 +688,7 @@ export default function ProfileCompletionScreen() {
         } else {
           // All steps completed
           Alert.alert('Success', 'Profile completed successfully!');
-          router.replace('/(tabs)/index');
+          router.replace('/');
         }
       } else {
         Alert.alert('Error', response.message?.error?.[0] || 'Failed to submit step. Please try again.');

@@ -24,6 +24,7 @@ const settingsMenuItems: { id: string; title: string; icon: IconName; section: s
   { id: '11', title: 'About Us', icon: 'info', section: 'other' },
     { id: '13', title: 'Support Tickets', icon: 'help-circle', section: 'other' },
   { id: '12', title: 'Customer Care', icon: 'phone', section: 'other' },
+  { id: 'logout', title: 'Logout', icon: 'log-out', section: 'other' },
 ];
 
 export default function SettingsScreen() {
@@ -50,7 +51,7 @@ export default function SettingsScreen() {
   const handleMenuItemPress = (item: any) => {
     switch (item.title) {
       case 'Personal Information':
-        Alert.alert('Personal Information', 'Manage your personal details');
+        router.push('/profile-setting');
         break;
       case 'Privacy Centre':
         router.push('/privacy-policy');
@@ -78,6 +79,12 @@ export default function SettingsScreen() {
         break;
       case 'Customer Care':
         setShowContactModal(true);
+        break;
+      case 'Logout':
+        Alert.alert('Logout', 'Are you sure you want to logout?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Logout', style: 'destructive', onPress: () => { logout && logout(); } },
+        ]);
         break;
     }
   };

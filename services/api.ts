@@ -169,14 +169,36 @@ export const apiService = {
     return res.data?.data?.ticket;
   },
 
-  /* Razorpay */
-  createRazorpayOrder(planId: number) {
-    // POST /api/payments/razorpay/order
-    return axiosInstance.post('/payments/razorpay/order', { plan_id: planId }).then(r => r.data);
+  /* Razorpay – uses website payment flow (/api/payments/razorpay) */
+  async createRazorpayOrder(planId: number) {
+    const payload = { plan_id: planId };
+    const token   = await SecureStore.getItemAsync('token');
+
+    // Endpoint lives outside the /api/mobile prefix used by axiosInstance
+    const url = `${ROOT_URL}/api/payments/razorpay/order`;
+
+    const res = await axios.post(url, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      timeout: 20000,
+    });
+    return res.data;
   },
-  verifyRazorpayPayment(payload: any) {
-    // POST /api/payments/razorpay/verify
-    return axiosInstance.post('/payments/razorpay/verify', payload).then(r => r.data);
+
+  async verifyRazorpayPayment({ order_id, payment_id, signature }: { order_id: string; payment_id: string; signature: string; }) {
+    const token = await SecureStore.getItemAsync('token');
+    const url   = `${ROOT_URL}/api/payments/razorpay/verify`;
+
+    const res = await axios.post(url, { order_id, payment_id, signature }, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      timeout: 20000,
+    });
+    return res.data;
   },
 
   // Authentication methods
@@ -338,9 +360,12 @@ export const apiService = {
    * Complete basic info right after registration (state, city, image)
    * POST /profile/welcome-basic
    */
-  completeBasicInfo: async (formData: FormData) => axiosInstance.post('/profile/welcome-basic', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
+  completeBasicInfo: async (formData: FormData) => {
+    const res = await axiosInstance.post('/profile/welcome-basic', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
   skipAllProfile: async ()=> axiosInstance.post('/profile/skip-all'),
   getProfileStep: async () => axiosInstance.get('/user/complete-profile'),
   submitProfileStep: async (step: string, data: any) => axiosInstance.post(`/user/complete-profile/${step}`, data),
@@ -440,7 +465,18 @@ export const apiService = {
 
   createRazorOrder: async (planId: number) => {
     try {
-      const response = await axiosInstance.post('../payments/razorpay/order', { plan_id: planId });
+      const response = await axiosInstance.post('/razorpay/order', { plan_id: planId });
+      return response.data;
+    } catch (e:any) {
+      if (e.response?.status === 404) {
+        const response = await axiosInstance.post('/razorpay/order', { plan_id: planId });
+        return response.data;
+      }
+      console.error('⚠️ Razor order error', e.message);
+      throw e;
+    }
+    try {
+      const response = await axiosInstance.post('../razorpay/order', { plan_id: planId });
       return response.data;
     } catch (e:any) {
       console.error('⚠️ Razor order error', e.message);
@@ -450,7 +486,18 @@ export const apiService = {
 
   verifyRazorPayment: async (payload:any) => {
     try {
-      const response = await axiosInstance.post('../payments/razorpay/verify', payload);
+      const response = await axiosInstance.post('/razorpay/verify', payload);
+      return response.data;
+    } catch(e:any){
+      if (e.response?.status === 404) {
+        const response = await axiosInstance.post('/razorpay/verify', payload);
+        return response.data;
+      }
+      console.error('⚠️ Razor verify error', e.message);
+      throw e;
+    }
+    try {
+      const response = await axiosInstance.post('../razorpay/verify', payload);
       return response.data;
     } catch(e:any){
       console.error('⚠️ Razor verify error', e.message);

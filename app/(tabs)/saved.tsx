@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Linking } from 'react-native';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, RefreshControl, Image, StatusBar, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -21,6 +20,8 @@ export default function InterestedScreen() {
   const params = useLocalSearchParams();
   const { theme } = useTheme();
   const auth = useAuth();
+  // Determine current user gender (lowercase), default to 'male' if unknown
+  const currentUserGender = (auth?.user?.gender || (auth?.user as any)?.basic_info?.gender || (auth?.user as any)?.basicInfo?.gender || 'male')?.toLowerCase();
   
   const hasFreePackage = (): boolean => {
     const pkgIdUser = auth?.user?.package_id ?? auth?.user?.packageId;
@@ -453,10 +454,17 @@ export default function InterestedScreen() {
 
   // Helper to resolve default avatar
   const getDefaultAvatar = (gender?: string) => {
-    if ((gender || '').toLowerCase() === 'female') {
+    const g = (gender || '').toLowerCase();
+    if (g === 'female') {
       return require('../../assets/images/default-female.jpg');
     }
-    return require('../../assets/images/default-male.jpg');
+    if (g === 'male') {
+      return require('../../assets/images/default-male.jpg');
+    }
+    // If gender unknown, show opposite of current user's gender
+    return currentUserGender === 'male'
+      ? require('../../assets/images/default-female.jpg')
+      : require('../../assets/images/default-male.jpg');
   };
 
   const renderProfile = ({ item }: { item: any }) => {
@@ -630,6 +638,42 @@ export default function InterestedScreen() {
 
   const currentProfiles = getCurrentProfiles();
 
+  // Empty state UI meta (computed without hooks)
+  const emptyStateData = (() => {
+    switch (activeTab) {
+      case 'sent':
+        return {
+          icon: 'send',
+          title: 'No Hearts Sent',
+          description: "You haven't expressed heart in any profiles yet. Start exploring and find your perfect match!",
+        };
+      case 'received':
+        return {
+          icon: 'heart',
+          title: 'No Hearts Received',
+          description: "No one has expressed heart in your profile yet. Keep your profile updated and active!",
+        };
+      case 'ignored':
+        return {
+          icon: 'x-circle',
+          title: 'No Ignored Profiles',
+          description: "You haven't ignored any profiles yet.",
+        };
+      case 'shortlist':
+        return {
+          icon: 'bookmark',
+          title: 'No Shortlisted Profiles',
+          description: "You haven't shortlisted any profiles yet.",
+        };
+      default:
+        return {
+          icon: 'heart',
+          title: 'No Data',
+          description: 'No results to show.',
+        };
+    }
+  })();
+
   return (
     //<WithSwipe toLeft="/(tabs)/profiles" toRight="/(tabs)/chats">
     <View style={[styles.container, themeStyles.container, { flex: 1 }]}>
@@ -657,7 +701,7 @@ export default function InterestedScreen() {
       {/* Premium Upgrade Banner - Only show for non-premium users */}
       {hasFreePackage() && (
         <LinearGradient
-          colors={['#FCA5A5', '#EF4444']}
+          colors={['#D4AF37',"#FFD700", '#B8860B']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.premiumBanner}
@@ -672,10 +716,7 @@ export default function InterestedScreen() {
             </View>
             <TouchableOpacity 
               style={styles.premiumBannerButton}
-              onPress={() => {
-                const url = `https://90skalyanam.com/upgrade?user_id=${auth?.user?.id || ''}`;
-                Linking.openURL(url);
-              }}
+              onPress={() => router.push('/plans') }
             >
               <Text style={styles.premiumBannerButtonText}>Upgrade</Text>
             </TouchableOpacity>
@@ -701,20 +742,17 @@ export default function InterestedScreen() {
           scrollEnabled={true}
         />
       ) : (
-        <View style={styles.emptyContainer}>
+                <View style={styles.emptyContainer}>
           <Feather 
-            name={activeTab === 'sent' ? 'send' : 'heart'} 
+            name={emptyStateData.icon} 
             size={64} 
-            color={Colors.light.icon} 
+            color={theme === 'dark' ? Colors.dark.icon : Colors.light.icon} 
           />
-          <Text style={styles.emptyTitle}>
-            {activeTab === 'sent' ? 'No Hearts Sent' : 'No Hearts Received'}
+          <Text style={[styles.emptyTitle, theme === 'dark' && { color: '#FFFFFF' }]}>
+            {emptyStateData.title}
           </Text>
-          <Text style={styles.emptyText}>
-            {activeTab === 'sent' 
-              ? "You haven't expressed heart in any profiles yet. Start exploring and find your perfect match!"
-              : "No one has expressed heart in your profile yet. Keep your profile updated and active!"
-            }
+          <Text style={[styles.emptyText, theme === 'dark' && { color: Colors.dark.icon }]}>
+            {emptyStateData.description}
           </Text>
           <TouchableOpacity 
             style={styles.browseButton} 

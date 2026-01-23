@@ -16,14 +16,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { getImageUrl } from '../../utils/imageUtils';
 
 // Resolve profile image, accept full URL or filename
-const resolveProfileImage = (img?: string): string | null => {
+type ImgInput = string | { primary?: string|null; fallback?: string|null } | null | undefined;
+const resolveProfileImage = (img?: ImgInput): string | null => {
   if (!img) return null;
-  // Convert insecure http to https when possible
+  // If API already provides structured object
+  if (typeof img === 'object') {
+    const primary = img.primary ?? null;
+    if (primary) return resolveProfileImage(primary);
+    const fallback = img.fallback ?? null;
+    if (fallback) return resolveProfileImage(fallback);
+    return null;
+  }
+  // At this point it's a string
   if (img.startsWith('http://')) return img.replace('http://', 'https://');
   if (img.startsWith('https://')) return img;
   const urls = getImageUrl(img);
-  // Prefer production (https) URL to avoid blocked insecure http images
-  return urls.fallback || urls.primary;
+  return urls.primary || urls.fallback;
 };
 
 export default function ChatsScreen() {
@@ -435,6 +443,11 @@ export default function ChatsScreen() {
     );
   };
 
+  const hasFreePackage = (): boolean => {
+    const pkgId = user?.package_id ?? (user as any)?.packageId;
+    return pkgId === 4;
+  };
+
   const themeStyles = {
     container: theme === 'dark' ? { backgroundColor: '#1A1A1A' } : { backgroundColor: '#FFFFFF' },
     text: theme === 'dark' ? { color: '#FFFFFF' } : { color: '#1A1A2E' },
@@ -476,7 +489,31 @@ export default function ChatsScreen() {
         leftIcon="menu"
       />
 
-      {/* Premium banner removed - all users can now access chat */}
+      {/* Upgrade banner for Free users */}
+      {hasFreePackage() && (
+        <LinearGradient
+          colors={['#D4AF37',"#FFD700", '#B8860B']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.premiumBanner}
+        >
+          <View style={styles.premiumBannerContent}>
+            <View style={styles.premiumBannerText}>
+              <Feather name="lock" size={18} color="white" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.premiumBannerTitle}>Unlock Full Chats</Text>
+                <Text style={styles.premiumBannerSubtitle}>Upgrade to Premium to enjoy unlimited chat</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.premiumBannerButton}
+              onPress={() => router.push('/plans')}
+            >
+              <Text style={styles.premiumBannerButtonText}>Upgrade</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      )}
 
       {/* Active Chats Horizontal Scroll */}
       <View style={[styles.activeChatsContainer, { backgroundColor: theme === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}>

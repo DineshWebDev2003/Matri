@@ -362,6 +362,11 @@ export default function HomeScreen() {
             : require('../../assets/images/default-male.jpg');
 
           // Determine city: prefer city / present_city / city_name / location
+          // Determine if API returned a generic default image placeholder
+          const rawImage = profile.image || profile.profileImage || null;
+          const isApiDefault = rawImage && /default|placeholder|no[-_]image/i.test(rawImage);
+          const profileImage = isApiDefault ? null : rawImage;
+
           const city = profile.city || profile.present_city || profile.city_name || profile.location || null;
 
           // Derive age in years if not provided
@@ -371,7 +376,7 @@ export default function HomeScreen() {
           return {
             id: profile.id || profile.user_id,
             name: profile.name || `${profile.firstname || ''} ${profile.lastname || ''}`.trim(),
-            profileImage: profile.image || profile.profileImage || null,
+            profileImage,
             defaultImage,
             location: city || 'Location N/A',
             age: profile.age || derivedAge,

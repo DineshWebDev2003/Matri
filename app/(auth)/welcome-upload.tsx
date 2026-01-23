@@ -84,7 +84,7 @@ export default function WelcomeUploadScreen() {
       const res = await apiService.completeBasicInfo(formData as any);
       if (res.status === 'success') {
         Alert.alert('Success', 'Profile updated!');
-        router.replace('/(tabs)/index');
+        router.replace('/');
       } else {
         throw new Error(res.message || 'Upload failed');
       }
@@ -113,7 +113,7 @@ export default function WelcomeUploadScreen() {
         selectedValue={countryId}
         onValueChange={(v)=>setCountryId(String(v))}
         enabled={false}
-        style={[styles.cityInput,{height:50, backgroundColor:'#f0f0f0'}]}
+        style={[styles.cityInput, {height: 50, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary}]}
       >
         <Picker.Item label="India" value="IN" />
       </Picker>
@@ -122,7 +122,7 @@ export default function WelcomeUploadScreen() {
       <Picker
         selectedValue={stateId}
         onValueChange={(v)=>setStateId(String(v))}
-        style={[styles.cityInput,{height:50}]}
+        style={[styles.cityInput, {height: 50, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary}]}
       >
         <Picker.Item label="Select State" value="" />
         {states.map(s=> <Picker.Item key={s.id} label={s.name} value={s.id} />)}
@@ -132,7 +132,7 @@ export default function WelcomeUploadScreen() {
       <Picker
         selectedValue={city}
         onValueChange={(v)=>setCity(String(v))}
-        style={[styles.cityInput,{height:50}]}
+        style={[styles.cityInput, {height: 50, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary}]}
         enabled={!!stateId && cities.length>0}
       >
         <Picker.Item label={stateId? (cities.length? 'Select City':'Loading...') :'Select State first'} value="" />

@@ -91,6 +91,10 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
       profileImage = `${imageBaseUrl}/${cleanImageName}`;
     }
   }
+  // Ignore generic placeholders from API
+  if (profileImage && /default|placeholder|no[-_]image/i.test(profileImage)) {
+    profileImage = null;
+  }
   
   // Get package info
   const packageName = item?.packageName || item?.package_name || 'FREE MATCH';
@@ -99,13 +103,13 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
     if (!name) return { bg: '#E5E7EB', text: '#374151' };
     const upper = name.toUpperCase();
     if (upper.includes('PREMIUM')) {
-      return { bg: '#DDD6FE', text: '#6D28D9' }; // light purple bg, deep purple text
+      return { bg: '#D2AF26', text: '#f7f6faff' }; // light purple bg, deep purple text
     }
     if (upper.includes('BASIC')) {
-      return { bg: '#FEF9C3', text: '#D97706' }; // light gold bg, gold text
+      return { bg: '#f36d14ff', text: '#ffffffff' }; // light gold bg, gold text
     }
     if (upper.includes('PLATINUM') || upper.includes('ELITE')) {
-      return { bg: '#DBEAFE', text: '#2563EB' }; // light blue bg, blue text
+      return { bg: '#1b8be7ff', text: '#2563EB' }; // light blue bg, blue text
     }
     if (upper.includes('FREE')) {
       return { bg: '#E5E7EB', text: '#374151' }; // gray bg/text
@@ -130,7 +134,7 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
   
   const getCardBorderColor = () => {
     if (packageName.includes('PREMIUM') || packageName.includes('PRO')) {
-      return '#8B5CF6'; // Purple
+      return '#D2AF26'; // Purple
     } else if (packageName.includes('GOLD')) {
       return '#F59E0B'; // Orange
     } else if (packageName.includes('SILVER')) {
@@ -138,7 +142,7 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
     } else if (packageName.includes('PLATINUM')) {
       return '#3B82F6'; // Blue
     }
-    return '#E5E7EB'; // Light gray - Default
+    return '#f36d14ff'; // Light gray - Default
   };
   
   const getCrownColor = () => {
@@ -167,14 +171,16 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
     return 'rgba(99, 102, 241, 0.15)';
   };
   
-  const cardWidth = isHorizontal ? 200 : (screenWidth - 48) / 2;
+  const SIDE_MARGIN = 8; // left & right margin
+  const GRID_GAP = 12; // space between two cards
+  const cardWidth = isHorizontal ? 200 : (screenWidth - (SIDE_MARGIN * 2 + GRID_GAP)) / 2;
   const cardStyle = isHorizontal ? styles.horizontalCard : styles.gridCard;
   const gradientColors = getGradientColors();
   const cardBorderColor = getCardBorderColor();
   
   return (
     <TouchableOpacity 
-      style={[cardStyle, { width: cardWidth, borderColor: cardBorderColor }]} 
+      style={[cardStyle, { width: cardWidth, borderColor: cardBorderColor, marginHorizontal: GRID_GAP / 2 }]} 
       onPress={onPress}
       activeOpacity={0.9}
     >
@@ -201,10 +207,10 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
         {/* Profile Info - Bottom Left */}
         <View style={styles.profileInfoOverlay}>
           <View style={styles.nameAgeRow}>
-            <Text style={styles.profileNameText} numberOfLines={1}>
+                        <Text style={styles.profileNameText} numberOfLines={1}>
               {profileName}
             </Text>
-            <Text style={styles.profileAgeText}>,{age}</Text>
+            <Text style={styles.profileAgeText}>Age {age}</Text>
           </View>
           <View style={styles.locationRow}>
             <Feather name="map-pin" size={12} color="rgba(255,255,255,0.9)" />
@@ -226,7 +232,7 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
         >
           <Feather 
             name={isInterested ? 'heart' : 'heart'} 
-            size={18} 
+            size={25} 
             color={isInterested ? '#DC2626' : '#FFC5C5'}
             fill={isInterested ? '#DC2626' : '#FFC5C5'}
           />
@@ -1655,7 +1661,7 @@ const styles = StyleSheet.create({
   backButton: {
     width: 40,
     height: 40,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   headerTitle: { 
@@ -1672,7 +1678,7 @@ const styles = StyleSheet.create({
   actionButton: {
     width: 40,
     height: 40,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginLeft: 4,
   },
@@ -1690,7 +1696,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     height: 45,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#DC2626',
   },
   searchIcon: {
     marginRight: 10,
@@ -1736,23 +1742,24 @@ const styles = StyleSheet.create({
   },
   // Grid Styles
   allMatchGrid: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 8,
     paddingBottom: 20,
   },
   gridRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+        marginBottom: 10,
   },
   // Horizontal Layout Styles
   horizontalScrollContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 8,
     paddingRight: 40,
   },
   horizontalCard: {
     backgroundColor: 'white',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#DC2626',
     shadowColor: Colors.light.tint,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -1764,7 +1771,9 @@ const styles = StyleSheet.create({
   },
   gridCard: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#DC2626',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1772,26 +1781,61 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     marginBottom: 0,
-    height: 240,
+    height: 200,
+    backgroundColor: 'white',
+    borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: '#DC2626',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 0,
+    height: 200,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#DC2626',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 0,
+    height: 200,
+    borderWidth: 2,
+    borderColor: '#DC2626',
   },
   imageContainer: {
     position: 'relative',
     width: '100%',
     height: '100%',
     overflow: 'hidden',
-    borderRadius: 8,
+    borderRadius: 16,
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    borderRadius: 16,
   },
   profileImageHorizontal: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 16,
   },
   profileImageGrid: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 16,
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
   },
   avatarTextGrid: {
     fontSize: 48,
@@ -1807,7 +1851,7 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1837,9 +1881,9 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   nameAgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    rowGap: 0,
     marginBottom: 3,
   },
   profileNameText: {
@@ -1849,7 +1893,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   profileAgeText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
     color: 'white',
   },
@@ -1930,7 +1974,7 @@ const styles = StyleSheet.create({
     left: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 16,
     backgroundColor: '#DC2626',
     zIndex: 9,
     shadowColor: '#000',
@@ -1968,7 +2012,7 @@ const styles = StyleSheet.create({
     bottom: 12,
     right: 12,
     zIndex: 10,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   heartIconGrid: {
@@ -1982,7 +2026,7 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -2001,7 +2045,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignItems: 'center',
   },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
+  loadingContainer: { flex: 1, justifyContent: 'space-between', alignItems: 'center', paddingTop: 50 },
   loadingText: { marginTop: 10, fontSize: 16, color: Colors.light.icon },
   emptyStateSubtext: { marginTop: 8, fontSize: 14, color: Colors.light.icon, opacity: 0.7, textAlign: 'center' },
   filterButton: { backgroundColor: '#f0f0f0', padding: 12, borderRadius: 10, marginLeft: 8 },
@@ -2012,7 +2056,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', 
-    justifyContent: 'center', 
+    justifyContent: 'space-between', 
     alignItems: 'center',
     zIndex: 1000
   },
@@ -2031,17 +2075,17 @@ const styles = StyleSheet.create({
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.light.text },
-  closeButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 20, backgroundColor: '#F3F4F6' },
+  closeButton: { width: 40, height: 40, justifyContent: 'space-between', alignItems: 'center', borderRadius: 20, backgroundColor: '#F3F4F6' },
   modalContent: { maxHeight: '70%', paddingVertical: 10 },
   modalFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
   filterSection: { marginBottom: 20 },
   filterLabel: { fontSize: 16, fontWeight: '600', color: Colors.light.text, marginBottom: 8 },
-  filterInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#F9F9F9' },
+  filterInput: { borderWidth: 1, borderColor: '#DC2626', borderRadius: 16, padding: 12, fontSize: 16, backgroundColor: '#F9F9F9' },
   rangeContainer: { flexDirection: 'row', alignItems: 'center' },
   rangeInput: { flex: 1, marginHorizontal: 5 },
   rangeSeparator: { marginHorizontal: 10, color: Colors.light.icon },
   pickerContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  religionOption: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9F9F9' },
+  religionOption: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#DC2626', backgroundColor: '#F9F9F9' },
   religionOptionSelected: { backgroundColor: Colors.light.tint, borderColor: Colors.light.tint },
   religionOptionText: { color: Colors.light.text, fontSize: 14 },
   religionOptionTextSelected: { color: 'white', fontWeight: '600' },
@@ -2061,7 +2105,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     gap: 6,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
   filterTab: {
     paddingHorizontal: 12,
@@ -2070,7 +2114,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     marginRight: 2,
     height: 30,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   filterTabActive: {
@@ -2089,13 +2133,14 @@ const styles = StyleSheet.create({
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    justifyContent: 'center',
+    paddingLeft: 0,
+    paddingRight: 8,
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingBottom: 16,
     paddingTop: 8,
     minHeight: 'auto',
-    gap: 8,
+    gap: 12,
   },
   gridItem: {
     width: '48%',
@@ -2103,13 +2148,13 @@ const styles = StyleSheet.create({
   },
   emptyStateContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 40,
   },
   // New Matches Section Styles
   newMatchesScrollContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingRight: 40,
   },
   newMatchCard: {
@@ -2132,7 +2177,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 35,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   newMatchAvatarText: {
@@ -2177,7 +2222,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 16,
   },
   sliderContainer: {
     marginBottom: 16,
@@ -2200,7 +2245,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#DC2626',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,

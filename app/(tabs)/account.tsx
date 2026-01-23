@@ -58,7 +58,6 @@ const FallbackImage = ({
 };
 
 const quickActionItems: { id: string; title: string; icon: IconName; color: string; bgColor: string }[] = [
-  { id: '1', title: 'Edit Profile', icon: 'edit-3', color: '#DC2626', bgColor: '#FEE2E2' },
   { id: '2', title: 'Complete Profile', icon: 'check-circle', color: '#8B5CF6', bgColor: '#EDE9FE' },
 ];
 
@@ -88,6 +87,10 @@ const menuItems: { id: string; title: string; icon: IconName }[] = [
 // Helper function to construct image URL with fallback
 // Primary: Local IP server, Fallback: 90skalyanam.com
 const getImageUrl = (image: string | null | undefined): { primary: string | null; fallback: string | null } => {
+  // Treat empty or generic placeholder images as no image
+  if (!image || typeof image !== 'string' || image.trim() === '' || /default|placeholder|no[-_]image/i.test(image)) {
+    return { primary: null, fallback: null };
+  }
   if (!image || typeof image !== 'string' || image.trim() === '') {
     return { primary: null, fallback: null };
   }
@@ -114,6 +117,9 @@ const getImageUrl = (image: string | null | undefined): { primary: string | null
 // Helper function to construct gallery image URL with fallback
 // Primary: Local IP server, Fallback: 90skalyanam.com
 const getGalleryImageUrl = (image: string | null | undefined): { primary: string | null; fallback: string | null } => {
+  if (!image || typeof image !== 'string' || image.trim() === '' || /default|placeholder|no[-_]image/i.test(image)) {
+    return { primary: null, fallback: null };
+  }
   if (!image || typeof image !== 'string' || image.trim() === '') {
     return { primary: null, fallback: null };
   }
@@ -137,6 +143,8 @@ const getGalleryImageUrl = (image: string | null | undefined): { primary: string
 };
 
 export default function AccountScreen() {
+  const { user } = useAuth();
+
   const handlePayNow = (planId:number) => {
     router.push({ pathname: '/payment', params: { planId: planId.toString() } });
   };
@@ -146,11 +154,18 @@ export default function AccountScreen() {
   const { theme, setThemeMode } = useTheme();
   const { language, setLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
-  const user = auth?.user;
   const limitation = auth?.limitation;
   const logout = auth?.logout;
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  // Determine default image based on gender after userProfile is available
+  const defaultProfileImg = React.useMemo(() => {
+    const g = (userProfile?.gender || user?.gender || '').toString().trim().toLowerCase();
+    const isFemale = g === 'female' || g === 'f';
+    return isFemale
+      ? require('../../assets/images/default-female.jpg')
+      : require('../../assets/images/default-male.jpg');
+  }, [userProfile?.gender, user?.gender]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -159,6 +174,15 @@ export default function AccountScreen() {
   const [galleryImages, setGalleryImages] = useState<any[]>([]);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+    // Resolve profile image URL regardless of object or string shape
+  const profileImageUrl = (() => {
+    if (!userProfile?.image) return null;
+    if (typeof userProfile.image === 'string') return userProfile.image;
+    if (typeof userProfile.image === 'object' && userProfile.image.primary) return userProfile.image.primary;
+    return null;
+  })();
+
+  const isValidProfileImage = !!profileImageUrl && !/default|placeholder|no[-_]image/i.test(profileImageUrl);
   // Remaining uploads based on gallery images count (UI authoritative)
   const MAX_GALLERY_IMAGES = 4;
   // Prepare images for ImageViewing component
@@ -246,7 +270,8 @@ export default function AccountScreen() {
             id: prof.id,
             packageId: prof.plan_name,
             packageName: prof.plan_name,
-            premium: isPrem ? 1 : 0
+            premium: isPrem ? 1 : 0,
+            gender: prof.gender
           });
           apiProfileLoaded = true;
           // gallery list
@@ -305,6 +330,7 @@ export default function AccountScreen() {
         setUserProfile({
           firstname: user.firstname,
           lastname: user.lastname,
+          gender: user.gender,
           profile_id: user.profile_id,
           image: imageUrl,
           id: user.id,
@@ -643,7 +669,8 @@ export default function AccountScreen() {
         {/* Premium Upgrade Banner - Only show for non-premium users */}
         {userProfile && (String(userProfile.packageName || '').toUpperCase().includes('FREE')) && (
           <LinearGradient
-            colors={['#FCA5A5', '#EF4444']}
+                      colors={['#D4AF37',"#FFD700", '#B8860B']}
+
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.premiumBannerTop}
@@ -700,31 +727,24 @@ export default function AccountScreen() {
           >
             {/* Profile Image - Large Circle */}
             <View style={styles.profileImageLarge}>
-              {userProfile?.image && typeof userProfile.image === 'object' && userProfile.image.primary ? (
+              {isValidProfileImage ? (
                 <>
-                <FallbackImage 
-                  source={{ uri: userProfile.image.primary }} 
-                  fallbackSource={userProfile.image.fallback ? { uri: userProfile.image.fallback } : undefined}
-                  style={styles.profileImageLargeImg}
-                />
-                {/* Crown Icon */}
-                {userProfile?.premium && (
-                  <View style={[styles.crownOverlay, { backgroundColor: getCrownColor(userProfile.packageName)+'30' }]}> 
-                    <MaterialCommunityIcons name="crown" size={18} color={getCrownColor(userProfile.packageName)} />
-                  </View>
-                )}
-              </>
+                  <FallbackImage 
+                    source={{ uri: profileImageUrl }} 
+                    style={styles.profileImageLargeImg}
+                  />
+                  {userProfile?.premium && (
+                    <View style={[styles.crownOverlay, { backgroundColor: getCrownColor(userProfile.packageName)+'30' }]}> 
+                      <MaterialCommunityIcons name="crown" size={18} color={getCrownColor(userProfile.packageName)} />
+                    </View>
+                  )}
+                </>
               ) : (
-                <LinearGradient
-                  colors={['#FF6B6B', '#4ECDC4', '#45B7D1']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
+                <Image
+                  source={defaultProfileImg}
                   style={styles.profileImageLargeImg}
-                >
-                  <Text style={styles.avatarTextXL}>
-                    {userProfile?.firstname?.charAt(0)?.toUpperCase() || 'U'}
-                  </Text>
-                </LinearGradient>
+                  resizeMode="cover"
+                />
               )}
               <TouchableOpacity 
                 style={styles.cameraIconLarge} 
@@ -786,7 +806,7 @@ export default function AccountScreen() {
               onPress={() => router.push('/profile-setting')}
             >
               <Feather name="edit-3" size={18} color="white" style={{ marginRight: 8 }} />
-              <Text style={[styles.actionButtonText, { color: 'white' }]}>Edit </Text>
+              <Text style={[styles.actionButtonText, { color: 'white' }]}>Edit Profile </Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -803,41 +823,15 @@ export default function AccountScreen() {
               }]}
               onPress={() => router.push(`/profile/${user?.id}`)}
             >
-              <Feather name="eye" size={18} color="#3B82F6" style={{ marginRight: 8 }} />
+              <Feather name="eye" size={18} color="#f50c0cff" style={{ marginRight: 8 }} />
               <Text style={[{
                 fontSize: 16,
                 fontWeight: '500',
-                color: '#3B82F6',
-              }]}> Profile</Text>
+                color: '#fc0808ff',
+              }]}>my Profile</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[{
-                flex: 1,
-                flexDirection: 'row',
-                justifyContent: 'center',
-                alignItems: 'center',
-                paddingVertical: 10,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: theme === 'dark' ? '#3A3A3A' : '#FEE2E2',
-                backgroundColor: theme === 'dark' ? '#2A2A2A' : '#FEF2F2',
-              }]}
-              onPress={() => {
-                Alert.alert('Logout', 'Are you sure you want to logout?', [
-                  { text: 'Cancel', onPress: () => {} },
-                  { text: 'Logout', onPress: () => logout?.(), style: 'destructive' }
-                ]);
-              }}
-            >
-              <Feather name="log-out" size={18} color="#DC2626" style={{ marginRight: 8 }} />
-              <Text style={[{
-                fontSize: 16,
-                fontWeight: '500',
-                color: '#DC2626',
-              }]}>Logout</Text>
-            </TouchableOpacity>
-          </View>
+                      </View>
         </View>
 
 

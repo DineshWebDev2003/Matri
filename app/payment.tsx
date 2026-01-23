@@ -20,7 +20,8 @@ export default function PaymentScreen() {
       const resp = await apiService.createRazorpayOrder(Number(id));
       if (resp.status !== 'success') throw new Error('Order creation failed');
 
-      const { order_id, amount, currency, key } = resp.data; // backend should send these
+      const { order_id, amount, currency, razorpay_key } = resp.data;
+      const key = razorpay_key || resp.data.key || '';
 
       const options = {
         description: 'Plan purchase',
@@ -34,11 +35,18 @@ export default function PaymentScreen() {
 
       RazorpayCheckout.open(options)
         .then(async (data: any) => {
+          // Razorpay returns: razorpay_payment_id, razorpay_order_id, razorpay_signature
+          const payload = {
+            order_id: order_id, // our original order id
+            payment_id: data.razorpay_payment_id,
+            signature: data.razorpay_signature,
+          };
           try {
-            await apiService.verifyRazorpayPayment({ order_id, ...data });
+            await apiService.verifyRazorpayPayment(payload);
             Alert.alert('Success', 'Payment completed');
             router.back();
           } catch (e) {
+            console.warn('🔴 Verification error', e);
             Alert.alert('Verification failed', 'Payment captured but verification failed');
           }
         })
@@ -46,9 +54,10 @@ export default function PaymentScreen() {
           Alert.alert('Cancelled', 'Payment not completed');
           router.back();
         });
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Unable to start payment');
+    } catch (e: any) {
+      console.error('⚠️ createRazorpayOrder error', e.response?.data || e.message);
+      const msg = e.response?.data?.message || e.response?.data?.error || e.message || 'Unable to start payment';
+      Alert.alert('Error', msg);
       router.back();
     } finally {
       setLoading(false);

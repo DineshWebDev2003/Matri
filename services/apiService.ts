@@ -542,6 +542,23 @@ export class APIService {
   }
 
   // ========================================================================
+  // PUSH NOTIFICATION ENDPOINTS
+  // ========================================================================
+
+  /**
+   * Register or update Expo push token for the current user
+   * POST /device-token
+   */
+  async savePushToken(token: string): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/device-token', { token });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to save push token');
+    }
+  }
+
+  // ========================================================================
   // CHAT/CONVERSATION ENDPOINTS
   // ========================================================================
 

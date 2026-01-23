@@ -247,6 +247,7 @@ import { Colors } from '../../constants/Colors';
     marginBottom: 30,
   },
   browseButton: {
+    marginTop: 10,
     backgroundColor: Colors.light.tint,
     paddingHorizontal: 30,
     paddingVertical: 12,
@@ -292,6 +293,7 @@ import { Colors } from '../../constants/Colors';
     color: 'white',
   },
   emptyText: {
+    marginBottom: 24,
     fontSize: 16,
     color: Colors.light.icon,
     textAlign: 'center',
