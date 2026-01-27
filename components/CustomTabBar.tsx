@@ -1,192 +1,141 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Image, useWindowDimensions, Platform, Animated } from 'react-native';
-import { FontAwesome, Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../context/AuthContext';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Platform,
+  Pressable
+} from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { Colors } from '@/constants/Colors';
 
-// Modern matrimony-themed icons with red/black theme
-const ICONS = {
-  index: { name: 'home', type: 'FontAwesome' },
-  profiles: { name: 'users', type: 'FontAwesome' },
-  chats: { name: 'comments', type: 'FontAwesome' },
-  saved: { name: 'heart', type: 'FontAwesome' },
-  account: { name: 'user', type: 'FontAwesome' }, // Profile picture will override this
-};
-
-// Modern matrimony theme colors matching the design
-const THEME_COLORS = {
-  primary: '#DC2626',      // Red theme color
-  secondary: '#EF4444',    // Lighter red
-  background: '#FFFFFF',   // White background
-  cardBg: '#F8F9FA',       // Very light gray
-  inactive: '#9CA3AF',     // Gray for inactive
-  white: '#FFFFFF',
-  black: '#1F2937',        // Dark gray instead of pure black
-  shadow: 'rgba(0, 0, 0, 0.08)', // Very soft shadow
-  redShadow: 'rgba(220, 38, 38, 0.15)', // Red shadow
+const ICONS: any = {
+  index: 'home',
+  profiles: 'users',
+  chats: 'comments',
+  saved: 'heart',
+  account: 'user',
 };
 
 export default function CustomTabBar({ state, descriptors, navigation }: any) {
-  const { width } = useWindowDimensions();
   const { theme } = useTheme();
-  const isTablet = width >= 768;
-  const iconSize = isTablet ? 22 : 18;
-  const iconSizeFocused = isTablet ? 24 : 20;
-  
-  // Dynamic colors based on theme
-  const dynamicColors = {
-    background: theme === 'dark' ? '#1A1A1A' : '#FFFFFF',
-    primary: '#DC2626',
-    inactive: theme === 'dark' ? '#6B7280' : '#E5E7EB',
-    white: theme === 'dark' ? '#FFFFFF' : '#FFFFFF',
-    cardBg: theme === 'dark' ? '#2A2A2A' : '#F8F9FA',
+
+  const COLORS = {
+    background: theme === 'dark' ? '#121212' : '#FFFFFF',
+    indicator: theme === 'dark' ? '#2A1A1A' : '#FCE8E6',
+    active: '#DC2626',
+    inactive: theme === 'dark' ? '#9CA3AF' : '#5F6368',
+    border: theme === 'dark' ? '#2A2A2A' : '#E5E7EB',
+    ripple: 'rgba(220,38,38,0.15)',
   };
-  
-  // Theme-aware solid colors (not transparent)
-  const gradientColors: readonly [string, string, ...string[]] = theme === 'dark' 
-    ? ['#1A1A1A', '#1A1A1A']
-    : ['#FFFFFF', '#FFFFFF'];
 
   return (
-    <View style={[styles.tabBarWrapper, isTablet && styles.tabBarWrapperTablet]}>
-      <LinearGradient
-        colors={gradientColors as any}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={[styles.tabBarContainer, isTablet && styles.tabBarContainerTablet]}
-      >
+    <View style={[styles.wrapper, { backgroundColor: COLORS.background }]}>
+      <View style={[styles.container, { borderTopColor: COLORS.border }]}>
         {state.routes.map((route: any, index: number) => {
           const { options } = descriptors[route.key];
-          const label = options.title !== undefined ? options.title : route.name;
+          const label =
+            options.tabBarLabel ??
+            options.title ??
+            route.name;
+
           const isFocused = state.index === index;
-          const isLast = route.name === 'account';
 
           const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
             if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
           };
 
-          const iconConfig = (ICONS as any)[route.name] || { name: 'circle', type: 'FontAwesome' };
-
-          const renderIcon = () => {
-            const IconComponent = iconConfig.type === 'Ionicons' ? Ionicons : 
-                                iconConfig.type === 'MaterialIcons' ? MaterialIcons : FontAwesome;
-            
-            return (
-              <IconComponent 
-                name={iconConfig.name} 
-                size={isFocused ? iconSizeFocused : iconSize} 
-                color={isFocused ? dynamicColors.primary : dynamicColors.inactive} 
-              />
-            );
-          };
-
           return (
-            <TouchableOpacity
+            <Pressable
               key={route.key}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
               onPress={onPress}
-              style={[
-                styles.tabItem, 
-                isFocused ? styles.tabItemFocused : styles.tabItemUnfocused,
-                isTablet && styles.tabItemTablet
-              ]}
+              android_ripple={{ color: 'transparent' }} // keep whole area clickable
+              style={styles.tabItem}
             >
-              <View style={[styles.iconWrapper, isFocused && styles.iconWrapperFocused]}>
-                {renderIcon()}
+              {/* Indicator with ripple but SAME press handler */}
+              <View
+                style={[
+                  styles.indicator,
+                  isFocused && { backgroundColor: COLORS.indicator },
+                ]}
+              >
+                <Pressable
+                  onPress={onPress}
+                  android_ripple={{ color: COLORS.ripple }}
+                  style={styles.iconPress}
+                >
+                  <FontAwesome
+                    name={ICONS[route.name] || 'circle'}
+                    size={22}
+                    color={isFocused ? COLORS.active : COLORS.inactive}
+                  />
+                </Pressable>
               </View>
-            </TouchableOpacity>
+
+              <Text
+                style={[
+                  styles.label,
+                  { color: isFocused ? COLORS.active : COLORS.inactive },
+                ]}
+              >
+                {label}
+              </Text>
+            </Pressable>
           );
         })}
-      </LinearGradient>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBarWrapper: {
+  wrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 0,
-    paddingBottom: 0,
-    backgroundColor: 'transparent',
-    pointerEvents: 'box-none',
   },
-  tabBarWrapperTablet: {
-    paddingHorizontal: 0,
-    paddingBottom: 0,
-  },
-  tabBarContainer: {
+
+  container: {
     flexDirection: 'row',
-    height: Platform.OS === 'ios' ? 85 : 75,
+    height: Platform.OS === 'ios' ? 70 : 64,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
-    borderRadius: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 10,
+    borderTopWidth: 1,
   },
-  tabBarContainerTablet: {
-    height: Platform.OS === 'ios' ? 80 : 72,
-    borderRadius: 28,
-    paddingHorizontal: 12,
-  },
+
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 25,
-    minHeight: 50,
-    minWidth: 50,
   },
-  tabItemFocused: {
-    backgroundColor: 'transparent',
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  tabItemUnfocused: {
-    backgroundColor: 'transparent',
-  },
-  tabItemTablet: {
-    paddingVertical: 10,
-    minHeight: 56,
-    minWidth: 56,
-  },
-  lastTab: {
-    // Special styling for last tab (account) if needed
-  },
-  iconWrapper: {
-    width: 40,
-    height: 40,
+
+  indicator: {
+    width: 56,
+    height: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: 'transparent',
+    marginBottom: 2,
   },
-  iconWrapperFocused: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+
+  iconPress: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  label: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

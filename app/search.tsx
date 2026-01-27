@@ -49,8 +49,8 @@ export default function SearchScreen() {
     try{
       const res = await dropdowns.religions();
       const relArr = Array.isArray(res)
-        ? res.map((r:any)=>({ id:String(r.id??r.value??r.key??r), name:r.name??r.label??r }))
-        : Object.entries(res||{}).map(([id,val]:any)=>({ id:String(id), name: String(val?.name??val) }));
+        ? res.map((r:any)=>({ label:r.name??r.label??r, value:String(r.id??r.value??r.key??r) }))
+        : Object.entries(res||{}).map(([id,val]:any)=>({ label:String(val?.name??val), value:String(id) }));
       setReligionOptions(relArr);
     }catch(e){console.warn('religion fetch err',e);}}
   )();},[]);
@@ -59,7 +59,15 @@ export default function SearchScreen() {
     setSelectedReligion(id);
     setSelectedCaste('');
     if(id){
-      try{const res=await dropdowns.castes(Number(id));setCasteOptions(res);}catch{setCasteOptions([]);}
+      try {
+        const res = await dropdowns.castes(Number(id));
+        const castArr = Array.isArray(res)
+          ? res.map((c:any)=>({ label:c.name??c.label??c.caste??c.title??String(c), value:String(c.id??c.value??c.key??c) }))
+          : Object.entries(res||{}).map(([cid,val]:any)=>({ label:String(val?.name??val), value:String(cid) }));
+        setCasteOptions(castArr);
+      } catch {
+        setCasteOptions([]);
+      }
     }else{setCasteOptions([]);}
   };
 
@@ -123,6 +131,23 @@ export default function SearchScreen() {
           console.log('⚠️ No profiles found');
           Alert.alert('No Results', `No profiles found matching your ${filterType} search`);
         }
+      } else if(response?.remark==='profile_incomplete'||response?.data?.remark==='profile_incomplete'){
+        console.warn('⏩ Backend blocked search due to incomplete profile. Fallback to generic profiles and client-side filtering');
+        // generic fetch
+        const generic = await apiService.getProfiles({ type: 'all', limit: 200, page:1 });
+        if(generic?.status==='success'&&generic?.data?.profiles){
+          let profiles:any[]=generic.data.profiles;
+          if(filterType==='location'){
+            const q = searchQuery.toLowerCase();
+            profiles=profiles.filter((p:any)=> (p.location||p.city||'').toLowerCase().includes(q));
+          }else if(filterType==='name'){
+            const q=searchQuery.toLowerCase();
+            profiles=profiles.filter((p:any)=> (`${p.firstname||''} ${p.lastname||''}`).toLowerCase().includes(q));
+          }
+          setSearchResults(profiles);
+        }else{
+          setSearchResults([]);
+        }
       } else {
         setSearchResults([]);
         console.log('⚠️ Error response:', response);
@@ -151,8 +176,8 @@ export default function SearchScreen() {
   const renderProfileCard = ({ item }: { item: any }) => {
     const userGender = (item?.gender || '').toLowerCase();
     const defaultImg = userGender === 'female'
-      ? require('../assets/images/default-female.jpg')
-      : require('../assets/images/default-male.jpg');
+      ? require('../assets/images/female_avatar.webp')
+      : require('../assets/images/male_avatar.webp');
 
     const profileName = item?.name || `${item?.firstname || ''} ${item?.lastname || ''}`.trim() || 'User';
     const age = calculateAge(item?.dateOfBirth || item?.dob) || item?.age;
@@ -263,7 +288,7 @@ export default function SearchScreen() {
               style={[styles.searchInputContainer,{height:48}]}
             >
               <Picker.Item label="Select Religion" value="" />
-              {religionOptions.map(r=>(<Picker.Item key={r.id} label={r.name} value={r.id} />))}
+              {religionOptions.map(r=>(<Picker.Item key={r.value} label={r.label} value={r.value} />))}
             </Picker>
             <Picker
               enabled={selectedReligion!==''}
@@ -272,7 +297,7 @@ export default function SearchScreen() {
               style={[styles.searchInputContainer,{height:48}]}
             >
               <Picker.Item label="Select Caste" value="" />
-              {casteOptions.map(c=>(<Picker.Item key={c.id} label={c.name} value={c.name} />))}
+              {casteOptions.map(c=>(<Picker.Item key={c.value} label={c.label} value={c.label} />))}
             </Picker>
           </View>
         )}

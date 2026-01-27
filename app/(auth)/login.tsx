@@ -291,14 +291,20 @@ export default function LoginScreen() {
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.modernLoginButtonText}>{t('login')}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Feather name="log-in" size={18} color="#FFFFFF" />
+                    <Text style={styles.modernLoginButtonText}>{t('login')}</Text>
+                  </View>
                 )}
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modernLoginButton, styles.registerButton, { flex: 1 }]}
                 onPress={() => router.push('/(auth)/register')}
               >
-                <Text style={styles.registerButtonText}>{t('register')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="user-plus" size={18} color="#FFFFFF" />
+                  <Text style={styles.registerButtonText}>{t('register')}</Text>
+                </View>
               </TouchableOpacity>
             </View>
             
@@ -312,8 +318,11 @@ export default function LoginScreen() {
                 <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
                   <FontAwesome name="google" size={24} color={colors.textPrimary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                  <FontAwesome name="apple" size={24} color={colors.textPrimary} />
+                <TouchableOpacity 
+                  style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}
+                  onPress={() => router.push('/(auth)/mobile-login')}
+                >
+                  <Feather name="phone-call" size={24} color={colors.textPrimary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -567,6 +576,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   
+  registerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
   // Social Login Styles
   socialContainer: {
     alignItems: 'center',

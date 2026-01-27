@@ -5,12 +5,15 @@ import { Colors } from '@/constants/Colors';
 import CustomTabBar from '../../components/CustomTabBar';
 import { useAuth } from '../../context/AuthContext';
 
+import { PremiumModalProvider } from '../../context/PremiumModalContext';
+
 export default function TabLayout() {
   const auth = useAuth();
   const isGuest = auth?.isGuest || false;
 
   return (
-    <Tabs
+    <PremiumModalProvider>
+      <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         tabBarActiveTintColor: Colors.light.tint,
@@ -68,6 +71,7 @@ export default function TabLayout() {
           }}
         />
       )}
-    </Tabs>
+      </Tabs>
+    </PremiumModalProvider>
   );
 }

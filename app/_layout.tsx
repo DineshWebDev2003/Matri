@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
+import { PremiumModalProvider } from '../context/PremiumModalContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -109,7 +110,9 @@ export default function RootLayout() {
         <LanguageProvider>
           <AuthProvider>
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <RootLayoutNav />
+              <PremiumModalProvider>
+                <RootLayoutNav />
+              </PremiumModalProvider>
             </ThemeProvider>
           </AuthProvider>
         </LanguageProvider>

@@ -6,12 +6,15 @@ import axios from 'axios';
 import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, TextInput, FlatList, ImageBackground, Animated, SafeAreaView, Dimensions, RefreshControl, StatusBar, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
+import { ProfileCard } from './profiles';
 import { useRouter } from 'expo-router';
 import { apiService } from '../../services/api';
+import { usePremiumModal } from '../../context/PremiumModalContext';
 import MenuModal from '../../components/MenuModal';
 import UniversalHeader from '../../components/UniversalHeader';
 // import WithSwipe from '../../components/WithSwipe';
 import { LinearGradient } from 'expo-linear-gradient';
+import MiniProfileCard from '../../components/MiniProfileCard';
 
 const { width } = Dimensions.get('window');
 
@@ -60,8 +63,11 @@ const banners = [
 // Stats will be fetched from API - no hardcoded values
 
 export default function HomeScreen() {
-  const router = useRouter();
+  const { showPremiumModal } = usePremiumModal();
   const auth = useAuth();
+  const loggedUser = auth.user;
+  const isFreePlan = Number(loggedUser?.package_id||0) === 4;
+  const router = useRouter();
   const { theme } = useTheme();
   const { t } = useLanguage();
   const [selectedBanner, setSelectedBanner] = useState(0);
@@ -289,6 +295,11 @@ export default function HomeScreen() {
 
   // Send interest to a profile
   const expressHeart = async (profileId: string | number) => {
+    const isFreePlan = Number(auth?.user?.package_id||0) === 4;
+    if(isFreePlan){
+      showPremiumModal();
+      return;
+    }
     try {
       const response = await apiService.expressHeart(profileId);
       if (response.status === 'success') {
@@ -333,8 +344,8 @@ export default function HomeScreen() {
   // Fetch profiles (Recommended & New Matches)
   const fetchProfiles = async () => {
     try {
-      const currentUserGender = (userInfo?.gender || userInfo?.basicInfo?.gender || auth?.user?.gender)?.toLowerCase();
-      const oppositeGender = currentUserGender === 'male' ? 'female' : currentUserGender === 'female' ? 'male' : null;
+      const currentUserGender = (userInfo?.gender || userInfo?.basicInfo?.gender || loggedUser?.gender)?.toLowerCase();
+      const oppositeGender = (loggedUser?.gender || '').toLowerCase() === 'male' ? 'female' : 'male';
 
       // Concurrent calls
       const [recommendedResp, newMatchesResp] = await Promise.all([
@@ -346,7 +357,7 @@ export default function HomeScreen() {
       console.log('⭐ recommended API →', recommendedResp);
       console.log('🆕 new-matches API →', newMatchesResp);
 
-      const sanitize = (list: any[]) => {
+      const sanitize = (list: any[], currentUser: any, oppositeGender?: string) => {
         let filtered = list;
         if (oppositeGender) {
           filtered = list.filter((p: any) => (p.gender || '').toLowerCase() === oppositeGender);
@@ -356,16 +367,26 @@ export default function HomeScreen() {
           }
         }
         return filtered.slice(0, 5).map((profile: any) => {
-          const genderLower = (profile.gender || '').toLowerCase();
-          const defaultImage = genderLower === 'female'
-            ? require('../../assets/images/default-female.jpg')
-            : require('../../assets/images/default-male.jpg');
+          const genderLower = (String(profile.gender || '')).toLowerCase();
+          let defaultImage;
+          if (genderLower.startsWith('f')) {
+            defaultImage = require('../../assets/images/female_avatar.webp');
+          } else if (genderLower.startsWith('m')) {
+            defaultImage = require('../../assets/images/male_avatar.webp');
+          } else {
+            // If gender missing, show opposite of logged-in user's gender for variety
+            defaultImage = oppositeGender === 'female'
+              ? require('../../assets/images/female_avatar.webp')
+              : require('../../assets/images/male_avatar.webp');
+          }
 
           // Determine city: prefer city / present_city / city_name / location
           // Determine if API returned a generic default image placeholder
-          const rawImage = profile.image || profile.profileImage || null;
-          const isApiDefault = rawImage && /default|placeholder|no[-_]image/i.test(rawImage);
-          const profileImage = isApiDefault ? null : rawImage;
+          let profileImage:any = profile.image || profile.profileImage || null;
+          if (profileImage && typeof profileImage === 'string' && !profileImage.startsWith('http')) {
+            const base = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || 'https://90skalyanam.com/assets/images/user/profile';
+            profileImage = `${base}/${profileImage}`;
+          }
 
           const city = profile.city || profile.present_city || profile.city_name || profile.location || null;
 
@@ -405,8 +426,8 @@ export default function HomeScreen() {
         );
       };
 
-      const recommendedList = sanitize(extractList(recommendedResp));
-      const newMatchesList = sanitize(extractList(newMatchesResp));
+      const recommendedList = sanitize(extractList(recommendedResp), loggedUser, oppositeGender);
+      const newMatchesList = sanitize(extractList(newMatchesResp), loggedUser, oppositeGender);
 
       setNewlyJoinedProfiles(recommendedList); // Recommended section
       setNewMatchesProfiles(newMatchesList);   // New Matches section
@@ -567,28 +588,41 @@ export default function HomeScreen() {
 
         {/* Counters Section - Horizontal */}
         <View style={styles.countersSection}>
-          <TouchableOpacity 
-            style={styles.counterItem}
-            onPress={() => router.push({ pathname: '/(tabs)/saved', params: { tab: 'sent' } })}
-          >
-            <Text style={styles.counterValue}>{stats[0]?.value || '0'}</Text>
-            <Text style={styles.counterLabel}>{stats[0]?.label || 'Interest Sent'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.counterItem}
-            onPress={() => router.push({ pathname: '/(tabs)/saved', params: { tab: 'received' } })}
-          >
-            <Text style={styles.counterValue}>{stats[1]?.value || '0'}</Text>
-            <Text style={styles.counterLabel}>{stats[1]?.label || 'Interest Received'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.counterItem}
-            onPress={() => router.push({ pathname: '/(tabs)/saved', params: { tab: 'shortlist' } })}
-          >
-            <Text style={styles.counterValue}>{stats[3]?.value || '0'}</Text>
-            <Text style={styles.counterLabel}>{stats[3]?.label || 'Shortlist'}</Text>
-          </TouchableOpacity>
+          {/* Interest Sent */}
+          <LinearGradient colors={['#FCA5A5', '#F87171']} style={styles.counterGradient}>
+            <TouchableOpacity
+              style={styles.counterItem}
+              onPress={() => router.push({ pathname: '/(tabs)/saved', params: { tab: 'sent' } })}
+            >
+              <Text style={styles.counterValue}>{stats[0]?.value || '0'}</Text>
+              <Text style={styles.counterLabel}>{stats[0]?.label || 'Interest Sent'}</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+
+          {/* Interest Received */}
+          <LinearGradient colors={['#FCA5A5', '#F87171']} style={styles.counterGradient}>
+            <TouchableOpacity
+              style={styles.counterItem}
+              onPress={() => router.push({ pathname: '/(tabs)/saved', params: { tab: 'received' } })}
+            >
+              <Text style={styles.counterValue}>{stats[1]?.value || '0'}</Text>
+              <Text style={styles.counterLabel}>{stats[1]?.label || 'Interest Received'}</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+
+          {/* Shortlist */}
+          <LinearGradient colors={['#FCA5A5', '#F87171']} style={styles.counterGradient}>
+            <TouchableOpacity
+              style={styles.counterItem}
+              onPress={() => router.push({ pathname: '/(tabs)/saved', params: { tab: 'shortlist' } })}
+            >
+              <Text style={styles.counterValue}>{stats[3]?.value || '0'}</Text>
+              <Text style={styles.counterLabel}>{stats[3]?.label || 'Shortlist'}</Text>
+            </TouchableOpacity>
+          </LinearGradient>
         </View>
+
+        {/* Main Content - Card Container with Margin */}
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, themeStyles.text]}>Recommended</Text>
@@ -598,103 +632,14 @@ export default function HomeScreen() {
           horizontal
           data={newlyJoinedProfiles}
           keyExtractor={(item, index) => item?.id?.toString() || index.toString()}
-          renderItem={({ item }) => {
-            const profileName = item?.name || `${item?.firstname || 'Unknown'} ${item?.lastname || ''}`.trim();
-            const profileImage = item?.profileImage;
-            const defaultImage = item?.defaultImage;
-            const age = item?.age || calculateAge(item?.dateOfBirth || item?.dob);
-            const location = item?.city || item?.location || 'Location N/A';
-            
-            // Get package info for crown badge
-            const packageName = item?.packageName || item?.package_name || 'FREE MATCH';
-            
-            // Package color helper
-            const getPackageColor = () => {
-              if (packageName.includes('PREMIUM') || packageName.includes('PRO')) {
-                return '#8B5CF6'; // Purple
-              } else if (packageName.includes('GOLD')) {
-                return '#FFD700'; // Gold
-              } else if (packageName.includes('SILVER')) {
-                return '#C0C0C0'; // Silver
-              } else if (packageName.includes('PLATINUM')) {
-                return '#3B82F6'; // Blue
-              }
-              return '#6366F1';
-            };
-            
-            const getPackageBgColor = () => {
-              if (packageName.includes('PREMIUM') || packageName.includes('PRO')) {
-                return 'rgba(139, 92, 246, 0.15)';
-              } else if (packageName.includes('GOLD')) {
-                return 'rgba(255, 215, 0, 0.15)';
-              } else if (packageName.includes('SILVER')) {
-                return 'rgba(156, 163, 175, 0.15)';
-              } else if (packageName.includes('PLATINUM')) {
-                return 'rgba(59, 130, 246, 0.15)';
-              }
-              return 'rgba(99, 102, 241, 0.15)';
-            };
-            
-            console.log('🖼️ Just Joined Card Image Debug:', {
-              id: item?.id,
-              name: profileName,
-              profileImage: profileImage,
-              hasDefaultImage: !!defaultImage,
-              imageType: profileImage ? 'url' : 'default'
-            });
-            
-            return (
-              <View style={styles.justJoinedCard}>
-                <TouchableOpacity onPress={() => router.push(`/profile/${item?.id || '1'}`)} style={styles.justJoinedImageContainer}>
-                  {profileImage ? (
-                    <Image 
-                      source={{ uri: profileImage }} 
-                      style={styles.justJoinedImage} 
-                      resizeMode="cover"
-                      onError={() => console.log('❌ Just Joined image failed to load:', profileImage)}
-                      onLoad={() => console.log('✅ Just Joined image loaded:', profileImage)}
-                    />
-                  ) : (
-                    <Image source={defaultImage} style={styles.justJoinedImage} resizeMode="cover" />
-                  )}
-                  
-                  {/* Crown Icon Badge - Top Left */}
-                  {/* Package Tag */}
-                  <View style={[styles.packageTag, { backgroundColor: getPackageBgColor() }]}>
-                    <Text style={[styles.packageTagText,{color:getPackageColor()}]} numberOfLines={1}>{packageName}</Text>
-                  </View>
-                  
-                  {/* Gradient Overlay with Profile Info */}
-                  <LinearGradient
-                    colors={['transparent', 'rgba(255,255,255,0.1)', 'rgba(220,38,38,0.7)', 'rgba(220,38,38,0.95)']}
-                    style={styles.justJoinedGradient}
-                  >
-                    <View style={styles.justJoinedContent}>
-                      <Text style={styles.justJoinedName} numberOfLines={1}>
-                        {profileName}
-                      </Text>
-                      <View style={styles.justJoinedDetails}>
-                        <Text style={styles.justJoinedAge}>
-                          {age ? `Age ${age}` : 'Age N/A'}
-                        </Text>
-                        <Text style={styles.justJoinedLocation} numberOfLines={1}>
-                          📍 {location}
-                        </Text>
-                      </View>
-                    </View>
-                  </LinearGradient>
-                  
-                  {/* Heart Button - Bottom Right Corner */}
-                  <TouchableOpacity 
-                    style={{position:'absolute',bottom:6,right:6,width:28,height:28,borderRadius:14,borderWidth:1,borderColor:'#FFFFFF',alignItems:'center',justifyContent:'center',backgroundColor:'rgba(0,0,0,0.4)'}}
-                    onPress={() => expressHeart(item?.id)}
-                  >
-                    <Feather name="heart" size={18} color={interestingProfiles.has(item?.id?.toString()) ? '#DC2626' : 'white'} fill={interestingProfiles.has(item?.id?.toString()) ? '#DC2626' : 'white'} />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              </View>
-            );
-          }}
+          renderItem={({ item }) => (
+            <MiniProfileCard
+              item={item}
+              onPress={() => router.push(`/profile/${item.id}`)}
+              onHeartPress={() => expressHeart(item.id)}
+              interestingProfiles={interestingProfiles}
+            />
+          )}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
         />
@@ -707,85 +652,19 @@ export default function HomeScreen() {
           horizontal
           data={newMatchesProfiles}
           keyExtractor={(item, index) => item?.id?.toString() || index.toString()}
-          renderItem={({ item }) => {
-            const profileName = item?.name || `${item?.firstname || 'Unknown'} ${item?.lastname || ''}`.trim();
-            const profileImage = item?.profileImage;
-            const defaultImage = item?.defaultImage;
-            const age = item?.age || calculateAge(item?.dateOfBirth || item?.dob);
-            const location = item?.city || item?.location || 'Location N/A';
-            
-            const packageName = item?.packageName || item?.package_name || 'FREE MATCH';
-            const getPackageColor = () => {
-              if (packageName.includes('PREMIUM') || packageName.includes('PRO')) return '#8B5CF6';
-              if (packageName.includes('GOLD')) return '#FFD700';
-              if (packageName.includes('SILVER')) return '#C0C0C0';
-              if (packageName.includes('PLATINUM')) return '#3B82F6';
-              return '#6366F1';
-            };
-            const getPackageBgColor = () => {
-              if (packageName.includes('PREMIUM') || packageName.includes('PRO')) return 'rgba(139,92,246,0.15)';
-              if (packageName.includes('GOLD')) return 'rgba(255,215,0,0.15)';
-              if (packageName.includes('SILVER')) return 'rgba(156,163,175,0.15)';
-              if (packageName.includes('PLATINUM')) return 'rgba(59,130,246,0.15)';
-              return 'rgba(99,102,241,0.15)';
-            };
-
-            console.log('🖼️ New Match Card Image Debug:', {
-              id: item?.id,
-              name: profileName,
-              profileImage: profileImage,
-              hasDefaultImage: !!defaultImage,
-              imageType: profileImage ? 'url' : 'default'
-            });
-            
-            return (
-              <View style={styles.newMatchCard}>
-                <View style={styles.newMatchImageWrapper}>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/profile/${item?.id || '1'}`)}
-                    style={styles.newMatchImageContainer}
-                  >
-                    {profileImage ? (
-                      <Image 
-                        source={{ uri: profileImage }} 
-                        style={styles.newMatchImage} 
-                        resizeMode="cover"
-                        onError={() => console.log('❌ New Match image failed to load:', profileImage)}
-                        onLoad={() => console.log('✅ New Match image loaded:', profileImage)}
-                      />
-                    ) : (
-                      <Image source={defaultImage} style={styles.newMatchImage} resizeMode="cover" />
-                    )}
-                  </TouchableOpacity>
-                  
-                  {/* Heart Button - Bottom Right Corner */}
-                  <TouchableOpacity 
-                    style={{position:'absolute',bottom:6,right:6,width:28,height:28,borderRadius:14,borderWidth:1,borderColor:'#FFFFFF',alignItems:'center',justifyContent:'center',backgroundColor:'rgba(0,0,0,0.4)'}}
-                    onPress={() => expressHeart(item?.id)}
-                  >
-                    <Feather name="heart" size={16} color={interestingProfiles.has(item?.id?.toString()) ? '#DC2626' : 'white'} fill={interestingProfiles.has(item?.id?.toString()) ? '#DC2626' : 'white'} />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.newMatchInfo}>
-                  <Text style={[styles.newMatchName, theme==='dark' && { color: '#FFFFFF' }]} numberOfLines={1}>
-                    {profileName}
-                  </Text>
-                  <Text style={[styles.newMatchAge, theme==='dark' && { color:'#9CA3AF'}]}>
-                    {age ? `${age} yrs` : 'Age N/A'}
-                  </Text>
-                  <Text style={[styles.newMatchLocation, theme==='dark' && { color:'#9CA3AF'}]} numberOfLines={1}>
-                    📍 {location}
-                  </Text>
-                </View>
-              </View>
-            );
-          }}
+          renderItem={({ item }) => (
+            <ProfileCard
+              item={item}
+              onPress={() => router.push(`/profile/${item.id}`)}
+              onHeartPress={() => expressHeart(item.id)}
+              interestingProfiles={interestingProfiles}
+              isHorizontal={true}
+            />
+          )}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, paddingBottom: 20 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
         />
-          
-          {/* Bottom Horizontal Line */}
-          <View style={styles.bottomLine} />
+        
         </ScrollView>
       </View>
 
@@ -947,6 +826,11 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: 'space-between',
     marginVertical: 8,
+  },
+  counterGradient: {
+    flex: 1,
+    marginHorizontal: 4,
+    borderRadius: 16,
   },
   counterItem: {
     flex: 1,

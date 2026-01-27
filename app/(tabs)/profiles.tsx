@@ -11,6 +11,7 @@ import { apiService, premiumUtils } from '../../services/api';
 import ProfileImage from '../../components/ProfileImage';
 import HeartIcon from '../../components/HeartIcon';
 import UniversalHeader from '../../components/UniversalHeader';
+import { usePremiumModal } from '../../context/PremiumModalContext';
 //import WithSwipe from '../../components/WithSwipe';
 import MenuModal from '../../components/MenuModal';
 import * as Haptics from 'expo-haptics';
@@ -46,7 +47,7 @@ const calculateAge = (dateString: string) => {
 };
 
 // Modern ProfileCard component - EXACT UI DESIGN
-const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHorizontal = false }: { 
+export const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHorizontal = false }: { 
   item: any, 
   onPress: () => void, 
   onHeartPress: (item: any) => void, 
@@ -63,8 +64,8 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
   // Get gender and set default image
   const userGender = item?.gender?.toLowerCase();
   const defaultImage = userGender === 'female' 
-    ? require('../../assets/images/default-female.jpg')
-    : require('../../assets/images/default-male.jpg');
+    ? require('../../assets/images/female_avatar.webp')
+    : require('../../assets/images/male_avatar.webp');
   
   // Get profile image from API if available
   // API returns full URLs from formatProfileResponse, use them directly
@@ -173,7 +174,7 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
   
   const SIDE_MARGIN = 8; // left & right margin
   const GRID_GAP = 12; // space between two cards
-  const cardWidth = isHorizontal ? 200 : (screenWidth - (SIDE_MARGIN * 2 + GRID_GAP)) / 2;
+  const cardWidth = isHorizontal ? 160 : (screenWidth - (SIDE_MARGIN * 2 + GRID_GAP)) / 2;
   const cardStyle = isHorizontal ? styles.horizontalCard : styles.gridCard;
   const gradientColors = getGradientColors();
   const cardBorderColor = getCardBorderColor();
@@ -243,6 +244,7 @@ const ProfileCard = ({ item, onPress, onHeartPress, interestingProfiles, isHoriz
 };
 
 export default function ProfilesScreen() {
+  const { showPremiumModal } = usePremiumModal();
   const [showInterestAnimation, setShowInterestAnimation] = useState(false);
   const [interestName,setInterestName]=useState<string>('Member');
   const slideUpAnim = useState(new Animated.Value(500))[0];
@@ -516,6 +518,13 @@ export default function ProfilesScreen() {
   };
 
   const handleHeartPress = async (profile: any) => {
+    // Block if not premium
+    const isFreePlan = Number(auth?.user?.package_id||0) === 4;
+    if(isFreePlan){
+      showPremiumModal();
+      return;
+    }
+
     // Guest users cannot express interest
     if (isGuest) {
       // Show toast
@@ -716,8 +725,17 @@ export default function ProfilesScreen() {
       let resp: any;
       if (type === 'recommended') {
         resp = await apiService.getRecommendedMatches({ page: pageNum, limit: 12 });
+        if (resp?.remark === 'profile_incomplete' || resp?.data?.remark === 'profile_incomplete' || resp?.status==='error') {
+          console.warn('⏩ Fallback: backend blocked recommended matches due to incomplete profile. Using generic profiles.');
+          resp = await apiService.getProfiles({ type: 'all', page: pageNum, limit: 12 });
+        }
       } else if (type === 'newly_joined') {
         resp = await apiService.getNewMatches({ page: pageNum, limit: 12 });
+        // Fallback if backend blocks incomplete profile
+        if (resp?.remark === 'profile_incomplete' || resp?.data?.remark === 'profile_incomplete' || resp?.status==='error') {
+          console.warn('⏩ Fallback: backend blocked new matches due to incomplete profile. Using generic profiles.');
+          resp = await apiService.getProfiles({ type: 'all', page: pageNum, limit: 12 });
+        }
       } else {
         resp = await apiService.getMembers(pageNum, 12);
       }
@@ -1767,7 +1785,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     overflow: 'hidden',
     marginBottom: 10,
-    height: 280,
+    height: 240,
   },
   gridCard: {
     backgroundColor: 'white',

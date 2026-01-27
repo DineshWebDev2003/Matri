@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Dimensions, Alert, ActivityIndicator, FlatList, Modal, PanResponder, Animated } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import ImageViewing from 'react-native-image-viewing';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import FallbackImage from '../../components/FallbackImage';
 import UniversalHeader from '../../components/UniversalHeader';
+import { usePremiumModal } from '../../context/PremiumModalContext';
 import { getGalleryImageUrl } from '../../utils/imageUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -65,6 +66,7 @@ const NoData = ({ theme }: { theme?: string }) => (
 );
 
 export default function ProfileDetailScreen() {
+  const { showPremiumModal } = usePremiumModal();
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { theme } = useTheme();
@@ -160,7 +162,13 @@ export default function ProfileDetailScreen() {
           const family = memberData.family_info || memberData.family || {};
 
           const pref = memberData.partner_preference || {};
-          let langsRaw:any = basic.language;
+          let langsRaw:any = basic.language || memberData.languages;
+          if (typeof langsRaw === 'string') {
+            const trimmed = langsRaw.trim();
+            if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+              try { langsRaw = JSON.parse(trimmed); } catch {}
+            }
+          }
           if (typeof langsRaw === 'string') {
             try { langsRaw = JSON.parse(langsRaw);} catch {}
           }
@@ -245,9 +253,9 @@ export default function ProfileDetailScreen() {
           eyeColor: memberData.eye_color || memberData.eyeColor || 'N/A',
           hairColor: memberData.hair_color || memberData.hairColor || 'N/A',
           disability: memberData.disability || 'N/A',
-          languages: Array.isArray(langsRaw) ? langsRaw.join(', ') : (memberData.languages || ''),
-          presentAddress: presentAddr.address || `${presentAddr.city||''} ${presentAddr.state||''} ${presentAddr.country||''}`.trim() || 'N/A',
-          permanentAddress: residence.permanent_address?.address || 'N/A',
+          languages: Array.isArray(langsRaw) ? langsRaw.join(', ') : String(langsRaw || ''),
+          presentAddress: '',
+          permanentAddress: '',
           fatherName: family.father_name || 'N/A',
           fatherProfession: family.father_profession || family.father_occupation || 'N/A',
           fatherContact: (memberData.family?.father_contact || memberData.fatherContact || 'N/A'),
@@ -294,6 +302,8 @@ export default function ProfileDetailScreen() {
   };
 
   const handleChat = () => {
+    const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
+    if(isFreeUser){ showPremiumModal(); return; }
     if (auth?.isGuest) {
       Alert.alert('Login Required', 'Please login to chat with this member', [
         { text: 'Cancel' },
@@ -325,6 +335,8 @@ export default function ProfileDetailScreen() {
 
   // Unlock contact – calls backend and refreshes user credits
   const handleViewContact = async () => {
+    const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
+    if(isFreeUser){ showPremiumModal(); return; }
     console.log('🔓 Attempting to unlock contact for profile:', profile?.id);
     console.log('🔢 Credits before unlock:', remainingCredits===Infinity ? 'Unlimited' : remainingCredits);
     try {
@@ -374,6 +386,9 @@ export default function ProfileDetailScreen() {
   };
 
   const handleInterest = async () => {
+    const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
+    if(isFreeUser){showPremiumModal();return;}
+
     if (auth?.isGuest) {
       Alert.alert('Login Required', 'Please login to send interest', [
         { text: 'Cancel' },
@@ -467,6 +482,9 @@ export default function ProfileDetailScreen() {
   }, [profile?.id]);
 
   const handleShortlist = async () => {
+    const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
+    if(isFreeUser){showPremiumModal();return;}
+
     if (!profile?.id) return;
     try {
       const resp = await apiService.toggleShortlist(profile.id.toString());
@@ -542,8 +560,8 @@ export default function ProfileDetailScreen() {
   const galleriesArr:any[] = (profile?.galleries || []).filter((g:any)=>g && g.image);
   const viewerImages = galleriesArr.map((g)=>({ uri: g.image }));
   const profileImageFallback = genderLower === 'female'
-    ? require('../../assets/images/default-female.jpg')
-    : require('../../assets/images/default-male.jpg');
+    ? require('../../assets/images/female_avatar.webp')
+    : require('../../assets/images/male_avatar.webp');
   console.log('👤 Profile Detail Screen - Main Image:', {
     profileId: profile?.id,
     profileName: profile?.name,
@@ -579,8 +597,9 @@ export default function ProfileDetailScreen() {
       {/* Universal Header - Prevents overlap */}
       <UniversalHeader 
         title="Profile"
-        showProfileImage={false}
         leftIcon="back"
+        onProfilePress={() => router.push('/account')}
+        userImage={auth?.user?.image}
         onLeftIconPress={() => router.back()}
       />
 
@@ -611,7 +630,7 @@ export default function ProfileDetailScreen() {
               
 
               {/* Package Badge */}
-              {profile.badgeColor && (
+              {profile?.badgeColor && (
                 <Feather name="crown" size={24} color={profile.badgeColor} style={styles.packageBadge} />
               )}
             </LinearGradient>
@@ -634,10 +653,10 @@ export default function ProfileDetailScreen() {
           <View style={[styles.cardActionButtons, theme === 'dark' && styles.cardActionButtonsDark]}>
             {/* Chat Button - X Icon - Small */}
             <TouchableOpacity 
-              style={[styles.cardActionButton, styles.cardActionButtonSmall, theme === 'dark' ? styles.chatButtonDark : styles.chatButton]}
+              style={[styles.cardActionButton, styles.cardActionButtonSmall]}
               onPress={handleChat}
             >
-              <Feather name="message-circle" size={22} color="white" />
+              <Feather name="message-circle" size={22} color="#3B82F6" />
             </TouchableOpacity>
 
             {/* Heart Button - Interest - Large Center */}
@@ -645,27 +664,25 @@ export default function ProfileDetailScreen() {
               style={[
                 styles.cardActionButton, 
                 styles.cardActionButtonLarge,
-                theme === 'dark' ? styles.interestCardButtonDark : styles.interestCardButton,
                 isInterested && (theme === 'dark' ? styles.interestCardButtonActiveDark : styles.interestCardButtonActive)
               ]}
               onPress={handleInterest}
               disabled={isBlocked}
             >
-              <Feather 
-                name="heart" 
-                size={36} 
-                color={isInterested ? '#DC2626' : '#FFC5C5'}
-                fill={isInterested ? '#DC2626' : 'none'}
-              />
+              {isInterested ? (
+                <MaterialCommunityIcons name="heart" size={36} color="#DC2626" />
+              ) : (
+                <MaterialCommunityIcons name="heart-outline" size={36} color="#000000" />
+              )}
             </TouchableOpacity>
 
             {/* Shortlist Button */}
             <TouchableOpacity 
-              style={[styles.cardActionButton, styles.cardActionButtonSmall, theme === 'dark' ? styles.shortlistButtonDark : styles.shortlistButton, isShortlisted && (theme === 'dark' ? styles.shortlistButtonActiveDark : styles.shortlistButtonActive)]}
+              style={[styles.cardActionButton, styles.cardActionButtonSmall, isShortlisted && (theme === 'dark' ? styles.shortlistButtonActiveDark : styles.shortlistButtonActive)]}
               onPress={handleShortlist}
               disabled={isBlocked}
             >
-              <Feather name="bookmark" size={22} color={isBlocked ? '#6B7280' : 'white'} />
+              <Feather name="bookmark" size={22} color={isBlocked ? '#6B7280' : (isShortlisted ? '#DC2626' : '#000000')} />
             </TouchableOpacity>
           </View>
 
@@ -677,7 +694,14 @@ export default function ProfileDetailScreen() {
               <TouchableOpacity
                 key={tab}
                 style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
-                onPress={() => setActiveTab(tab as any)}
+                onPress={() => {
+                const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
+                if (tab === 'photos' && isFreeUser) {
+                  showPremiumModal();
+                  return;
+                }
+                setActiveTab(tab as any);
+              }}
               >
                 {/* Icon centered at top */}
                 <View style={styles.tabIconContainer}>
@@ -714,43 +738,6 @@ export default function ProfileDetailScreen() {
                   {profile?.maritalStatus && (
                     <DetailRow label="Marital Status" value={profile.maritalStatus} theme={theme} />
                   )}
-                  {profile?.height && (
-                    <DetailRow label="Height" value={profile.height} theme={theme} />
-                  )}
-                  {profile?.weight && (
-                    <DetailRow label="Weight" value={profile.weight} theme={theme} />
-                  )}
-                  {profile?.bloodGroup && (
-                    <DetailRow label="Blood Group" value={profile.bloodGroup} theme={theme} />
-                  )}
-                                    {profile?.eyeColor && (
-                    <DetailRow label="Eye Color" value={profile.eyeColor} theme={theme} />
-                  )}
-                  {profile?.hairColor && (
-                    <DetailRow label="Hair Color" value={profile.hairColor} theme={theme} />
-                  )}
-                  {profile?.faceColour && (
-                    <DetailRow label="Face Colour" value={profile.faceColour} theme={theme} />
-                  )}
-                  {profile?.disability && (
-                    <DetailRow label="Disability" value={profile.disability} theme={theme} />
-                  )}
-                  {profile?.languages && (
-                    <DetailRow label="Languages" value={profile.languages} theme={theme} />
-                  )}
-                  {profile?.location && (
-                    <DetailRow label="Location" value={profile.location} theme={theme} />
-                  )}
-                  {profile?.presentAddress && (
-                    <DetailRow label="Present Address" value={profile.presentAddress} theme={theme} />
-                  )}
-                  {profile?.permanentAddress && (
-                    <DetailRow label="Permanent Address" value={profile.permanentAddress} theme={theme} />
-                  )}
-                </CollapsibleSection>
-
-                {/* Physical Attributes */}
-                <CollapsibleSection title="Physical Attributes" icon="activity" section="physical">
                   {profile?.height && (
                     <DetailRow label="Height" value={profile.height} theme={theme} />
                   )}
@@ -1242,10 +1229,11 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   shortlistButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
   },
-  shortlistButtonDark: {
-    backgroundColor: '#2563EB',
+  shortlistButtonWhitePlaceholder: {
+    backgroundColor: '#FFFFFF',
   },
   shortlistButtonActive: {
     opacity: 0.6,
@@ -1323,26 +1311,24 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   chatButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#FFFFFF',
   },
-  interestButton: {
-    backgroundColor: '#DC2626',
+  chatButtonDark: {
+    backgroundColor: '#FFFFFF',
   },
-  interestButtonActive: {
-    backgroundColor: '#FEE2E2',
-  },
-  blockButton: {
+  ignoreButton: {
     backgroundColor: '#EF4444',
   },
-  blockButtonActive: {
-    backgroundColor: '#1F2937',
+  ignoreButtonDark: {
+    backgroundColor: '#FFFFFF',
+  },
+  ignoreButtonActive: {
+    backgroundColor: '#9CA3AF',
     opacity: 0.7,
   },
-  actionButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'white',
-    letterSpacing: 0.3,
+  ignoreButtonActiveDark: {
+    backgroundColor: '#6B7280',
+    opacity: 0.7,
   },
   // Main Card Styles
   mainCard: {
@@ -1404,13 +1390,15 @@ const styles = StyleSheet.create({
     borderColor: '#EF4444',
   },
   interestCardButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
   },
   interestCardButtonActive: {
     backgroundColor: '#FEE2E2',
+    backgroundColor: '#FEE2E2',
   },
   interestCardButtonDark: {
-    backgroundColor: '#DC2626',
+    backgroundColor: '#FFFFFF',
   },
   interestCardButtonActiveDark: {
     backgroundColor: '#7F1D1D',
@@ -1423,16 +1411,16 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   chatButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#FFFFFF',
   },
   chatButtonDark: {
-    backgroundColor: '#1E40AF',
+    backgroundColor: '#FFFFFF',
   },
   ignoreButton: {
     backgroundColor: '#EF4444',
   },
   ignoreButtonDark: {
-    backgroundColor: '#DC2626',
+    backgroundColor: '#FFFFFF',
   },
   ignoreButtonActive: {
     backgroundColor: '#9CA3AF',
@@ -1813,7 +1801,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   viewButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: '#FFFFFF',
   },
   buttonText: {
     fontSize: 15,
@@ -1833,6 +1821,22 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
     borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  cardActionButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,

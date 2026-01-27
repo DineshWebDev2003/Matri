@@ -9,6 +9,7 @@ export default function PaymentScreen() {
   const { planId } = useLocalSearchParams<{ planId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     if (planId) initiatePayment(planId);
@@ -16,12 +17,30 @@ export default function PaymentScreen() {
 
   const initiatePayment = async (id: string) => {
     try {
+      setCurrentPlanId(id);
       // create order via backend
       const resp = await apiService.createRazorpayOrder(Number(id));
-      if (resp.status !== 'success') throw new Error('Order creation failed');
+      if (resp.status !== 'success') {
+        // Handle specific error for free plans
+        if (resp.message && resp.message.includes('too low for payment processing')) {
+          Alert.alert('Free Plan', 'This is a free plan. No payment required.');
+          router.back();
+          return;
+        }
+        throw new Error(resp.message || 'Order creation failed');
+      }
 
       const { order_id, amount, currency, razorpay_key } = resp.data;
       const key = razorpay_key || resp.data.key || '';
+
+      console.log('🔧 Razorpay Checkout Debug:', {
+        order_id,
+        amount,
+        currency,
+        razorpay_key,
+        key,
+        plan_id: currentPlanId,
+      });
 
       const options = {
         description: 'Plan purchase',
@@ -33,11 +52,14 @@ export default function PaymentScreen() {
         theme: { color: '#DC2626' }
       } as any;
 
+      console.log('🔧 Opening Razorpay with options:', options);
+
       RazorpayCheckout.open(options)
         .then(async (data: any) => {
+          console.log('✅ Razorpay payment successful:', data);
           // Razorpay returns: razorpay_payment_id, razorpay_order_id, razorpay_signature
           const payload = {
-            order_id: order_id, // our original order id
+            order_id: order_id,
             payment_id: data.razorpay_payment_id,
             signature: data.razorpay_signature,
           };
@@ -50,8 +72,25 @@ export default function PaymentScreen() {
             Alert.alert('Verification failed', 'Payment captured but verification failed');
           }
         })
-        .catch(() => {
-          Alert.alert('Cancelled', 'Payment not completed');
+        .catch((error: any) => {
+          console.error('❌ Razorpay payment error:', error);
+          console.error('❌ Error details:', {
+            code: error.code,
+            description: error.description,
+            source: error.source,
+            step: error.step,
+            reason: error.reason,
+          });
+          
+          // Show more specific error message
+          let errorMessage = 'Payment not completed';
+          if (error.description) {
+            errorMessage = error.description;
+          } else if (error.reason) {
+            errorMessage = error.reason;
+          }
+          
+          Alert.alert('Payment Error', errorMessage);
           router.back();
         });
     } catch (e: any) {

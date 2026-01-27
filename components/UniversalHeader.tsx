@@ -26,8 +26,8 @@ const getProfileSource = (image?: string, gender?: string) => {
     const g = (gender || '').toLowerCase();
     const isFemale = g === 'female' || g === 'f';
     return isFemale
-      ? require('../assets/images/default-female.jpg')
-      : require('../assets/images/default-male.jpg');
+      ? require('../assets/images/female_avatar.webp')
+      : require('../assets/images/male_avatar.webp');
   }
   if (image.startsWith('http')) return { uri: image };
   return { uri: `https://app.90skalyanam.com/assets/images/user/profile/${image}` };

@@ -24,22 +24,28 @@ export const getImageUrl = (image: string | null | undefined): ImageUrls => {
   }
   
   const trimmedImage = image.trim();
-  // If it's already a full URL (from API), use production URL directly
+  // If it's already a full URL (from API), normalise production paths
   if (trimmedImage.startsWith('http')) {
     // If it's a local IP URL, convert to production URL
     if (trimmedImage.includes('10.177.237.139') || trimmedImage.includes('localhost')) {
       // Extract filename from URL
       const filename = trimmedImage.split('/').pop();
-      const productionUrl = `https://90skalyanam.com/assets/images/user/profile/${filename}`;
+      const productionUrl = `https://app.90skalyanam.com/assets/images/user/profile/${filename}`;
       console.log('🔄 Converting local IP URL to production:', { local: trimmedImage, production: productionUrl });
       return { primary: productionUrl, fallback: null };
+    }
+    // Fix: some API URLs miss the /profile/ segment (e.g. .../user/profile_xxx.jpg)
+    if(trimmedImage.includes('/assets/images/user/') && !trimmedImage.includes('/assets/images/user/profile/')){
+      const fixed = trimmedImage.replace('/assets/images/user/','/assets/images/user/profile/');
+      console.log('🔄 Fixed malformed profile URL', trimmedImage,'→',fixed);
+      return { primary: fixed, fallback: null };
     }
     // If it's already a production URL, use it directly
     return { primary: trimmedImage, fallback: null };
   }
   
   // If it's just a filename, construct URL with production server
-  const primaryUrl = `https://90skalyanam.com/assets/images/user/profile/${trimmedImage}`;
+  const primaryUrl = `https://app.90skalyanam.com/assets/images/user/profile/${trimmedImage}`;
   // Fallback to environment variable (local IP)
   const imageBaseUrl = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || 'http://10.177.237.139:8000/Final%20Code/assets/assets/images/user/profile';
   const fallbackUrl = `${imageBaseUrl}/${trimmedImage}`;
@@ -76,7 +82,7 @@ export const getGalleryImageUrl = (image: string | null | undefined): ImageUrls 
   const imageBaseUrl = process.env.EXPO_PUBLIC_IMAGE_GALLERY_BASE_URL || `${webBase}/assets/images/user/gallery`;
   const primaryUrl = `${imageBaseUrl}/${trimmedImage}`;
   // Production fallback
-  const fallbackUrl = `https://90skalyanam.com/assets/images/user/gallery/${trimmedImage}`;
+  const fallbackUrl = `https://app.90skalyanam.com/assets/images/user/gallery/${trimmedImage}`;
   return { primary: primaryUrl, fallback: fallbackUrl };
 };
 

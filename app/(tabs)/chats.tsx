@@ -157,14 +157,7 @@ export default function ChatsScreen() {
           if (!conv.other_user || !conv.other_user.name) return false;
           
           // Apply gender filter - show only opposite gender
-          const targetGender = currentUserGender === 'male' ? 'female' : 'male';
-          const otherUserGender = conv.other_user?.gender?.toLowerCase();
-          
-          if (otherUserGender && otherUserGender !== targetGender) {
-            console.log(`🚫 Filtering out ${otherUserGender} user (looking for ${targetGender})`);
-            return false;
-          }
-          
+          // Remove gender-based filtering to show all conversations
           return true;
         });
         
@@ -200,6 +193,9 @@ export default function ChatsScreen() {
         console.log('✅ Valid conversations after filtering:', validConversations.length);
         console.log(`🔍 Gender filter applied: User is ${currentUserGender}, showing opposite gender`);
         setConversations(validConversations);
+      } else if(response?.remark==='profile_incomplete'||response?.data?.remark==='profile_incomplete'){ 
+        console.warn('Profile incomplete – conversations suppressed');
+        setConversations([]);
       } else {
         console.error('❌ Conversations API error:', response);
         setConversations([]);
@@ -328,9 +324,9 @@ export default function ChatsScreen() {
     const profileName = item?.name || `${item?.firstname || ''} ${item?.lastname || ''}`.trim() || 'User';
     const isOnline = item?.is_online === true || item?.is_online === 1 || item?.online_status === true || item?.online_status === 1 || item?.online_status === 'online'; // Check if user is online
     const userGender = item?.gender?.toLowerCase();
-    const defaultImage = userGender === 'female' ? require('../../assets/images/default-female.jpg') :
-      userGender === 'male' ? require('../../assets/images/default-male.jpg') :
-      (currentUserGender === 'male' ? require('../../assets/images/default-female.jpg') : require('../../assets/images/default-male.jpg'));
+    const defaultImage = userGender === 'female' ? require('../../assets/images/female_avatar.webp') :
+      userGender === 'male' ? require('../../assets/images/male_avatar.webp') :
+      (currentUserGender === 'male' ? require('../../assets/images/female_avatar.webp') : require('../../assets/images/male_avatar.webp'));
     
     return (
       <TouchableOpacity style={styles.storyItem} onPress={() => {
@@ -380,9 +376,9 @@ export default function ChatsScreen() {
     const messageTimeColor = theme === 'dark' ? '#9CA3AF' : '#9CA3AF';
     const messageTextColor = theme === 'dark' ? '#B0B0B0' : '#6B7280';
     const messageBorderColor = theme === 'dark' ? '#3A3A3A' : '#F3F4F6';
-    const defaultImage = userGender?.toLowerCase() === 'female' ? require('../../assets/images/default-female.jpg') :
-      userGender?.toLowerCase() === 'male' ? require('../../assets/images/default-male.jpg') :
-      (currentUserGender === 'male' ? require('../../assets/images/default-female.jpg') : require('../../assets/images/default-male.jpg'));
+    const defaultImage = userGender?.toLowerCase() === 'female' ? require('../../assets/images/female_avatar.webp') :
+      userGender?.toLowerCase() === 'male' ? require('../../assets/images/male_avatar.webp') :
+      (currentUserGender === 'male' ? require('../../assets/images/female_avatar.webp') : require('../../assets/images/male_avatar.webp'));
     
     // Console log profile image details
     console.log('📱 Chat List - Conversation Item:', {

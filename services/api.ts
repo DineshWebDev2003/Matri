@@ -169,33 +169,23 @@ export const apiService = {
     return res.data?.data?.ticket;
   },
 
-  /* Razorpay – uses website payment flow (/api/payments/razorpay) */
+  /* Razorpay – use mobile API (/api/mobile/razorpay) */
   async createRazorpayOrder(planId: number) {
     const payload = { plan_id: planId };
     const token   = await SecureStore.getItemAsync('token');
 
-    // Endpoint lives outside the /api/mobile prefix used by axiosInstance
-    const url = `${ROOT_URL}/api/payments/razorpay/order`;
+    // Use mobile API endpoint that loads credentials from DB
+    const url = `${API_BASE_URL}/razorpay/order`;
 
-    const res = await axios.post(url, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
+    const res = await axiosInstance.post(url, payload, {
       timeout: 20000,
     });
     return res.data;
   },
 
   async verifyRazorpayPayment({ order_id, payment_id, signature }: { order_id: string; payment_id: string; signature: string; }) {
-    const token = await SecureStore.getItemAsync('token');
-    const url   = `${ROOT_URL}/api/payments/razorpay/verify`;
-
-    const res = await axios.post(url, { order_id, payment_id, signature }, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
+    const payload = { razorpay_order_id: order_id, razorpay_payment_id: payment_id, razorpay_signature: signature, plan_id: /* you may need to pass plan_id from caller */ null };
+    const res = await axiosInstance.post('/razorpay/verify', payload, {
       timeout: 20000,
     });
     return res.data;
@@ -1247,7 +1237,7 @@ export const apiService = {
 
   async acceptHeart(userId: string | number) {
     try {
-      const response = await axiosInstance.post('/accept-heart', { user_id: userId });
+      const response = await axiosInstance.post(`/accept-interest/${userId}`);
       return response.data;
     } catch (error: any) {
       console.error('❌ Accept heart failed', error);
@@ -1457,7 +1447,7 @@ export const apiService = {
   async acceptInterest(userId: string | number) {
     try {
       console.log('✅ Accepting interest from:', userId);
-      const response = await axiosInstance.post('/accept-interest', { user_id: userId });
+      const response = await axiosInstance.post(`/accept-interest/${userId}`);
       console.log('✅ Accept interest response:', response.data);
       return response.data;
     } catch (error: any) {

@@ -168,6 +168,7 @@ export default function ProfileCompletionScreen() {
   const [religionOptions, setReligionOptions] = useState<{id:string;name:string}[]>([]);
   const [casteOptions, setCasteOptions] = useState<{id:string;name:string}[]>([]);
   const getCasteName = (cid:string)=> casteOptions.find(c=>c.id===String(cid))?.name || cid;
+  const getOptionName = (opts:{id:string;name:string}[], val:any)=> opts.find(o=>String(o.id)===String(val))?.name || String(val);
   const [maritalStatusOptions, setMaritalStatusOptions] = useState<{id:string;name:string}[]>([]);
   const [countryOptions, setCountryOptions]   = useState<{id:string;name:string}[]>([]);
   const [stateOptions, setStateOptions]       = useState<{id:string;name:string}[]>([]);
@@ -784,17 +785,20 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             return g.startsWith('m')?'m':g.startsWith('f')?'f':g;
           })(),
             looking_for: formData.looking_for,
-            marital_status: formData.marital_status,
-            caste: formData.caste,
+            marital_status: (()=> {
+              const found = MARITAL_STATUS.find(ms=> String(ms.id)===String(formData.marital_status));
+              return found ? (found.label ?? found.name ?? found.id) : String(formData.marital_status);
+            })(),
+            caste: getCasteName(formData.caste),
             mother_tongue: formData.mother_tongue,
             languages: formData.languages ? formData.languages.split(',').map(l=>l.trim()) : [],
             profession: formData.profession,
             financial_condition: formData.financial_condition,
             smoking_status: formData.smoking_status,
             drinking_status: formData.drinking_status==='2'?1:(formData.drinking_status||0),
-            country: formData.country,
-            state: formData.state,
-            city: formData.city,
+            country: getOptionName(countryOptions, formData.country),
+            state: getOptionName(stateOptions, formData.state),
+            city: getOptionName(cityOptions, formData.city),
             zip: formData.zip,
           };
           break;

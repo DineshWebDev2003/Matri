@@ -603,25 +603,13 @@ export default function RegisterScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.registerButtonText}>{t('register')}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="user-plus" size={18} color="#FFFFFF" />
+                <Text style={styles.registerButtonText}>{t('register')}</Text>
+              </View>
             )}
           </TouchableOpacity>
 
-          {/* Social Signup */}
-          <View style={styles.socialContainer}>
-            <Text style={[styles.socialLabel, { color: colors.textSecondary }]}>{t('or')}</Text>
-            <View style={styles.socialButtonsRow}>
-              <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                <FontAwesome name="facebook" size={24} color={colors.textPrimary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                <FontAwesome name="google" size={24} color={colors.textPrimary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                <FontAwesome name="apple" size={24} color={colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-          </View>
 
           {/* Login Link */}
           <View style={styles.loginContainer}>
@@ -891,7 +879,8 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   pickerDial: {
-    width: 140,
-    height: 40,
-  },
+    fontSize: 14,
+    fontWeight: '500',
+    marginRight: 4,
+  }
 });

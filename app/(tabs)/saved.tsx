@@ -20,6 +20,13 @@ export default function InterestedScreen() {
   const params = useLocalSearchParams();
   const { theme } = useTheme();
   const auth = useAuth();
+  // Build absolute URL for current user's profile image
+  const userProfileImg = (() => {
+    const img = auth?.user?.image;
+    if (!img) return undefined;
+    if (typeof img === 'string' && img.startsWith('http')) return img;
+    return `https://app.90skalyanam.com/assets/images/user/profile/${img}`;
+  })();
   // Determine current user gender (lowercase), default to 'male' if unknown
   const currentUserGender = (auth?.user?.gender || (auth?.user as any)?.basic_info?.gender || (auth?.user as any)?.basicInfo?.gender || 'male')?.toLowerCase();
   
@@ -355,12 +362,12 @@ export default function InterestedScreen() {
       
       if (response.status === 'success') {
         // Update status to accepted
-        setReceivedProfiles((prev: any) => 
-          prev.map((p: any) => p.id === profileId ? { ...p, status: 'Accepted' } : p)
-        );
+        setReceivedProfiles((prev: any) => prev.filter((p: any) => p.id !== profileId));
         
         console.log('✅ Interest accepted successfully');
-        Alert.alert('Success', 'Interest accepted! You can now chat with this user.');
+        // Add to shortlist tab as accepted
+        setShortlistedProfiles((prev:any)=>[...prev,{...response.data, id: profileId, status: 'Accepted'}]);
+        Alert.alert('Success', 'Both are interested!');
       } else {
         Alert.alert('Error', response.message || 'Failed to accept interest. Please try again.');
       }
@@ -456,15 +463,15 @@ export default function InterestedScreen() {
   const getDefaultAvatar = (gender?: string) => {
     const g = (gender || '').toLowerCase();
     if (g === 'female') {
-      return require('../../assets/images/default-female.jpg');
+      return require('../../assets/images/female_avatar.webp');
     }
     if (g === 'male') {
-      return require('../../assets/images/default-male.jpg');
+      return require('../../assets/images/male_avatar.webp');
     }
     // If gender unknown, show opposite of current user's gender
     return currentUserGender === 'male'
-      ? require('../../assets/images/default-female.jpg')
-      : require('../../assets/images/default-male.jpg');
+      ? require('../../assets/images/female_avatar.webp')
+      : require('../../assets/images/male_avatar.webp');
   };
 
   const renderProfile = ({ item }: { item: any }) => {
@@ -523,6 +530,7 @@ export default function InterestedScreen() {
               <TouchableOpacity 
                 style={[styles.cardActionButton, styles.cardActionButtonSmall, styles.acceptActionButton]}
                 onPress={() => handleAcceptInterest(item.id)}
+                disabled={item.status === 'Accepted'}
               >
                 <Feather name="check" size={20} color="white" />
               </TouchableOpacity>
@@ -623,7 +631,7 @@ export default function InterestedScreen() {
         <UniversalHeader 
           title="Interest"
           showProfileImage={true}
-          userImage={auth?.user?.image}
+          userImage={userProfileImg}
           onProfilePress={() => router.push('/account')}
           onMenuPress={() => setMenuModalVisible(true)}
           leftIcon="heart"
@@ -688,7 +696,7 @@ export default function InterestedScreen() {
         <UniversalHeader 
           title="Interest"
           showProfileImage={true}
-          userImage={auth?.user?.image}
+          userImage={userProfileImg}
           onProfilePress={() => router.push('/account')}
           onMenuPress={() => setMenuModalVisible(true)}
           leftIcon="heart"

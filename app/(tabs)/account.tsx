@@ -163,8 +163,8 @@ export default function AccountScreen() {
     const g = (userProfile?.gender || user?.gender || '').toString().trim().toLowerCase();
     const isFemale = g === 'female' || g === 'f';
     return isFemale
-      ? require('../../assets/images/default-female.jpg')
-      : require('../../assets/images/default-male.jpg');
+      ? require('../../assets/images/female_avatar.webp')
+      : require('../../assets/images/male_avatar.webp');
   }, [userProfile?.gender, user?.gender]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
