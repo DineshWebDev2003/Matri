@@ -1055,7 +1055,7 @@ export default function AccountScreen() {
 
                               {/* Pay/Current Button */}
                               <TouchableOpacity
-                                disabled={plan.id === userProfile?.packageId}
+                                disabled={plan.id === userProfile?.packageId || String(plan.name || '').toUpperCase().includes('FREE')}
                                 style={[
                                   styles.payNowButton,
                                   plan.id === userProfile?.packageId && styles.payNowButtonDisabled,
@@ -1067,7 +1067,7 @@ export default function AccountScreen() {
                                 }}
                               >
                                 <Text style={styles.payNowButtonText}>
-                                  {plan.id === userProfile?.packageId ? 'Current' : 'Pay Now'}
+                                  {plan.id === userProfile?.packageId || String(plan.name || '').toUpperCase().includes('FREE') ? 'Current' : 'Pay Now'}
                                 </Text>
                               </TouchableOpacity>
                             </View>

@@ -248,11 +248,11 @@ export default function ProfileDetailScreen() {
             });
             return list.map(u=>({ image:u }));
           })(),
-          complexion: memberData.complexion || memberData.faceColour || 'N/A',
-          faceColour: memberData.faceColour || memberData.faceColor || memberData.complexion || 'N/A',
-          eyeColor: memberData.eye_color || memberData.eyeColor || 'N/A',
-          hairColor: memberData.hair_color || memberData.hairColor || 'N/A',
-          disability: memberData.disability || 'N/A',
+          complexion: physical.complexion || memberData.complexion || memberData.faceColour || 'N/A',
+          faceColour: physical.complexion || physical.faceColour || physical.faceColor || memberData.faceColour || memberData.faceColor || memberData.complexion || 'N/A',
+          eyeColor: physical.eye_color || physical.eyeColor || memberData.eye_color || memberData.eyeColor || 'N/A',
+          hairColor: physical.hair_color || physical.hairColor || memberData.hair_color || memberData.hairColor || 'N/A',
+          disability: physical.disability || memberData.disability || 'N/A',
           languages: Array.isArray(langsRaw) ? langsRaw.join(', ') : String(langsRaw || ''),
           presentAddress: '',
           permanentAddress: '',
@@ -828,7 +828,6 @@ export default function ProfileDetailScreen() {
                 <CollapsibleSection title="Education" icon="book" section="education">
                   {profile?.educations?.length ? profile.educations.map((edu: any, idx: number) => (
                     <View key={`edu-${idx}`} style={[styles.groupBox, theme === 'dark' && styles.groupBoxDark]}>
-                      <DetailRow label="Education" value={edu.education || edu.level || 'N/A'} theme={theme} />
                       <DetailRow label="Degree" value={edu.degree || 'N/A'} theme={theme} />
                       <DetailRow label="Field of Study" value={edu.field_of_study || edu.fieldOfStudy || 'N/A'} theme={theme} />
                       <DetailRow label="Institute" value={edu.institute || 'N/A'} theme={theme} />
@@ -844,7 +843,6 @@ export default function ProfileDetailScreen() {
                 <CollapsibleSection title="Career" icon="briefcase" section="career">
                   {profile?.careers?.length ? profile.careers.map((car: any, idx: number) => (
                     <View key={`car-${idx}`} style={[styles.groupBox, theme === 'dark' && styles.groupBoxDark]}>
-                      <DetailRow label="Profession" value={car.profession || 'N/A'} theme={theme} />
                       <DetailRow label="Company" value={car.company || 'N/A'} theme={theme} />
                       <DetailRow label="Designation" value={car.designation || 'N/A'} theme={theme} />
                       <DetailRow label="Start Year" value={car.start || 'N/A'} theme={theme} />
@@ -866,7 +864,8 @@ export default function ProfileDetailScreen() {
                 </CollapsibleSection>
                 
               
-{/* credit popup removed
+{/*
+  credit popup removed
                     transparent={true}
                     animationType="fade"
                     onRequestClose={() => setShowCreditPopup(false)}
@@ -954,9 +953,9 @@ export default function ProfileDetailScreen() {
                     {profile?.heightRange && profile.heightRange!=='N/A' && (
                       <DetailRow label="Height Range" value={profile.heightRange} theme={theme} />
                     )}
-                    {profile?.preferredEducation && profile.preferredEducation!=='N/A' && (
+                    {/* {profile?.preferredEducation && profile.preferredEducation!=='N/A' && (
                       <DetailRow label="Education" value={profile.preferredEducation} theme={theme} />
-                    )}
+                    )} */}
                     {profile?.preferredProfession && profile.preferredProfession!=='N/A' && (
                       <DetailRow label="Profession" value={profile.preferredProfession} theme={theme} />
                     )}

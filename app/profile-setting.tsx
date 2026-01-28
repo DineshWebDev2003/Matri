@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SafeAreaView,
   Image,
@@ -919,6 +920,8 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
 
   const getGenderLabel = (g: string) => (g === 'm' ? 'Male' : g === 'f' ? 'Female' : 'Not detected');
 
+  const insets = useSafeAreaInsets();
+
   const renderStep = () => {
     switch (currentStep) {
       case 1:
@@ -929,18 +932,17 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
 
             {/* Profile summary card */}
             {profileSummary.name ? (
-              <TouchableOpacity style={styles.profileSummaryCard} onPress={()=>setShowImageModal(true)}>
+              <TouchableOpacity style={[styles.profileSummaryCard, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]} onPress={()=>setShowImageModal(true)}>
                 {profileSummary.image ? (
-                <Image source={{ uri: profileSummary.image }} style={styles.profileImage} />
-              ) : (
-                <Feather name="user" size={48} color={colors.primary} style={styles.profileImagePlaceholder} />
-              )}
+                  <Image source={{ uri: profileSummary.image }} style={styles.profileImage} />
+                ) : (
+                  <Feather name="user" size={48} color={colors.primary} style={styles.profileImagePlaceholder} />
+                )}
                 <View style={{ marginLeft: 12, flex: 1 }}>
-                  <Text style={styles.profileName}>{profileSummary.name}</Text>
-                  <Text style={styles.profileId}>{profileSummary.id}</Text>
+                  <Text style={[styles.profileName,{ color: colors.textPrimary }]}>{profileSummary.name}</Text>
+                  <Text style={[styles.profileId,{ color: colors.textSecondary }]}>{profileSummary.id}</Text>
                 </View>
-                <Feather name="eye" size={22} color="red" />
-              </TouchableOpacity>
+                              </TouchableOpacity>
             ) : null}
 
             {/* Names */}
@@ -986,12 +988,12 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
 
             {/* Religion */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Religion *</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Religion *</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                 <Picker
                   selectedValue={formData.religion_id}
                   onValueChange={(value) => handleInputChange('religion_id', value)}
-                  style={styles.picker}
+                  style={[styles.picker, { color: colors.textPrimary } ]}
                 >
                   <Picker.Item label="Select Religion" value="" />
                   {religionOptions.map((rel) => (
@@ -1003,13 +1005,13 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
 
             {/* Looking For */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Looking For *</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Looking For *</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                 <Picker
                   enabled={false}
                   selectedValue={formData.looking_for}
                   onValueChange={()=>{}}
-                  style={styles.picker}
+                  style={[styles.picker, { color: colors.textPrimary } ]}
                 >
                   <Picker.Item label="Select" value="" />
                   {lookingForOptions.map((opt)=>(
@@ -1056,12 +1058,12 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             />
             <View style={styles.row}>
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={styles.label}>Smoking Habits</Text>
-                <View style={styles.pickerContainer}>
+                <Text style={[styles.label, { color: colors.textPrimary }]}>Smoking Habits</Text>
+                <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                   <Picker
                     selectedValue={formData.smoking_status}
                     onValueChange={(value) => handleInputChange('smoking_status', value)}
-                    style={styles.picker}
+                    style={[styles.picker, { color: colors.textPrimary } ]}
                   >
                     <Picker.Item label="Select" value="" />
                     {smokingHabits.map((habit) => (
@@ -1072,11 +1074,11 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
               </View>
               <View style={[styles.inputContainer, styles.halfWidth]}>
                 <Text style={[styles.label, { color: colors.textPrimary }]}>Drinking Status</Text>
-                <View style={styles.pickerContainer}>
+                <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                   <Picker
                     selectedValue={formData.drinking_status}
                     onValueChange={(value) => handleInputChange('drinking_status', value)}
-                    style={styles.picker}
+                    style={[styles.picker, { color: colors.textPrimary } ]}
                   >
                     <Picker.Item label="Select" value="" />
                     {drinkingHabits.map((habit) => (
@@ -1088,12 +1090,12 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             </View>
             
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Marital Status *</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Marital Status *</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                 <Picker
                   selectedValue={formData.marital_status}
                   onValueChange={(value) => handleInputChange('marital_status', value)}
-                  style={styles.picker}
+                  style={[styles.picker, { color: colors.textPrimary } ]}
                 >
                   <Picker.Item label="Select Marital Status" value="" />
                   {MARITAL_STATUS.map((status) => (
@@ -1103,8 +1105,8 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
               </View>
             </View>
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Caste *</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Caste *</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                 <Picker
                   selectedValue={(() => {
                     if (!formData.caste) return '';
@@ -1117,7 +1119,7 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
                     return match ? String(match.id) : String(formData.caste);
                   })()}
                   onValueChange={(value) => handleInputChange('caste', value)}
-                  style={styles.picker}
+                  style={[styles.picker, { color: colors.textPrimary } ]}
                 >
                   <Picker.Item label="Select Caste" value="" />
                   {casteOptions.map((c) => (
@@ -1136,10 +1138,10 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             />
             
             
-            <Text style={styles.subHeader}>Present Address</Text>
+            <Text style={[styles.subHeader,{ color: colors.textPrimary }]}>Present Address</Text>
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Country *</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Country *</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                 <Picker
                   enabled={false}
                   selectedValue={(() => {
@@ -1151,7 +1153,7 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
                     return match ? String(match.id) : String(formData.country);
                   })()}
                   onValueChange={(value) => handleInputChange('country', value)}
-                  style={styles.picker}
+                  style={[styles.picker, { color: colors.textPrimary } ]}
                 >
                   <Picker.Item 
                     label={( () => {
@@ -1169,8 +1171,8 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             </View>
             <View style={styles.row}>
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={styles.label}>State *</Text>
-                <View style={styles.pickerContainer}>
+                <Text style={[styles.label, { color: colors.textPrimary }]}>State *</Text>
+                <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                   <Picker
                     selectedValue={(() => {
                       if(!formData.state) return '';
@@ -1181,7 +1183,7 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
                       return match ? String(match.id) : String(formData.state);
                     })()}
                     onValueChange={(value)=>handleInputChange('state',value)}
-                    style={styles.picker}
+                    style={[styles.picker, { color: colors.textPrimary } ]}
                   >
                     <Picker.Item label="Select State" value="" />
                     {stateOptions.map(s=>(<Picker.Item key={s.id} label={s.name} value={s.id} />))}
@@ -1189,8 +1191,8 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
                 </View>
               </View>
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={styles.label}>City *</Text>
-                <View style={styles.pickerContainer}>
+                <Text style={[styles.label, { color: colors.textPrimary }]}>City *</Text>
+                <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                   <Picker
                     selectedValue={(() => {
                       if(!formData.city) return '';
@@ -1201,7 +1203,7 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
                       return match ? String(match.id) : String(formData.city);
                     })()}
                     onValueChange={(value)=>handleInputChange('city',value)}
-                    style={styles.picker}
+                    style={[styles.picker, { color: colors.textPrimary } ]}
                   >
                     <Picker.Item label="Select City" value="" />
                     {cityOptions.map(ct=>(<Picker.Item key={ct.id} label={ct.name} value={ct.id} />))}
@@ -1233,12 +1235,12 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             
             {/* Blood Group Dropdown */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Blood Group *</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Blood Group *</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                 <Picker
                   selectedValue={formData.bloodGroup}
                   onValueChange={(value) => handleInputChange('bloodGroup', value)}
-                  style={styles.picker}
+                  style={[styles.picker, { color: colors.textPrimary } ]}
                 >
                   <Picker.Item label="Select Blood Group" value="" />
                   {bloodGroups.map((bg) => (
@@ -1298,12 +1300,12 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             </View>
             {/* Marital Status Dropdown */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Marital Status</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Marital Status</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                 <Picker
                   selectedValue={formData.partnerMaritalStatus}
                   onValueChange={(value) => handleInputChange('partnerMaritalStatus', value)}
-                  style={styles.picker}
+                  style={[styles.picker, { color: colors.textPrimary } ]}
                 >
                   <Picker.Item label="Select Marital Status" value="" />
                   {MARITAL_STATUS.map((status) => (
@@ -1314,12 +1316,12 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             </View>
             {/* Religion Dropdown */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Religion</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Religion</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                 <Picker
                   selectedValue={formData.partnerReligion}
                   onValueChange={(value) => handleInputChange('partnerReligion', value)}
-                  style={styles.picker}
+                  style={[styles.picker, { color: colors.textPrimary } ]}
                 >
                   <Picker.Item label="Select Religion" value="" />
                   {religionOptions.map((opt) => (
@@ -1332,12 +1334,12 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
             {/* Smoking & Drinking Dropdowns */}
             <View style={styles.row}>
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={styles.label}>Smoking Habits</Text>
-                <View style={styles.pickerContainer}>
+                <Text style={[styles.label, { color: colors.textPrimary }]}>Smoking Habits</Text>
+                <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                   <Picker
                     selectedValue={formData.partnerSmokingHabits}
                     onValueChange={(value) => handleInputChange('partnerSmokingHabits', value)}
-                    style={styles.picker}
+                    style={[styles.picker, { color: colors.textPrimary } ]}
                   >
                     <Picker.Item label="Select One" value="" />
                     <Picker.Item label="Non-smoker" value="0" />
@@ -1347,12 +1349,12 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
                 </View>
               </View>
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={styles.label}>Drinking Habits</Text>
-                <View style={styles.pickerContainer}>
+                <Text style={[styles.label, { color: colors.textPrimary }]}>Drinking Habits</Text>
+                <View style={[styles.pickerContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder } ]}>
                   <Picker
                     selectedValue={formData.partnerDrinkingHabits}
                     onValueChange={(value) => handleInputChange('partnerDrinkingHabits', value)}
-                    style={styles.picker}
+                    style={[styles.picker, { color: colors.textPrimary } ]}
                   >
                     <Picker.Item label="Select One" value="" />
                     <Picker.Item label="Non-drinker" value="0" />
@@ -1436,7 +1438,7 @@ const YearPickerInput = ({ label, selectedYear, onYearChange, containerStyle }: 
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top, backgroundColor: colors.background }]}>
       <ScrollView {...(panResponderRef.current?.panHandlers)} contentContainerStyle={styles.container} style={{ backgroundColor: colors.background }}>
         {/* Header */}
         <View style={styles.header}>

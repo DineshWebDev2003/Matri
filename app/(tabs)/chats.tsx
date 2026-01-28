@@ -28,8 +28,22 @@ const resolveProfileImage = (img?: ImgInput): string | null => {
     return null;
   }
   // At this point it's a string
-  if (img.startsWith('http://')) return img.replace('http://', 'https://');
-  if (img.startsWith('https://')) return img;
+  if (img.startsWith('http://')) img = img.replace('http://', 'https://');
+  if (img.startsWith('https://')) {
+    // Fix: some API URLs miss the /profile/ segment (e.g. /assets/images/user/filename.jpg)
+    // Ensure correct subdomain (some APIs return https://90skalyanam.com which blocks)
+    if (img.includes('://90skalyanam.com')) {
+      const fixedDomain = img.replace('://90skalyanam.com', '://app.90skalyanam.com');
+      console.log('🔄 Fixed domain for chat profile URL', img, '→', fixedDomain);
+      img = fixedDomain;
+    }
+    if (img.includes('/assets/images/user/') && !img.includes('/assets/images/user/profile/')) {
+      const fixed = img.replace('/assets/images/user/', '/assets/images/user/profile/');
+      console.log('🔄 Fixed malformed chat profile URL', img, '→', fixed);
+      return fixed;
+    }
+    return img;
+  }
   const urls = getImageUrl(img);
   return urls.primary || urls.fallback;
 };
@@ -190,6 +204,26 @@ export default function ChatsScreen() {
           console.log('⚠️ Could not fetch profiles for images:', profileError);
         }
         
+        // If after profile batch fetch we still have default avatars, fetch individually
+        const hasDefault = (url?:string)=> !url || url.includes('/defaults/default_');
+        try {
+          const enriched = await Promise.all(validConversations.map(async (conv:any)=>{
+            const currImg = conv.other_user?.image || '';
+            if(hasDefault(currImg)){
+              try{
+                const detail = await apiService.getUserDetailsById(conv.other_user?.id);
+                if(detail?.status==='success'){
+                  const realImg = detail.data?.profile?.image || detail.data?.image || null;
+                  if(realImg && !hasDefault(realImg)){
+                    conv.other_user.image = realImg;
+                  }
+                }
+              }catch(e){ /* ignore individual errors */ }
+            }
+            return conv;
+          }));
+          validConversations = enriched;
+        }catch(e){ console.log('⚠️ Failed to enrich images individually', e);}        
         console.log('✅ Valid conversations after filtering:', validConversations.length);
         console.log(`🔍 Gender filter applied: User is ${currentUserGender}, showing opposite gender`);
         setConversations(validConversations);
@@ -361,7 +395,7 @@ export default function ChatsScreen() {
     }
     // Third try: images array
     else if (item.other_user?.images?.[0]) {
-      profileImage = item.other_user.images[0];
+      profileImage = resolveProfileImage(item.other_user.images[0]);
     }
     // Fourth try: use getImageUrl helper if we have a filename
     else if (item.other_user?.image) {

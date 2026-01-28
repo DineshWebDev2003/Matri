@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, FlatList, Image, KeyboardAvoidingView, Platform, Modal, Animated, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import FallbackImage from '../../components/FallbackImage';
@@ -72,10 +72,25 @@ export default function ChatScreen() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [canSendMessage, setCanSendMessage] = useState(true);
+  const imageCacheRef = useRef<Record<string,string>>({});
+
   const [waitingForReply, setWaitingForReply] = useState(false);
   const [hasReceivedReply, setHasReceivedReply] = useState(false);
   const [chatTitle, setChatTitle] = useState('Chat');
-  const [chatImage, setChatImage] = useState('https://via.placeholder.com/40');
+  const isDefaultAvatar = (url?:string|null)=> !url || /defaults\/default_/i.test(url);
+
+  const resolveProfileImage = (img?: string | { primary?: string; fallback?: string }): string | null => {
+  if (!img) return null;
+  if (typeof img === 'object') {
+    return img.primary || img.fallback || null;
+  }
+  if (img.startsWith('http://')) img = img.replace('http://', 'https://');
+  if (img.startsWith('https://')) return img;
+  const urls = getImageUrl(img);
+  return urls.primary || urls.fallback;
+};
+
+  const [chatImage, setChatImage] = useState<string | null>(null);
   const [otherUserGender, setOtherUserGender] = useState<string | null>(null);
   const [isUserOnline, setIsUserOnline] = useState(false);
   const [userHasActed, setUserHasActed] = useState(false);
@@ -107,8 +122,10 @@ export default function ChatScreen() {
       if (imageUrl && !imageUrl.startsWith('http')) {
         const urls = getImageUrl(imageUrl);
         imageUrl = urls.primary || 'https://via.placeholder.com/40';
-        
       }
+      imageUrl = imageUrl.replace(/\s+/g,'').trim();
+      if(imageUrl.includes('defaults/default_')) imageUrl = null;
+        
       console.log('🖼️ Chat Screen - Image URL Details:', {
         rawImage: params.image,
         constructedUrl: imageUrl,
@@ -116,7 +133,20 @@ export default function ChatScreen() {
         userId: params.userId,
         userName: params.name,
       });
-      setChatImage(imageUrl);
+      const firstResolved = resolveProfileImage(imageUrl);
+      if(!isDefaultAvatar(firstResolved)){
+        setChatImage(firstResolved);
+      } else {
+        apiService.getUserDetailsById(params.userId)
+          .then((detail)=>{
+            if(detail?.status==='success'){
+              console.log('📸 Header fetch profile.image', detail.data?.profile?.image || detail.data?.image, 'for', params.userId);
+              const realImg = detail.data?.profile?.image || detail.data?.image || null;
+              if(!isDefaultAvatar(realImg)) setChatImage(resolveProfileImage(realImg)); else console.log('⚠️ Header profile still default for', params.userId);
+            }
+          })
+          .catch(()=>{});
+      }
       
       fetchOrCreateConversation();
     }
@@ -210,8 +240,21 @@ export default function ChatScreen() {
           setConversationId(existingConversation.id.toString());
           
           // Update chat image from conversation data if available
-          if (existingConversation.other_user_image) {
-            setChatImage(existingConversation.other_user_image);
+          let imgSrc = existingConversation.other_user_image || existingConversation.other_user?.image || (existingConversation.other_user?.images?.[0] ?? null);
+          if(imgSrc){
+            const resolved = resolveProfileImage(imgSrc);
+            if(!isDefaultAvatar(resolved)){
+              setChatImage(resolved);
+            } else { apiService.getUserDetailsById(params.userId)
+                .then(detail=>{
+                  const real = detail?.data?.profile?.image || detail?.data?.image || null;
+                  if(!isDefaultAvatar(real)) setChatImage(resolveProfileImage(real));
+                })
+                .catch(()=>{});
+            }
+            if(!/defaults\/default_/i.test(String(imgSrc))){
+            setChatImage(resolveProfileImage(imgSrc));
+          }
           }
           
           // Extract gender information if available
@@ -272,8 +315,22 @@ export default function ChatScreen() {
           setConversationId(foundConversation.id.toString());
           
           // Update chat image from conversation data if available
-          if (foundConversation.other_user_image) {
-            setChatImage(foundConversation.other_user_image);
+          let img = foundConversation.other_user_image || foundConversation.other_user?.image || (foundConversation.other_user?.images?.[0] ?? null);
+          if(img){
+            const res=resolveProfileImage(img);
+            if(!isDefaultAvatar(res)){
+              setChatImage(res);
+            } else {
+              apiService.getUserDetailsById(params.userId)
+              .then(detail=>{
+                const real = detail?.data?.profile?.image || detail?.data?.image || null;
+                if(!isDefaultAvatar(real)) setChatImage(resolveProfileImage(real));
+              })
+              .catch(()=>{});
+            }
+            if(!/defaults\/default_/i.test(String(img))){
+            setChatImage(resolveProfileImage(img));
+          }
           }
           
           // Extract gender information if available
@@ -362,6 +419,7 @@ export default function ChatScreen() {
           return {
             id: msg.id.toString(),
             text: msg.message || msg.content || msg.text,
+            senderId: msg.sender_id || msg.senderId || senderId,
             sender: isMyMessage ? 'me' : 'other',
             timestamp: formatMessageTime(msg.created_at || msg.timestamp),
             type: 'text',
@@ -370,7 +428,30 @@ export default function ChatScreen() {
         });
         
         console.log('✅ Messages loaded:', transformedMessages.length);
-        console.log('📨 Transformed messages:', transformedMessages);
+        // enrich sender avatars if placeholder
+        const enrichmentPromises = transformedMessages.map(async (msg)=>{
+          if(msg.sender!=='me' && (!msg.senderImage || isDefaultAvatar(msg.senderImage))){
+            const cached = imageCacheRef.current[msg.senderId || ''];
+            if(cached){ msg.senderImage = cached; return; }
+            try {
+              await apiService.getUserDetailsById(msg.senderId)
+                .then(detail => {
+                  console.log('📸 Message fetch profile.image', detail?.data?.profile?.image || detail?.data?.image, 'for', msg.senderId);
+                  const real = detail?.data?.profile?.image || detail?.data?.image || null;
+                  if(!isDefaultAvatar(real)){
+                    const resolved = resolveProfileImage(real);
+                    imageCacheRef.current[msg.senderId] = resolved || '';
+                    msg.senderImage = resolved;
+                  } else {
+                    console.log('⚠️ Sender profile still default for', msg.senderId);
+                  }
+                })
+                .catch(()=>{});
+            } catch(e){}
+          }
+        });
+        await Promise.all(enrichmentPromises);
+        console.log('📨 Transformed messages after enrichment:', transformedMessages);
         
         // Sort messages by ID or timestamp to ensure correct order
         const sortedMessages = transformedMessages.sort((a: any, b: any) => {
@@ -572,6 +653,14 @@ export default function ChatScreen() {
     }
   };
 
+  const showComingSoon = () => {
+    Alert.alert('Coming Soon', 'This feature is coming soon');
+  };
+
+  const toggleCallMenu = () => {
+    setShowCallMenu(prev => !prev);
+  };
+
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -743,7 +832,7 @@ export default function ChatScreen() {
                 <Feather name="arrow-left" size={24} color={theme === 'dark' ? '#FFFFFF' : '#1F2937'} />
               </TouchableOpacity>
               <FallbackImage
-                source={{ uri: chatImage }}
+                source={ chatImage ? { uri: chatImage } : undefined }
                 fallbackSource={otherUserGender?.toLowerCase() === 'female'
                   ? require('../../assets/images/female_avatar.webp')
                   : require('../../assets/images/male_avatar.webp')}
@@ -778,7 +867,7 @@ export default function ChatScreen() {
               <Feather name="arrow-left" size={24} color={theme === 'dark' ? '#FFFFFF' : '#1F2937'} />
             </TouchableOpacity>
             <FallbackImage
-              source={{ uri: chatImage }}
+              source={ chatImage ? { uri: chatImage } : undefined }
               fallbackSource={otherUserGender?.toLowerCase() === 'female'
                 ? require('../../assets/images/female_avatar.webp')
                 : require('../../assets/images/male_avatar.webp')}
@@ -794,6 +883,22 @@ export default function ChatScreen() {
         </View>
       </View>
       <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        {showCallMenu && (
+        <TouchableOpacity style={[styles.menuOverlay]} activeOpacity={1} onPress={() => setShowCallMenu(false)}>
+          <View style={[styles.callMenuContainer, theme === 'dark' && styles.callMenuContainerDark]}>
+            <TouchableOpacity style={styles.callMenuItem} onPress={() => { setShowCallMenu(false); showComingSoon(); }}>
+              <Feather name="phone" size={20} color={theme === 'dark' ? '#FFFFFF' : '#1F2937'} />
+              <Text style={[styles.callMenuText, theme === 'dark' && { color: '#FFFFFF' }]}>Audio Call</Text>
+            </TouchableOpacity>
+            <View style={[styles.callMenuDivider, theme === 'dark' && styles.callMenuDividerDark]} />
+            <TouchableOpacity style={styles.callMenuItem} onPress={() => { setShowCallMenu(false); showComingSoon(); }}>
+              <Feather name="video" size={20} color={theme === 'dark' ? '#FFFFFF' : '#1F2937'} />
+              <Text style={[styles.callMenuText, theme === 'dark' && { color: '#FFFFFF' }]}>Video Call</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+        )}
+
         <FlatList
           data={messages}
           renderItem={renderMessage}
@@ -821,14 +926,14 @@ export default function ChatScreen() {
           <View style={[styles.inputContainer, theme === 'dark' && styles.inputContainerDark]}>
             <TouchableOpacity 
               style={[styles.inputButton, !canSendMessage && styles.disabledButton]} 
-              onPress={canSendMessage ? takePhoto : undefined}
+              onPress={showComingSoon}
               disabled={!canSendMessage}
             >
               <Feather name="camera" size={24} color={canSendMessage ? (theme === 'dark' ? '#B0B0B0' : '#6B7280') : "#D1D5DB"} />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.inputButton, !canSendMessage && styles.disabledButton]} 
-              onPress={canSendMessage ? pickImage : undefined}
+              onPress={showComingSoon}
               disabled={!canSendMessage}
             >
               <Feather name="image" size={24} color={canSendMessage ? (theme === 'dark' ? '#B0B0B0' : '#6B7280') : "#D1D5DB"} />
@@ -844,7 +949,7 @@ export default function ChatScreen() {
             <View style={styles.micContainer}>
               <TouchableOpacity 
                 style={[styles.inputButton, !canSendMessage && styles.disabledButton]} 
-                onPress={canSendMessage ? (recording ? stopRecording : startRecording) : undefined}
+                onPress={showComingSoon}
                 disabled={!canSendMessage}
               >
                 <Feather name="mic" size={24} color={isRecording ? 'red' : (canSendMessage ? (theme === 'dark' ? '#B0B0B0' : '#6B7280') : '#D1D5DB')} />

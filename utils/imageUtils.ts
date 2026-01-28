@@ -58,23 +58,35 @@ export const getImageUrl = (image: string | null | undefined): ImageUrls => {
  * @param image - Image filename or full URL
  * @returns Object with primary and fallback URLs
  */
-export const getGalleryImageUrl = (image: string | null | undefined): ImageUrls => {
-  if (!image || typeof image !== 'string' || image.trim() === '') {
+export const getGalleryImageUrl = (img?: string | null): ImageUrls => {
+  /*
+    Constructs gallery image URLs with robust fallbacks
+    1. If full https URL provided:
+       - primary: given URL (ensuring https and correct domain)
+       - fallback: same path prefixed with /core/public
+    2. If filename provided:
+       - primary: https://app.90skalyanam.com/assets/images/user/gallery/<file>
+       - fallback: https://app.90skalyanam.com/core/public/assets/images/user/gallery/<file>
+    Also normalises mistaken domain spellings (90skalyyanam 90skalyanam)
+  */
+  if (!img || typeof img !== 'string' || img.trim() === '') {
     return { primary: null, fallback: null };
   }
   
-  const trimmedImage = image.trim();
+  const trimmedImage = img.trim();
   const devBase = process.env.EXPO_PUBLIC_IMAGE_GALLERY_BASE_URL || 'http://10.169.108.139/app_matri/matri_app/assets/images/user/gallery';
   // If API already returns full URL, still prefer our dev server by filename
   if (trimmedImage.startsWith('http')) {
-    const filename = trimmedImage.split('/').pop();
-    // ensure production url contains /core/public/ segment
-    let fixedProd = trimmedImage;
-    if(fixedProd.includes('app.90skalyanam.com') && !fixedProd.includes('/core/public/')){
-      fixedProd = fixedProd.replace('app.90skalyanam.com','app.90skalyanam.com/core/public');
+    // normalise domain typos and force https
+    let primary = trimmedImage.replace('90skalyyanam.com','90skalyanam.com');
+    if(primary.startsWith('http://')) primary = primary.replace('http://','https://');
+
+    // fallback logic: if provided URL already contains '/core/public', try the non-core variant.
+    let fallback: string | null = null;
+    if (primary.includes('/core/public/')) {
+      fallback = primary.replace('/core/public', '');
     }
-    const legacyUrl = trimmedImage;
-    return { primary: fixedProd, fallback: legacyUrl };
+    return { primary, fallback };
   }
   
   // If it's just a filename, construct URL with LOCAL first
