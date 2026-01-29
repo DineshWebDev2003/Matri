@@ -6,6 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { isFreeUser } from '../../utils/membership';
 import { useLanguage } from '../../context/LanguageContext';
 import { apiService, premiumUtils } from '../../services/api';
 import ProfileImage from '../../components/ProfileImage';
@@ -519,8 +520,8 @@ export default function ProfilesScreen() {
 
   const handleHeartPress = async (profile: any) => {
     // Block if not premium
-    const isFreePlan = Number(auth?.user?.package_id||0) === 4;
-    if(isFreePlan){
+    const freeUser = isFreeUser(auth?.user) || isFreeUser(auth?.limitation);
+    if(freeUser){
       showPremiumModal();
       return;
     }

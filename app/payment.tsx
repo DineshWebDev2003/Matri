@@ -82,21 +82,16 @@ export default function PaymentScreen() {
             reason: error.reason,
           });
           
-          // Show more specific error message
-          let errorMessage = 'Payment not completed';
-          if (error.description) {
-            errorMessage = error.description;
-          } else if (error.reason) {
-            errorMessage = error.reason;
-          }
-          
-          Alert.alert('Payment Error', errorMessage);
+          // Distinguish cancellation vs other failures
+          const cancelled = String(error.code) === '0' || (error.description && /cancel/i.test(error.description));
+          const errorMessage = cancelled ? 'Payment cancelled' : 'Something went wrong, please try again later';
+          Alert.alert(cancelled ? 'Payment Cancelled' : 'Payment Error', errorMessage);
           router.back();
         });
     } catch (e: any) {
       console.error('⚠️ createRazorpayOrder error', e.response?.data || e.message);
       const msg = e.response?.data?.message || e.response?.data?.error || e.message || 'Unable to start payment';
-      Alert.alert('Error', msg);
+      Alert.alert('Error', 'Something went wrong, please try again later');
       router.back();
     } finally {
       setLoading(false);

@@ -379,6 +379,27 @@ const styles = StyleSheet.create({
   verifiedBadge: {
     marginLeft: 8,
   },
+  heartBtn: {
+    position: 'absolute',
+    bottom: -6,
+    right: -6,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 4,
+    elevation: 3,
+  },
+    marginLeft: 8,
+  },
+  heartBtn: {
+    position: 'absolute',
+    bottom: -6,
+    right: -6,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 4,
+    elevation: 3,
+  },
+  },
   profileDetailsRow: {
     flexDirection: 'row',
     alignItems: 'center',

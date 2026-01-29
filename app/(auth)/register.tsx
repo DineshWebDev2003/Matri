@@ -102,6 +102,8 @@ export default function RegisterScreen() {
     }
   };
 
+  const [showPassword, setShowPassword] = useState(false);
+
   const [formData, setFormData] = useState({
     looking_for: '',
     firstname: '',
@@ -537,10 +539,13 @@ export default function RegisterScreen() {
                   style={[styles.modernInput, { color: colors.textPrimary }]} 
                   placeholder="Password" 
                   placeholderTextColor={colors.textTertiary}
-                  secureTextEntry 
+                  secureTextEntry={!showPassword} 
                   value={formData.password} 
                   onChangeText={(text) => handleInputChange('password', text)} 
                 />
+                <TouchableOpacity onPress={() => setShowPassword(prev => !prev)} style={{ position: 'absolute', right: 10 }}>
+                  <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color={colors.textTertiary} />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -605,7 +610,7 @@ export default function RegisterScreen() {
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Feather name="user-plus" size={18} color="#FFFFFF" />
-                <Text style={styles.registerButtonText}>{t('register')}</Text>
+                <Text style={styles.registerButtonText}>{t('register').toUpperCase()}</Text>
               </View>
             )}
           </TouchableOpacity>

@@ -150,14 +150,21 @@ const createAxiosInstance = (): AxiosInstance => {
   });
 
   // Response interceptor - Handle errors
+  // Convert network failures into resolved responses to avoid uncaught promise rejections
   instance.interceptors.response.use(
     (response) => response,
     (error) => {
-      if (error.response?.status === 401) {
-        // Handle unauthorized
+      // No response object → network failure / timeout / DNS etc.
+      if (!error.response) {
+        console.warn('🌐 Network request failed:', error.message);
+        return Promise.resolve({
+          data: { status: 'error', message: 'network_error' },
+        });
+      }
+      if (error.response.status === 401) {
         SecureStore.deleteItemAsync('token');
       }
-      return Promise.reject(error);
+      return Promise.resolve(error.response);
     }
   );
 

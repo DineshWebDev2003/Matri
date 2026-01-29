@@ -12,6 +12,7 @@ import FallbackImage from '../../components/FallbackImage';
 import UniversalHeader from '../../components/UniversalHeader';
 import MenuModal from '../../components/MenuModal';
 import { LinearGradient } from 'expo-linear-gradient';
+import { usePremiumModal } from '../../context/PremiumModalContext';
 //import WithSwipe from '../../components/WithSwipe';
 import { getImageUrl } from '../../utils/imageUtils';
 
@@ -52,6 +53,7 @@ export default function ChatsScreen() {
   const router = useRouter();
   const auth = useAuth();
   const { user } = auth;
+  const { showPremiumModal } = usePremiumModal();
   const { theme } = useTheme();
   const { t } = useLanguage();
   const [conversations, setConversations] = useState([]);
@@ -314,7 +316,12 @@ export default function ChatsScreen() {
 
 
   const handleChatPress = (conversation: any) => {
-    // Allow all users to access chat
+    // Block free users from opening chat
+    if (hasFreePackage()) {
+      showPremiumModal();
+      return;
+    }
+    // Allow premium users to access chat
     console.log('💬 Chat Press - Opening conversation:', {
       isPremiumUser,
       userPackageId: user?.package_id,
@@ -364,6 +371,10 @@ export default function ChatsScreen() {
     
     return (
       <TouchableOpacity style={styles.storyItem} onPress={() => {
+        if (hasFreePackage()) {
+          showPremiumModal();
+          return;
+        }
         router.push({ pathname: '/chat/[id]', params: { id: item.id?.toString(), name: profileName, image: profileImage || '', userId: item.id?.toString(), gender: userGender } });
       }}>
         <View style={styles.storyImageContainer}>

@@ -119,22 +119,7 @@ export default function LoginScreen() {
             />
             <Text style={styles.loginHeaderText}>Welcome Back</Text>
             <Text style={styles.loginHeaderSubtext}>Find your perfect match</Text>
-            <TouchableOpacity
-              style={{ marginTop: 12, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1.5, borderColor: '#FFFFFF', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)' }}
-              onPress={async () => {
-                try {
-                  setLoading(true);
-                  await auth?.loginAsGuest();
-                } catch (error: any) {
-                  Alert.alert('Error', error.message || 'Failed to login as guest');
-                } finally {
-                  setLoading(false);
-                }
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Login as Guest</Text>
-            </TouchableOpacity>
-          </View>
+                      </View>
         </LinearGradient>
       </View>
     );
@@ -303,7 +288,7 @@ export default function LoginScreen() {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Feather name="user-plus" size={18} color="#FFFFFF" />
-                  <Text style={styles.registerButtonText}>{t('register')}</Text>
+                  <Text style={styles.registerButtonText}>{t('register').toUpperCase()}</Text>
                 </View>
               </TouchableOpacity>
             </View>

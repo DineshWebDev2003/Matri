@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import '../utils/silenceAlerts';
+import '../utils/globalErrorHandler';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { PremiumModalProvider } from '../context/PremiumModalContext';
+import ErrorBoundary from '../components/ErrorBoundary';
+import OfflineBanner from '../components/OfflineBanner';
+import { ConnectivityProvider } from '../context/ConnectivityContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -21,7 +26,7 @@ SplashScreen.preventAutoHideAsync();
 
 // play app notification sound
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: false, shouldSetBadge: false }),
+  handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
 });
 
 function RootLayoutNav() {
@@ -52,17 +57,18 @@ function RootLayoutNav() {
   const isAuthPage = segments[0] === '(auth)';
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, paddingBottom: insets.bottom, backgroundColor: theme === 'dark' ? '#000000' : '#FFFFFF' }}>
       {/* Dynamic StatusBar: Dark icons in light mode, Light icons in dark mode */}
-      <StatusBar 
-        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} 
-        backgroundColor="transparent" 
-        translucent={true}
+      <StatusBar
+        style={theme === 'dark' ? 'light' : 'dark'}
+        translucent
+        backgroundColor="transparent"
       />
+      <OfflineBanner />
       <Stack screenOptions={{ 
         headerShown: false, 
         contentStyle: { marginTop: 0 },
-        animationEnabled: true 
+        animation: 'default' 
       }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
@@ -106,17 +112,21 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <CustomThemeProvider>
-        <LanguageProvider>
-          <AuthProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <PremiumModalProvider>
-                <RootLayoutNav />
-              </PremiumModalProvider>
-            </ThemeProvider>
-          </AuthProvider>
-        </LanguageProvider>
-      </CustomThemeProvider>
+      <ErrorBoundary>
+        <ConnectivityProvider>
+          <CustomThemeProvider>
+            <LanguageProvider>
+              <AuthProvider>
+                <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                  <PremiumModalProvider>
+                    <RootLayoutNav />
+                  </PremiumModalProvider>
+                </ThemeProvider>
+              </AuthProvider>
+            </LanguageProvider>
+          </CustomThemeProvider>
+        </ConnectivityProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }

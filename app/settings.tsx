@@ -13,7 +13,6 @@ const settingsMenuItems: { id: string; title: string; icon: IconName; section: s
   { id: '1', title: 'Personal Information', icon: 'user', section: 'personal' },
   { id: '2', title: 'Privacy Centre', icon: 'lock', section: 'personal' },
   { id: '3', title: 'Account Status', icon: 'check-circle', section: 'personal' },
-  { id: 'cp', title: 'Complete Profile', icon: 'clipboard', section: 'personal' },
   { id: '4', title: 'Link History', icon: 'link', section: 'personal' },
   { id: '5', title: 'Push Notification', icon: 'bell', section: 'notifications', hasToggle: true },
   { id: '6', title: 'Email Notification', icon: 'mail', section: 'notifications', hasToggle: true },
@@ -58,9 +57,6 @@ export default function SettingsScreen() {
         break;
       case 'Account Status':
         Alert.alert('Account Status', 'Your account is active and verified');
-        break;
-      case 'Complete Profile':
-        router.push('/(auth)/profile-completion');
         break;
       case 'Link History':
         Alert.alert('Link History', 'View your connection history');

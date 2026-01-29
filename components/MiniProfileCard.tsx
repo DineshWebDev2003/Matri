@@ -32,6 +32,9 @@ const MiniProfileCard: React.FC<MiniProfileCardProps> = ({ item, onPress, onHear
 
     const buildImageUrl = (img?: string) => {
     if (!img) return null;
+    if (/default(\.|_)/i.test(img)) return null; // ignore generic placeholder
+    
+    if (!img) return null;
         if (img.startsWith('http')) return img;
     if (img.includes('/assets')) return `https://${img.replace(/^https?:\/\//, '')}`;
     const base = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || 'https://90skalyanam.com/assets/images/user/profile';
@@ -50,7 +53,11 @@ const MiniProfileCard: React.FC<MiniProfileCardProps> = ({ item, onPress, onHear
           {profileImage ? (
             <Image source={{ uri: profileImage }} style={styles.image} resizeMode="cover" />
           ) : (
-            <Feather name="user" size={48} color="#9CA3AF" />
+            item?.defaultImage ? (
+              <Image source={item.defaultImage} style={styles.image} resizeMode="cover" />
+            ) : (
+              <Feather name="user" size={48} color="#9CA3AF" />
+            )
           )}
         </View>
       </LinearGradient>

@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ComponentProps } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import styles from '../styles/accountStyles';
+import { isFreeUser } from '../../utils/membership';
+import { usePremiumModal } from '../../context/PremiumModalContext';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 // Razorpay inline code removed; payment handled via dedicated screen
@@ -145,6 +147,8 @@ const getGalleryImageUrl = (image: string | null | undefined): { primary: string
 export default function AccountScreen() {
   const { user } = useAuth();
 
+  const currentPackageId = Number(user?.package_id || 0);
+
   const handlePayNow = (planId:number) => {
     router.push({ pathname: '/payment', params: { planId: planId.toString() } });
   };
@@ -152,6 +156,7 @@ export default function AccountScreen() {
   const profileCardRef = useRef<ProfileCardRef>(null);
   const auth = useAuth();
   const { theme, setThemeMode } = useTheme();
+  const { showPremiumModal } = usePremiumModal();
   const { language, setLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const limitation = auth?.limitation;
@@ -404,6 +409,12 @@ export default function AccountScreen() {
   };
 
   const handleAddGalleryImage = async () => {
+    // Show premium modal for free-package users
+    const isFreePackage = isFreeUser(auth?.user) || isFreeUser(auth?.limitation);
+    if (isFreePackage) {
+      showPremiumModal();
+      return;
+    }
     try {
       if (uploadingGallery) return;
       // Request permission
@@ -938,33 +949,12 @@ export default function AccountScreen() {
                       <TouchableOpacity 
                         style={styles.uploadPhotosButton}
                         onPress={() => {
-                          // Check if user is premium
-                          const isFreePackage = String(userProfile?.packageId) === '4';
+                          const isFreePackage = isFreeUser(auth?.user) || isFreeUser(auth?.limitation);
                           if (isFreePackage) {
-                            console.log('📸 Non-premium user attempting to upload, showing upgrade prompt');
-                            Alert.alert(
-                              'Premium Feature',
-                              'Photo uploads are available for premium members only. Upgrade to Pro to upload photos.',
-                              [
-                                {
-                                  text: 'Cancel',
-                                  onPress: () => {},
-                                  style: 'cancel'
-                                },
-                                {
-                                  text: 'Upgrade to Pro',
-                                  onPress: () => {
-                                    console.log('🚀 Navigating to plans/upgrade screen');
-                                    router.push('/plans');
-                                  },
-                                  style: 'default'
-                                }
-                              ]
-                            );
-                          } else {
-                            console.log('📸 Premium user, navigating to gallery');
-                            router.push('/gallery');
+                            showPremiumModal();
+                            return;
                           }
+                          handleAddGalleryImage();
                         }}
                       >
                         <Text style={styles.uploadPhotosButtonText}>Upload Photos</Text>
@@ -1003,7 +993,7 @@ export default function AccountScreen() {
                     {planDetails && Array.isArray(planDetails) && planDetails.length > 0 && (
                       <View style={styles.availablePlansSection}>
                         <Text style={[styles.availablePlansTitle, theme === 'dark' && { color: '#E5E7EB' }]}>Available Plans</Text>
-                        {planDetails.map((plan: any, index: number) => (
+                        {planDetails.filter((p:any)=>String(p.id)!=='4').map((plan: any, index: number) => (
                           <View key={index} style={[styles.planOptionCard, theme === 'dark' && { backgroundColor: '#1A1A1A', borderColor: '#2A2A2A' }]}>
                             <View style={styles.planOptionHeader}>
                               <Text style={[styles.planOptionName, theme === 'dark' && { color: '#FFFFFF' }]}>
@@ -1055,19 +1045,19 @@ export default function AccountScreen() {
 
                               {/* Pay/Current Button */}
                               <TouchableOpacity
-                                disabled={plan.id === userProfile?.packageId || String(plan.name || '').toUpperCase().includes('FREE')}
+                                disabled={plan.id === currentPackageId || userProfile?.packageId === 4 || plan.id === 4}
                                 style={[
                                   styles.payNowButton,
                                   plan.id === userProfile?.packageId && styles.payNowButtonDisabled,
                                 ]}
                                 onPress={() => {
-                                  if (plan.id !== userProfile?.packageId) {
+                                  if (plan.id !== currentPackageId && userProfile?.packageId !== 4) {
                                     handlePayNow(plan.id);
                                   }
                                 }}
                               >
                                 <Text style={styles.payNowButtonText}>
-                                  {plan.id === userProfile?.packageId || String(plan.name || '').toUpperCase().includes('FREE') ? 'Current' : 'Pay Now'}
+                                  {plan.id === currentPackageId || userProfile?.packageId === 4 ? 'Current' : 'Pay Now'}
                                 </Text>
                               </TouchableOpacity>
                             </View>
@@ -1121,7 +1111,7 @@ export default function AccountScreen() {
                 {planDetails && Array.isArray(planDetails) && planDetails.length > 0 && (
                   <View style={styles.availablePlansSection}>
                     <Text style={[styles.availablePlansTitle, theme === 'dark' && { color: '#E5E7EB' }]}>Available Plans</Text>
-                    {planDetails.map((plan: any, index: number) => (
+                    {planDetails.filter((p:any)=>String(p.id)!=='4').map((plan: any, index: number) => (
                       <View key={index} style={[styles.planOptionCard, theme === 'dark' && { backgroundColor: '#1A1A1A', borderColor: '#2A2A2A' }]}>
                         <View style={styles.planOptionHeader}>
                           <Text style={[styles.planOptionName, theme === 'dark' && { color: '#FFFFFF' }]}>

@@ -1247,7 +1247,8 @@ export const apiService = {
 
   async ignoreHeart(userId: string | number) {
     try {
-      const response = await axiosInstance.post('/ignore-heart', { user_id: userId });
+      // Backend uses DELETE remove-interest/{id}
+      const response = await axiosInstance.delete(`/remove-interest/${userId}`);
       return response.data;
     } catch (error: any) {
       console.error('❌ Ignore heart failed', error);

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { isFreeUser } from '../../utils/membership';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import axios from 'axios';
@@ -295,8 +296,8 @@ export default function HomeScreen() {
 
   // Send interest to a profile
   const expressHeart = async (profileId: string | number) => {
-    const isFreePlan = Number(auth?.user?.package_id||0) === 4;
-    if(isFreePlan){
+    const freeUser = isFreeUser(auth?.user) || isFreeUser(auth?.limitation);
+    if(freeUser){
       showPremiumModal();
       return;
     }
@@ -367,7 +368,7 @@ export default function HomeScreen() {
           }
         }
         return filtered.slice(0, 5).map((profile: any) => {
-          const genderLower = (String(profile.gender || '')).toLowerCase();
+          const genderLower = (String(profile.gender || profile.genderIdentity || '')).toLowerCase();
           let defaultImage;
           if (genderLower.startsWith('f')) {
             defaultImage = require('../../assets/images/female_avatar.webp');
@@ -382,7 +383,15 @@ export default function HomeScreen() {
 
           // Determine city: prefer city / present_city / city_name / location
           // Determine if API returned a generic default image placeholder
-          let profileImage:any = profile.image || profile.profileImage || null;
+          let profileImage:any = profile.image || profile.profileImage || profile.photo || null;
+            if (profileImage && typeof profileImage === 'string') {
+              // If path is relative (starts with / or lacks http), prefix with CDN domain
+              const trimmed = profileImage.trim();
+              if (!/^https?:\/\//i.test(trimmed)) {
+                const baseCdn = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || 'https://90skalyanam.com/assets/images/user/profile';
+                profileImage = `${baseCdn}/${trimmed.replace(/^\/+/, '')}`;
+              }
+            }
           if (profileImage && typeof profileImage === 'string' && !profileImage.startsWith('http')) {
             const base = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || 'https://90skalyanam.com/assets/images/user/profile';
             profileImage = `${base}/${profileImage}`;
@@ -396,7 +405,9 @@ export default function HomeScreen() {
 
           return {
             id: profile.id || profile.user_id,
-            name: profile.name || `${profile.firstname || ''} ${profile.lastname || ''}`.trim(),
+            name: (profile.name || `${profile.firstname || ''} ${profile.lastname || ''}`.trim()).split(' ').slice(0,1).join(' '),
+            fullName: profile.name || `${profile.firstname || ''} ${profile.lastname || ''}`.trim(),
+            image: profileImage,
             profileImage,
             defaultImage,
             location: city || 'Location N/A',

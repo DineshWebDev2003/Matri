@@ -13,6 +13,7 @@ import UniversalHeader from '../../components/UniversalHeader';
 import MenuModal from '../../components/MenuModal';
 //import WithSwipe from '../../components/WithSwipe';
 import { LinearGradient } from 'expo-linear-gradient';
+import { usePremiumModal } from '../../context/PremiumModalContext';
 import styles from '../styles/savedscreenStyles';
 
 export default function InterestedScreen() {
@@ -20,6 +21,7 @@ export default function InterestedScreen() {
   const params = useLocalSearchParams();
   const { theme } = useTheme();
   const auth = useAuth();
+  const { showPremiumModal } = usePremiumModal();
   // Build absolute URL for current user's profile image
   const userProfileImg = (() => {
     const img = auth?.user?.image;
@@ -356,6 +358,11 @@ export default function InterestedScreen() {
   };
 
   const handleAcceptInterest = async (profileId: string | number) => {
+    // Block if user is on free package (id 4)
+    if (hasFreePackage()) {
+      showPremiumModal();
+      return;
+    }
     try {
       // Call API to accept interest
       const response = await apiService.acceptHeart(profileId);
@@ -554,23 +561,7 @@ export default function InterestedScreen() {
             </TouchableOpacity>
 
             {/* Right Button */}
-            {activeTab === 'sent' && (
-              <TouchableOpacity 
-                style={[styles.cardActionButton, styles.cardActionButtonSmall, styles.shortlistActionButton]}
-                onPress={() => handleShortlist(item.id)}
-              >
-                <Feather name="bookmark" size={20} color="white" />
-              </TouchableOpacity>
-            )}
-            
-            {activeTab === 'received' && (
-              <TouchableOpacity 
-                style={[styles.cardActionButton, styles.cardActionButtonSmall, styles.ignoreActionButton]}
-                onPress={() => handleIgnoreInterest(item.id)}
-              >
-                <Feather name="x-circle" size={20} color="white" />
-              </TouchableOpacity>
-            )}
+                        
 
             {activeTab === 'ignored' && (
               <TouchableOpacity 

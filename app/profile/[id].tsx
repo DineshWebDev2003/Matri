@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { isFreeUser } from '../../utils/membership';
 import { apiService } from '../../services/api';
 import FallbackImage from '../../components/FallbackImage';
 import UniversalHeader from '../../components/UniversalHeader';
@@ -75,6 +76,7 @@ export default function ProfileDetailScreen() {
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const freeUser = isFreeUser(auth?.user) || isFreeUser(auth?.limitation);
   const [isInterested, setIsInterested] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'preferences' | 'photos'>('details');
@@ -302,8 +304,7 @@ export default function ProfileDetailScreen() {
   };
 
   const handleChat = () => {
-    const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
-    if(isFreeUser){ showPremiumModal(); return; }
+        if(isFreeUser){ showPremiumModal(); return; }
     if (auth?.isGuest) {
       Alert.alert('Login Required', 'Please login to chat with this member', [
         { text: 'Cancel' },
@@ -335,8 +336,7 @@ export default function ProfileDetailScreen() {
 
   // Unlock contact – calls backend and refreshes user credits
   const handleViewContact = async () => {
-    const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
-    if(isFreeUser){ showPremiumModal(); return; }
+        if(isFreeUser){ showPremiumModal(); return; }
     console.log('🔓 Attempting to unlock contact for profile:', profile?.id);
     console.log('🔢 Credits before unlock:', remainingCredits===Infinity ? 'Unlimited' : remainingCredits);
     try {
@@ -386,8 +386,7 @@ export default function ProfileDetailScreen() {
   };
 
   const handleInterest = async () => {
-    const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
-    if(isFreeUser){showPremiumModal();return;}
+        if(isFreeUser){showPremiumModal();return;}
 
     if (auth?.isGuest) {
       Alert.alert('Login Required', 'Please login to send interest', [
@@ -482,8 +481,7 @@ export default function ProfileDetailScreen() {
   }, [profile?.id]);
 
   const handleShortlist = async () => {
-    const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
-    if(isFreeUser){showPremiumModal();return;}
+        if(isFreeUser){showPremiumModal();return;}
 
     if (!profile?.id) return;
     try {
@@ -648,7 +646,6 @@ export default function ProfileDetailScreen() {
               <Text style={[styles.profileDetails, theme === 'dark' && { color: '#B0B0B0' }]}>Maritial Status:{profile?.maritalStatus}</Text>
             </View>
           </View>
-
           {/* Action Buttons - Bottom of Card */}
           <View style={[styles.cardActionButtons, theme === 'dark' && styles.cardActionButtonsDark]}>
             {/* Chat Button - X Icon - Small */}
@@ -695,8 +692,7 @@ export default function ProfileDetailScreen() {
                 key={tab}
                 style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
                 onPress={() => {
-                const isFreeUser = Number(auth?.user?.package_id || 0) === 4;
-                if (tab === 'photos' && isFreeUser) {
+                                if (tab === 'photos' && freeUser) {
                   showPremiumModal();
                   return;
                 }
