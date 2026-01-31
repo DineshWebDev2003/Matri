@@ -134,18 +134,8 @@ export default function ChatScreen() {
         userName: params.name,
       });
       const firstResolved = resolveProfileImage(imageUrl);
-      if(!isDefaultAvatar(firstResolved)){
+      if (firstResolved) {
         setChatImage(firstResolved);
-      } else {
-        apiService.getUserDetailsById(params.userId)
-          .then((detail)=>{
-            if(detail?.status==='success'){
-              console.log('📸 Header fetch profile.image', detail.data?.profile?.image || detail.data?.image, 'for', params.userId);
-              const realImg = detail.data?.profile?.image || detail.data?.image || null;
-              if(!isDefaultAvatar(realImg)) setChatImage(resolveProfileImage(realImg)); else console.log('⚠️ Header profile still default for', params.userId);
-            }
-          })
-          .catch(()=>{});
       }
       
       fetchOrCreateConversation();
@@ -401,18 +391,16 @@ export default function ChatScreen() {
             // Try multiple sources for the sender image
             const imageFilename = msg.sender_image || msg.image;
             
-            if (imageFilename) {
-              // If we have an image filename, construct the production URL
+            if (imageFilename && !/defaults\/default_/i.test(imageFilename)) {
+              // Real image filename; build production URL
               const productionImageUrl = `${process.env.EXPO_PUBLIC_PRODUCTION_PROFILE_IMAGE_URL}/${imageFilename}`;
               senderImageUrl = productionImageUrl;
-              console.log('🖼️ Message sender image:', {
-                filename: imageFilename,
-                productionUrl: productionImageUrl
-              });
+              console.log('🖼️ Message sender image:', { filename: imageFilename, productionUrl: productionImageUrl });
             } else {
-              // Fallback to chat image or gender-based placeholder
-              senderImageUrl = chatImage || 
-                             (otherUserGender === 'female' ? 'https://via.placeholder.com/40/FF69B4/FFFFFF?text=F' : 'https://via.placeholder.com/40/4169E1/FFFFFF?text=M');
+              // Use chat header image if available, else gender placeholder
+              senderImageUrl = chatImage || (otherUserGender === 'female'
+                  ? 'https://via.placeholder.com/40/FF69B4/FFFFFF?text=F'
+                  : 'https://via.placeholder.com/40/4169E1/FFFFFF?text=M');
             }
           }
           
@@ -836,6 +824,7 @@ export default function ChatScreen() {
                 fallbackSource={otherUserGender?.toLowerCase() === 'female'
                   ? require('../../assets/images/female_avatar.webp')
                   : require('../../assets/images/male_avatar.webp')}
+                onError={(e)=>console.log('❌ Header image failed',e.nativeEvent.error,'url:',chatImage)}
                 style={styles.userInfoAvatar}
               />
               <View style={{ flex: 1, marginLeft: 12 }}>

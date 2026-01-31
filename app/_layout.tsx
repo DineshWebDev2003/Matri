@@ -6,6 +6,7 @@ import { Audio } from 'expo-av';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { PremiumModalProvider } from '../context/PremiumModalContext';
+import { useAuth } from '../context/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import OfflineBanner from '../components/OfflineBanner';
 import { ConnectivityProvider } from '../context/ConnectivityContext';
@@ -30,6 +31,17 @@ Notifications.setNotificationHandler({
 });
 
 function RootLayoutNav() {
+  const router = useRouter();
+  const { isAuthenticated, isGuest, isLoading } = useAuth();
+  // Decide initial route after auth state resolved
+  React.useEffect(() => {
+    if (isLoading) return;
+    const path = (isAuthenticated || isGuest) ? '/(tabs)' : '/onboarding';
+    if (router.pathname !== path) {
+      router.replace(path);
+    }
+  }, [isLoading, isAuthenticated, isGuest]);
+
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener(async () => {
       try {
@@ -70,6 +82,7 @@ function RootLayoutNav() {
         contentStyle: { marginTop: 0 },
         animation: 'default' 
       }}>
+        <Stack.Screen name="onboarding" />
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />

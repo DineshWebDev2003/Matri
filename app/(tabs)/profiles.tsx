@@ -2128,12 +2128,11 @@ const styles = StyleSheet.create({
   },
   filterTab: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
     borderRadius: 14,
     backgroundColor: '#F3F4F6',
     marginRight: 2,
     height: 30,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   filterTabActive: {

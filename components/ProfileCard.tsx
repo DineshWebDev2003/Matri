@@ -1,5 +1,6 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Alert } from 'react-native';
+import FallbackImage from './FallbackImage';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,7 +44,13 @@ const ProfileCard = forwardRef<ProfileCardRef, ProfileCardProps>(({ userProfile,
     return age;
   };
 
-  const profile = {
+  const genderRaw = item?.gender ?? item?.looking_for_gender ?? item?.genderIdentity ?? userProfile?.gender ?? '';
+const genderLower = String(genderRaw).trim().toLowerCase();
+const fallbackAvatar = genderLower === 'female'
+  ? require('../assets/images/female_avatar.webp')
+  : require('../assets/images/male_avatar.webp');
+
+const profile = {
     name: userProfile ? `${userProfile.firstname} ${userProfile.lastname}` : (item?.name || item?.firstname ? `${item?.firstname || ''} ${item?.lastname || ''}`.trim() : (user?.name || 'Dinesh M')),
     id: `ID : ${userProfile?.profile_id || item?.id || user?.id || '54879108'}`,
     profileImage: userProfile?.image || item?.images?.[0] || item?.image || user?.profileImage || null,
@@ -198,25 +205,12 @@ const ProfileCard = forwardRef<ProfileCardRef, ProfileCardProps>(({ userProfile,
     <Animated.View style={[styles.card, frontAnimatedStyle]}>
       <View style={styles.profileSection}>
         <View style={styles.profileImageContainer}>
-          {profile.profileImage ? (
-            <Image 
-              source={{ uri: profile.profileImage }} 
-              style={styles.profileImage}
-              onLoad={() => console.log('✅ Profile image loaded successfully:', profile.profileImage)}
-              onError={(error) => console.log('❌ Profile image failed to load:', error.nativeEvent.error, 'URL:', profile.profileImage)}
-            />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <LinearGradient
-                colors={['#FF6B6B', '#4ECDC4', '#45B7D1']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.avatarGradient}
-              >
-                <Text style={styles.avatarText}>{profile.firstLetter}</Text>
-              </LinearGradient>
-            </View>
-          )}
+          <FallbackImage
+            source={{ uri: profile.profileImage || '' }}
+            fallbackSource={fallbackAvatar}
+            style={styles.profileImage}
+            resizeMode="cover"
+          />
           <TouchableOpacity style={styles.editIconContainer} onPress={() => router.push('/profile-setting')}>
             <Feather name="edit-2" size={16} color="white" />
           </TouchableOpacity>

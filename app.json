@@ -48,12 +48,6 @@
       "expo-video",
       "expo-secure-store",
       [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID"
-        }
-      ],
-      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",

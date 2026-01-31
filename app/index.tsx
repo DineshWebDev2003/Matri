@@ -1,14 +1,31 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { ActivityIndicator, View, Text } from 'react-native';
 import { Colors } from '@/constants/Colors';
 
 export default function StartPage() {
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
   const auth = useAuth();
 
-  // Show loading spinner while checking authentication
-  if (!auth || auth.isLoading) {
+  // Check onboarding flag once on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const flag = await AsyncStorage.getItem('hasSeenOnboarding');
+        setHasSeenOnboarding(flag === 'true');
+      } catch {
+        setHasSeenOnboarding(false);
+      } finally {
+        setOnboardingChecked(true);
+      }
+    })();
+  }, []);
+
+  // Show loading spinner while checking authentication or onboarding flag
+  if (!auth || auth.isLoading || !onboardingChecked) {
     return (
       <View style={{ 
         flex: 1, 
@@ -27,6 +44,11 @@ export default function StartPage() {
         </Text>
       </View>
     );
+  }
+
+  // If onboarding not seen yet, redirect there first
+  if (hasSeenOnboarding === false) {
+    return <Redirect href="/onboarding" />;
   }
 
   // Auto-navigate based on authentication status

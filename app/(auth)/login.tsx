@@ -297,15 +297,13 @@ export default function LoginScreen() {
             <View style={styles.socialContainer}>
               <Text style={[styles.socialLabel, { color: colors.textSecondary }]}>{t('or')}</Text>
               <View style={styles.socialButtonsRow}>
-                <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                  <FontAwesome name="facebook" size={24} color={colors.textPrimary} />
+                <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]} onPress={()=>Alert.alert('Coming Soon','Facebook login will be available soon.')}>\n                  <FontAwesome name="facebook" size={24} color={colors.textPrimary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                  <FontAwesome name="google" size={24} color={colors.textPrimary} />
+                <TouchableOpacity style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]} onPress={()=>Alert.alert('Coming Soon','Google login will be available soon.')}>\n                  <FontAwesome name="google" size={24} color={colors.textPrimary} />
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.socialButton, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}
-                  onPress={() => router.push('/(auth)/mobile-login')}
+                  onPress={()=>Alert.alert('Coming Soon','Mobile OTP login will be available soon.') }
                 >
                   <Feather name="phone-call" size={24} color={colors.textPrimary} />
                 </TouchableOpacity>

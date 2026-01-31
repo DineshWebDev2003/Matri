@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, RefreshControl, Image, ScrollView, StatusBar } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '@/constants/Colors';
@@ -51,12 +51,11 @@ const resolveProfileImage = (img?: ImgInput): string | null => {
 
 export default function ChatsScreen() {
   const router = useRouter();
-  const auth = useAuth();
-  const { user } = auth;
+  const { user, isAuthenticated } = useAuth();
   const { showPremiumModal } = usePremiumModal();
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState<any[]>([]);
   const [activeChats, setActiveChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,12 +66,7 @@ export default function ChatsScreen() {
   useEffect(() => {
     // Initialize gender from user or fetch from API
     const initializeGender = async () => {
-      // First, refresh user data to ensure we have latest package_id and other info (non-blocking)
-      if (auth?.refreshUser) {
-        console.log('🔄 Refreshing user data on chat screen load...');
-        // Don't await this - let it happen in background
-        auth.refreshUser().catch(err => console.log('⚠️ Error refreshing user:', err));
-      }
+      if (!isAuthenticated) { setCurrentUserGender('male'); return; }
       
       // Prefer gender from user object, fallback to nested basic_info, else API
       let gender = (user?.gender || user?.basic_info?.gender || user?.basicInfo?.gender || '')?.toLowerCase() || 'male';
@@ -133,6 +127,7 @@ export default function ChatsScreen() {
   }, [conversations]);
 
   const fetchConversations = useCallback(async () => {
+    if (!isAuthenticated) { setConversations([]); return; }
     try {
       setLoading(true);
       console.log('💬 Fetching conversations...');
@@ -235,12 +230,12 @@ export default function ChatsScreen() {
       } else {
         console.error('❌ Conversations API error:', response);
         setConversations([]);
-        Alert.alert('Error', 'Failed to load conversations');
+        if (isAuthenticated) Alert.alert('Error', 'Failed to load conversations');
       }
     } catch (error) {
       console.error('💥 Failed to fetch conversations:', error);
       setConversations([]);
-      Alert.alert('Error', 'Failed to load conversations');
+      if (isAuthenticated) Alert.alert('Error', 'Failed to load conversations');
     } finally {
       setLoading(false);
     }

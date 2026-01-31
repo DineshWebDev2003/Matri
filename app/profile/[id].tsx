@@ -304,7 +304,7 @@ export default function ProfileDetailScreen() {
   };
 
   const handleChat = () => {
-        if(isFreeUser){ showPremiumModal(); return; }
+        if (freeUser) { showPremiumModal(); return; }
     if (auth?.isGuest) {
       Alert.alert('Login Required', 'Please login to chat with this member', [
         { text: 'Cancel' },
@@ -336,7 +336,7 @@ export default function ProfileDetailScreen() {
 
   // Unlock contact – calls backend and refreshes user credits
   const handleViewContact = async () => {
-        if(isFreeUser){ showPremiumModal(); return; }
+        if (freeUser) { showPremiumModal(); return; }
     console.log('🔓 Attempting to unlock contact for profile:', profile?.id);
     console.log('🔢 Credits before unlock:', remainingCredits===Infinity ? 'Unlimited' : remainingCredits);
     try {
@@ -386,7 +386,7 @@ export default function ProfileDetailScreen() {
   };
 
   const handleInterest = async () => {
-        if(isFreeUser){showPremiumModal();return;}
+        if (freeUser) { showPremiumModal(); return; }
 
     if (auth?.isGuest) {
       Alert.alert('Login Required', 'Please login to send interest', [
@@ -481,7 +481,7 @@ export default function ProfileDetailScreen() {
   }, [profile?.id]);
 
   const handleShortlist = async () => {
-        if(isFreeUser){showPremiumModal();return;}
+        if (freeUser) { showPremiumModal(); return; }
 
     if (!profile?.id) return;
     try {
@@ -551,8 +551,18 @@ export default function ProfileDetailScreen() {
     );
   }
 
-  // Use image directly from API (already includes full URL from formatProfileResponse)
-    const profileImagePrimary = profile?.image || 'https://via.placeholder.com/400x600';
+  // Resolve profile image URL; return empty string if none or placeholder so FallbackImage shows avatar
+  const buildImageUrl = (img?: string) => {
+    if (!img) return null;
+    // ignore default/placeholder filenames
+    if (/default(\.|_)/i.test(img) || /placeholder/i.test(img)) return null;
+    if (img.startsWith('http')) return img;
+    if (img.includes('/assets')) return `https://${img.replace(/^https?:\/\//, '')}`;
+    const base = process.env.EXPO_PUBLIC_IMAGE_PROFILE_BASE_URL || 'https://90skalyanam.com/assets/images/user/profile';
+    return `${base}/${img}`;
+  };
+
+  const profileImagePrimary = buildImageUrl(profile?.image) || '';
   const genderLower = (profile?.gender || profile?.looking_for_gender || '').toLowerCase();
   // Prepare images for ImageViewing component
   const galleriesArr:any[] = (profile?.galleries || []).filter((g:any)=>g && g.image);
@@ -669,7 +679,7 @@ export default function ProfileDetailScreen() {
               {isInterested ? (
                 <MaterialCommunityIcons name="heart" size={36} color="#DC2626" />
               ) : (
-                <MaterialCommunityIcons name="heart-outline" size={36} color="#000000" />
+                <MaterialCommunityIcons name="heart-outline" size={36} color="#9CA3AF" />
               )}
             </TouchableOpacity>
 
@@ -1389,14 +1399,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   interestCardButtonActive: {
-    backgroundColor: '#FEE2E2',
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FFFFFF',
   },
   interestCardButtonDark: {
     backgroundColor: '#FFFFFF',
   },
   interestCardButtonActiveDark: {
-    backgroundColor: '#7F1D1D',
+    backgroundColor: '#FFFFFF',
   },
   blockCardButton: {
     backgroundColor: '#9CA3AF',
