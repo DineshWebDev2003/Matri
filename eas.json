@@ -1,0 +1,13 @@
+{
+  "build": {
+    "release-aab": {
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "EXPO_NO_CLEAR_CACHE": "true"
+      }
+    }
+  }
+}

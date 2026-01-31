@@ -62,13 +62,13 @@ workflows:
             echo "$GOOGLE_SERVICES_BASE64" | base64 --decode > app/google-services.json
           fi
 
-      - name: Build APK
+      - name: Build AAB
         script: |
           cd "$APP_DIR/android"
-          ./gradlew clean assembleRelease --no-daemon
+          ./gradlew clean bundleRelease --no-daemon
 
     artifacts:
-      - "$APP_DIR/android/app/build/outputs/**/*.apk"
+      - "$APP_DIR/android/app/build/outputs/**/*.aab"
 
     publishing:
       email:
