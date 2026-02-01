@@ -104,7 +104,7 @@ export default function UniversalHeader({
             style={styles.profileIconButtonPink}
           >
             <Image
-              source={getProfileSource(userImage, auth?.user?.gender)}
+              source={getProfileSource(userImage ?? auth?.user?.image ?? auth?.user?.profile_image, auth?.user?.gender)}
               style={styles.profileIconImage}
               onError={() => console.log('Profile image failed to load')}
             />

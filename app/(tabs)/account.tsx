@@ -993,7 +993,12 @@ export default function AccountScreen() {
                     {planDetails && Array.isArray(planDetails) && planDetails.length > 0 && (
                       <View style={styles.availablePlansSection}>
                         <Text style={[styles.availablePlansTitle, theme === 'dark' && { color: '#E5E7EB' }]}>Available Plans</Text>
-                        {planDetails.filter((p:any)=>String(p.id)!=='4').map((plan: any, index: number) => (
+                        {planDetails.filter((p:any)=>{
+                          const idOk = String(p.id)!==String(currentPackageId) && String(p.id)!=='4';
+                          const currentName = String(userProfile?.packageName||'').toLowerCase();
+                          const planName = String(p.name||p.title||'').toLowerCase();
+                          return idOk && planName!==currentName;
+                        }).map((plan: any, index: number) => (
                           <View key={index} style={[styles.planOptionCard, theme === 'dark' && { backgroundColor: '#1A1A1A', borderColor: '#2A2A2A' }]}>
                             <View style={styles.planOptionHeader}>
                               <Text style={[styles.planOptionName, theme === 'dark' && { color: '#FFFFFF' }]}>
@@ -1045,19 +1050,19 @@ export default function AccountScreen() {
 
                               {/* Pay/Current Button */}
                               <TouchableOpacity
-                                disabled={plan.id === currentPackageId || userProfile?.packageId === 4 || plan.id === 4}
+                                disabled={plan.id === currentPackageId}
                                 style={[
                                   styles.payNowButton,
-                                  plan.id === userProfile?.packageId && styles.payNowButtonDisabled,
+                                  plan.id === currentPackageId && styles.payNowButtonDisabled,
                                 ]}
                                 onPress={() => {
-                                  if (plan.id !== currentPackageId && userProfile?.packageId !== 4) {
+                                  if (plan.id !== currentPackageId) {
                                     handlePayNow(plan.id);
                                   }
                                 }}
                               >
                                 <Text style={styles.payNowButtonText}>
-                                  {plan.id === currentPackageId || userProfile?.packageId === 4 ? 'Current' : 'Pay Now'}
+                                  {plan.id === currentPackageId ? 'Current' : 'Pay Now'}
                                 </Text>
                               </TouchableOpacity>
                             </View>
@@ -1111,7 +1116,12 @@ export default function AccountScreen() {
                 {planDetails && Array.isArray(planDetails) && planDetails.length > 0 && (
                   <View style={styles.availablePlansSection}>
                     <Text style={[styles.availablePlansTitle, theme === 'dark' && { color: '#E5E7EB' }]}>Available Plans</Text>
-                    {planDetails.filter((p:any)=>String(p.id)!=='4').map((plan: any, index: number) => (
+                    {planDetails.filter((p:any)=>{
+                          const idOk = String(p.id)!==String(currentPackageId) && String(p.id)!=='4';
+                          const currentName = String(userProfile?.packageName||'').toLowerCase();
+                          const planName = String(p.name||p.title||'').toLowerCase();
+                          return idOk && planName!==currentName;
+                        }).map((plan: any, index: number) => (
                       <View key={index} style={[styles.planOptionCard, theme === 'dark' && { backgroundColor: '#1A1A1A', borderColor: '#2A2A2A' }]}>
                         <View style={styles.planOptionHeader}>
                           <Text style={[styles.planOptionName, theme === 'dark' && { color: '#FFFFFF' }]}>

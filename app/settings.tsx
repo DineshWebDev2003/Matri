@@ -34,6 +34,7 @@ export default function SettingsScreen() {
   const logout = auth?.logout;
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [toggleStates, setToggleStates] = useState({
     pushnotification: false,
     emailnotification: false,
@@ -77,10 +78,7 @@ export default function SettingsScreen() {
         setShowContactModal(true);
         break;
       case 'Logout':
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Logout', style: 'destructive', onPress: () => { logout && logout(); } },
-        ]);
+        setShowLogoutModal(true);
         break;
     }
   };
@@ -113,7 +111,7 @@ export default function SettingsScreen() {
       
       {/* Universal Header */}
       <UniversalHeader 
-        title="Settings"
+        title={t('settings')}
         leftIcon="arrow-left"
         onLeftPress={() => router.back()}
         rightIcons={['more-vertical']}
@@ -282,6 +280,32 @@ export default function SettingsScreen() {
             >
               <Text style={styles.modalCloseButtonText}>Close</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Logout Confirmation Modal */}
+      <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>  
+            <Text style={[styles.modalTitle, theme === 'dark' && { color: '#FFFFFF' }]}>{t('logout')}</Text>
+            <Text style={[styles.modalText, { color: theme === 'dark' ? '#B0B0B0' : '#6B7280', textAlign: 'center' }]}>
+              {t('logout_confirmation')}
+            </Text>
+            <View style={styles.logoutButtonsRow}>
+              <TouchableOpacity
+                style={[styles.cancelButton, theme === 'dark' && { backgroundColor: '#374151' }]}
+                onPress={() => setShowLogoutModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => { setShowLogoutModal(false); logout && logout(); }}
+              >
+                <Text style={styles.confirmButtonText}>{t('logout')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -478,6 +502,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCloseButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  // Logout Modal Buttons
+  logoutButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#D1D5DB',
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+  },
+  confirmButtonText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',

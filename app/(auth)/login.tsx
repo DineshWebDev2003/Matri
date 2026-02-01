@@ -17,6 +17,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const [langRotate] = useState(new Animated.Value(0));
   const [themeRotate] = useState(new Animated.Value(0));
   const [themeSpread] = useState(new Animated.Value(0));
@@ -134,10 +135,11 @@ export default function LoginScreen() {
     );
 
     if (!username || !password) {
-      Alert.alert('Error', 'Please enter both username and password.');
+      setLoginError(t('enter_credentials'));
       return;
     }
     
+    setLoginError('');
     setLoading(true);
     
     try {
@@ -157,7 +159,7 @@ export default function LoginScreen() {
         errorMessage = error.message || t('check_credentials');
       }
       
-      Alert.alert(t('login_failed'), errorMessage);
+      setLoginError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -204,7 +206,7 @@ export default function LoginScreen() {
               {/* Theme Toggle Button */}
               <Animated.View style={{ transform: [{ rotate: themeRotateInterpolate }] }}>
                 <TouchableOpacity 
-                  style={[styles.toggleButton, { borderColor: '#DC2626', backgroundColor: 'rgba(220, 38, 38, 0.2)' }]}
+                  style={styles.toggleButton}
                   onPress={handleThemeToggle}
                 >
                   {theme === 'dark' ? (
@@ -218,7 +220,7 @@ export default function LoginScreen() {
               {/* Language Toggle Button */}
               <Animated.View style={{ transform: [{ rotate: langRotateInterpolate }] }}>
                 <TouchableOpacity 
-                  style={[styles.toggleButton, { borderColor: '#DC2626', backgroundColor: 'rgba(220, 38, 38, 0.2)' }]}
+                  style={styles.toggleButton}
                   onPress={handleLanguageToggle}
                 >
                   <Text style={[styles.languageButtonText, { color: '#DC2626' }]}>
@@ -266,6 +268,10 @@ export default function LoginScreen() {
               </View>
             </View>
 
+            {loginError !== '' && (
+              <Text style={styles.errorText}>{loginError}</Text>
+            )}
+
             {/* Action Buttons Row */}
             <View style={{ flexDirection: 'row', gap: 15, marginTop: 10 }}>
               <TouchableOpacity
@@ -288,7 +294,7 @@ export default function LoginScreen() {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Feather name="user-plus" size={18} color="#FFFFFF" />
-                  <Text style={styles.registerButtonText}>{t('register').toUpperCase()}</Text>
+                  <Text style={styles.registerButtonText}>{language === 'en' ? t('register').toUpperCase() : t('register')}</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -646,19 +652,19 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   toggleButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 3,
   },
   languageButtonText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 10,
   },
 });
