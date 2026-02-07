@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ColorValue, SafeAreaView, StatusBar, Modal, Alert, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ColorValue, SafeAreaView, StatusBar, Modal, Alert, ActivityIndicator, FlatList, RefreshControl, Animated } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import ImageViewing from 'react-native-image-viewing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,9 +30,9 @@ const FallbackImage = ({
   fallbackSource,
   ...props 
 }: { 
-  source: { uri: string }; 
+  source: { uri: string } | any; 
   style: any; 
-  fallbackSource?: { uri: string };
+  fallbackSource?: { uri: string } | any;
   [key: string]: any;
 }) => {
   const [imageSource, setImageSource] = useState(source);
@@ -40,6 +40,7 @@ const FallbackImage = ({
   const [triedFallback, setTriedFallback] = useState(false);
 
   const handleError = () => {
+    console.log('🖼️ Profile image failed to load:', imageSource, 'switching to fallback');
     if (!triedFallback && fallbackSource) {
       setTriedFallback(true);
       setImageSource(fallbackSource);
@@ -53,7 +54,7 @@ const FallbackImage = ({
       source={imageSource}
       style={style}
       onError={handleError}
-      onLoad={() => {}}
+      onLoad={() => console.log('🖼️ Profile image loaded successfully:', imageSource)}
       {...props}
     />
   );
@@ -187,6 +188,8 @@ export default function AccountScreen() {
     return null;
   })();
 
+  console.log('🖼️ Resolved profileImageUrl:', profileImageUrl);
+
   const isValidProfileImage = !!profileImageUrl && !/default|placeholder|no[-_]image/i.test(profileImageUrl);
   // Remaining uploads based on gallery images count (UI authoritative)
   const MAX_GALLERY_IMAGES = 4;
@@ -216,6 +219,8 @@ export default function AccountScreen() {
   };
   const remainingUploads = Math.max(0, MAX_GALLERY_IMAGES - galleryImages.length);
 
+  const glowAnim = useState(new Animated.Value(0.3))[0];
+
   const handleThemeToggle = async () => {
     try {
       const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -241,6 +246,19 @@ export default function AccountScreen() {
     }
   }, [limitation]);
 
+  useEffect(() => {
+    if (userProfile?.premium) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
+          Animated.timing(glowAnim, { toValue: 0.3, duration: 1000, useNativeDriver: false }),
+        ])
+      ).start();
+    } else {
+      glowAnim.setValue(0.3);
+    }
+  }, [userProfile?.premium]);
+
   const fetchDashboardData = async () => {
       let apiProfileLoaded = false;
     try {
@@ -258,8 +276,9 @@ export default function AccountScreen() {
           console.log('📄 User details:', prof);
           // Map image url
           const imgUrl = getImageUrl(prof.image);
+          console.log('🖼️ getImageUrl result:', imgUrl);
           // derive premium
-          const isPrem = prof.plan_name && !['FREE MATCH','BASIC MATCH'].includes(prof.plan_name.toUpperCase());
+          const isPrem = prof.package_id !== 4;
           // stats
           const stats = prof.stats || {};
           setDashboardData({
@@ -341,7 +360,7 @@ export default function AccountScreen() {
           id: user.id,
           packageId: packageId,
           packageName: packageName,
-          premium: packageId > 1 ? 1 : 0
+          premium: packageId !== 4 ? 1 : 0
         });
       }
       
@@ -361,7 +380,7 @@ export default function AccountScreen() {
             ...prev,
             packageName: packageName,
             packageId: packageResponse.data.package.id,
-            premium: packageResponse.data.package.id > 1 ? 1 : 0
+            premium: packageResponse.data.package.id !== 4 ? 1 : 0
           }));
         }
       } catch (packageError) {
@@ -609,6 +628,10 @@ export default function AccountScreen() {
     { id: '9', title: 'Logout', icon: 'log-out' },
   ];
 
+  const isFreeUserFlag = isFreeUser(auth?.user) || isFreeUser(auth?.limitation);
+  const buttonBackgroundColor = isFreeUserFlag ? '#DC2626' : '#FFD700';
+  const buttonTextColor = isFreeUserFlag ? '#FFFFFF' : '#524f4fff';
+
   return (
     <>
       <StatusBar 
@@ -730,35 +753,36 @@ export default function AccountScreen() {
         {/* Premium Profile Card with Modern Design */}
         <View style={[styles.profileCardContainer, theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>
           {/* Card Header with Gradient Background */}
-          <LinearGradient
-            colors={['#DC2626', '#EF4444']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.profileCardHeader}
-          >
-            {/* Profile Image - Large Circle */}
-            <View style={styles.profileImageLarge}>
-              {isValidProfileImage ? (
-                <>
-                  <FallbackImage 
-                    source={{ uri: profileImageUrl }} 
-                    style={styles.profileImageLargeImg}
-                  />
-                  {userProfile?.premium && (
-                    <View style={[styles.crownOverlay, { backgroundColor: getCrownColor(userProfile.packageName)+'30' }]}> 
-                      <MaterialCommunityIcons name="crown" size={18} color={getCrownColor(userProfile.packageName)} />
-                    </View>
-                  )}
-                </>
-              ) : (
-                <Image
-                  source={defaultProfileImg}
+          <Animated.View style={{ shadowOpacity: glowAnim, shadowColor: '#FFD700', shadowRadius: 10, shadowOffset: { width: 0, height: 0 } }}>
+            <LinearGradient
+              colors={userProfile?.premium ? ['#FFD700', '#B8860B'] : ['#DC2626', '#EF4444']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.profileCardHeader, { position: 'relative' }]}
+            >
+              {/* Profile Image - Large Circle */}
+              <View style={styles.profileImageLarge}>
+                <FallbackImage 
+                  key={profileImageUrl}
+                  source={profileImageUrl ? { uri: `${profileImageUrl}?t=${Date.now()}` } : defaultProfileImg}
+                  fallbackSource={profileImageUrl ? defaultProfileImg : undefined}
                   style={styles.profileImageLargeImg}
-                  resizeMode="cover"
                 />
-              )}
+              </View>
+
+              {/* Floating Camera Icon Overlay */}
               <TouchableOpacity 
-                style={styles.cameraIconLarge} 
+                style={[{
+                  position: 'absolute',
+                  bottom: 10,
+                  right: 10,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: 'black',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }]}
                 onPress={handleChangeProfilePicture}
                 disabled={uploadingImage}
               >
@@ -768,37 +792,37 @@ export default function AccountScreen() {
                   <Feather name="camera" size={16} color="white" />
                 )}
               </TouchableOpacity>
-            </View>
 
-            {/* Name and Premium Badge */}
-            <View style={styles.profileHeaderInfo}>
-              <Text style={styles.profileNameLarge}>
-                {userProfile?.firstname} {userProfile?.lastname}
-              </Text>
-              <View style={styles.premiumBadge}>
-                <Feather name="star" size={14} color="#FCD34D" />
-                <Text style={styles.premiumBadgeText}>{userProfile?.packageName || 'FREE MATCH'}</Text>
+              {/* Name and Premium Badge */}
+              <View style={styles.profileHeaderInfo}>
+                <Text style={styles.profileNameLarge}>
+                  {userProfile?.firstname} {userProfile?.lastname}
+                </Text>
+                <View style={styles.premiumBadge}>
+                  <MaterialCommunityIcons name={userProfile?.premium ? "crown" : "star"} size={14} color="#FFD700" />
+                  <Text style={[styles.premiumBadgeText, userProfile?.premium && { color: '#FFD700' }]}>{userProfile?.packageName || 'FREE MATCH'}</Text>
+                </View>
+                <Text style={styles.profileIdText}>
+                  Profile ID: {userProfile?.profile_id || userProfile?.id || 'N/A'}
+                </Text>
               </View>
-              <Text style={styles.profileIdText}>
-                Profile ID: {userProfile?.profile_id || userProfile?.id || 'N/A'}
-              </Text>
-            </View>
-          </LinearGradient>
+            </LinearGradient>
+          </Animated.View>
 
           {/* Stats Section */}
           <View style={[styles.profileStatsSection, theme === 'dark' && { backgroundColor: '#1A1A1A' }]}>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{dashboardData?.remaining_interests || '0'}</Text>
+              <Text style={[styles.statValue, userProfile?.premium && { color: '#FFD700' }]}>{dashboardData?.remaining_interests || '0'}</Text>
               <Text style={[styles.statLabel, theme === 'dark' && { color: '#9CA3AF' }]}>Interest Left</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{dashboardData?.remaining_contact_view || '0'}</Text>
+              <Text style={[styles.statValue, userProfile?.premium && { color: '#FFD700' }]}>{dashboardData?.remaining_contact_view || '0'}</Text>
               <Text style={[styles.statLabel, theme === 'dark' && { color: '#9CA3AF' }]}>Contact View</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{remainingUploads || '0'}</Text>
+              <Text style={[styles.statValue, userProfile?.premium && { color: '#FFD700' }]}>{remainingUploads || '0'}</Text>
               <Text style={[styles.statLabel, theme === 'dark' && { color: '#9CA3AF' }]}>Gallery Upload</Text>
             </View>
           </View>
@@ -810,14 +834,14 @@ export default function AccountScreen() {
                 flex: 1, 
                 flexDirection: 'row', 
                 justifyContent: 'center',
-                backgroundColor: theme === 'dark' ? '#DC2626' : '#DC2626',
+                backgroundColor: buttonBackgroundColor,
                 paddingVertical: 10,
                 borderRadius: 8,
               }]}
               onPress={() => router.push('/profile-setting')}
             >
-              <Feather name="edit-3" size={18} color="white" style={{ marginRight: 8 }} />
-              <Text style={[styles.actionButtonText, { color: 'white' }]}>Edit Profile </Text>
+              <Feather name="edit-3" size={18} color={buttonTextColor} style={{ marginRight: 8 }} />
+              <Text style={[styles.actionButtonText, { color: buttonTextColor }]}>Edit Profile </Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -830,15 +854,15 @@ export default function AccountScreen() {
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: theme === 'dark' ? '#3A3A3A' : '#E5E7EB',
-                backgroundColor: theme === 'dark' ? '#2A2A2A' : '#F9FAFB',
+                backgroundColor: buttonBackgroundColor,
               }]}
               onPress={() => router.push(`/profile/${user?.id}`)}
             >
-              <Feather name="eye" size={18} color="#f50c0cff" style={{ marginRight: 8 }} />
+              <Feather name="eye" size={18} color={buttonTextColor} style={{ marginRight: 8 }} />
               <Text style={[{
                 fontSize: 16,
-                fontWeight: '500',
-                color: '#fc0808ff',
+                fontWeight: '700',
+                color: buttonTextColor,
               }]}>my Profile</Text>
             </TouchableOpacity>
             
@@ -1016,7 +1040,7 @@ export default function AccountScreen() {
                             <View style={styles.planBenefitsInline}>
                               {plan.interest_express_limit > 0 && (
                                 <View style={styles.benefitItemInline}>
-                                  <Feather name="check-circle" size={16} color="#10B981" />
+                                  <Feather name="heart" size={16} color="#10B981" />
                                   <Text style={[styles.benefitTextInline, theme === 'dark' && { color: '#9CA3AF' }]}>
                                     {plan.interest_express_limit} Interests
                                   </Text>
@@ -1024,7 +1048,7 @@ export default function AccountScreen() {
                               )}
                               {plan.contact_view_limit > 0 && (
                                 <View style={styles.benefitItemInline}>
-                                  <Feather name="check-circle" size={16} color="#10B981" />
+                                  <Feather name="eye" size={16} color="#10B981" />
                                   <Text style={[styles.benefitTextInline, theme === 'dark' && { color: '#9CA3AF' }]}>
                                     {plan.contact_view_limit} Contact Views
                                   </Text>
@@ -1032,7 +1056,7 @@ export default function AccountScreen() {
                               )}
                               {plan.image_upload_limit > 0 && (
                                 <View style={styles.benefitItemInline}>
-                                  <Feather name="check-circle" size={16} color="#10B981" />
+                                  <Feather name="camera" size={16} color="#10B981" />
                                   <Text style={[styles.benefitTextInline, theme === 'dark' && { color: '#9CA3AF' }]}>
                                     {plan.image_upload_limit} Photo Uploads
                                   </Text>
@@ -1040,7 +1064,7 @@ export default function AccountScreen() {
                               )}
                               {plan.validity_period > 0 && (
                                 <View style={styles.benefitItemInline}>
-                                  <Feather name="check-circle" size={16} color="#10B981" />
+                                  <Feather name="calendar" size={16} color="#10B981" />
                                   <Text style={[styles.benefitTextInline, theme === 'dark' && { color: '#9CA3AF' }]}>
                                     {plan.validity_period} Days Validity
                                   </Text>
@@ -1139,7 +1163,7 @@ export default function AccountScreen() {
                         <View style={styles.planBenefitsInline}>
                           {plan.interest_express_limit > 0 && (
                             <View style={styles.benefitItemInline}>
-                              <Feather name="check-circle" size={16} color="#10B981" />
+                              <Feather name="heart" size={16} color="#10B981" />
                               <Text style={[styles.benefitTextInline, theme === 'dark' && { color: '#9CA3AF' }]}>
                                 {plan.interest_express_limit} Interests
                               </Text>
@@ -1147,7 +1171,7 @@ export default function AccountScreen() {
                           )}
                           {plan.contact_view_limit > 0 && (
                             <View style={styles.benefitItemInline}>
-                              <Feather name="check-circle" size={16} color="#10B981" />
+                              <Feather name="eye" size={16} color="#10B981" />
                               <Text style={[styles.benefitTextInline, theme === 'dark' && { color: '#9CA3AF' }]}>
                                 {plan.contact_view_limit} Contact Views
                               </Text>
@@ -1155,7 +1179,7 @@ export default function AccountScreen() {
                           )}
                           {plan.image_upload_limit > 0 && (
                             <View style={styles.benefitItemInline}>
-                              <Feather name="check-circle" size={16} color="#10B981" />
+                              <Feather name="camera" size={16} color="#10B981" />
                               <Text style={[styles.benefitTextInline, theme === 'dark' && { color: '#9CA3AF' }]}>
                                 {plan.image_upload_limit} Photo Uploads
                               </Text>
@@ -1163,7 +1187,7 @@ export default function AccountScreen() {
                           )}
                           {plan.validity_period > 0 && (
                             <View style={styles.benefitItemInline}>
-                              <Feather name="check-circle" size={16} color="#10B981" />
+                              <Feather name="calendar" size={16} color="#10B981" />
                               <Text style={[styles.benefitTextInline, theme === 'dark' && { color: '#9CA3AF' }]}>
                                 {plan.validity_period} Days Validity
                               </Text>

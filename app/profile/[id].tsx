@@ -304,7 +304,12 @@ export default function ProfileDetailScreen() {
   };
 
   const handleChat = () => {
-        if (freeUser) { showPremiumModal(); return; }
+        console.log('handleChat: freeUser =', freeUser, 'auth.user.package_id =', auth?.user?.package_id, 'auth.limitation.package_id =', auth?.limitation?.package_id);
+        if (freeUser) { 
+          console.log('Showing premium modal for chat');
+          showPremiumModal(); 
+          return; 
+        }
     if (auth?.isGuest) {
       Alert.alert('Login Required', 'Please login to chat with this member', [
         { text: 'Cancel' },
@@ -386,7 +391,13 @@ export default function ProfileDetailScreen() {
   };
 
   const handleInterest = async () => {
-        if (freeUser) { showPremiumModal(); return; }
+        console.log('handleInterest: freeUser =', freeUser, 'auth.user.package_id =', auth?.user?.package_id, 'auth.limitation.package_id =', auth?.limitation?.package_id);
+        if (freeUser) { 
+          console.log('Showing premium modal for interest');
+          console.log('Debug: Free user attempting to send interest');
+          showPremiumModal(); 
+          return; 
+        }
 
     if (auth?.isGuest) {
       Alert.alert('Login Required', 'Please login to send interest', [
@@ -481,7 +492,12 @@ export default function ProfileDetailScreen() {
   }, [profile?.id]);
 
   const handleShortlist = async () => {
-        if (freeUser) { showPremiumModal(); return; }
+        console.log('handleShortlist: freeUser =', freeUser, 'auth.user.package_id =', auth?.user?.package_id, 'auth.limitation.package_id =', auth?.limitation?.package_id);
+        if (freeUser) { 
+          console.log('Showing premium modal for shortlist');
+          showPremiumModal(); 
+          return; 
+        }
 
     if (!profile?.id) return;
     try {
@@ -1399,7 +1415,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   interestCardButtonActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FEF2F2',
   },
   interestCardButtonDark: {
     backgroundColor: '#FFFFFF',

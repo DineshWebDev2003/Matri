@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { usePremiumModal } from '../../context/PremiumModalContext';
 //import WithSwipe from '../../components/WithSwipe';
 import { getImageUrl } from '../../utils/imageUtils';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Resolve profile image, accept full URL or filename
 type ImgInput = string | { primary?: string|null; fallback?: string|null } | null | undefined;
@@ -108,6 +109,12 @@ export default function ChatsScreen() {
       });
     }
   }, [user?.id, user?.package_id, user?.package_name]);
+
+  // Auto-refresh on screen focus
+  useFocusEffect(useCallback(() => {
+    fetchConversations();
+    fetchActiveChats();
+  }, [fetchConversations, fetchActiveChats]));
 
   // Debug logging for conversations data
   useEffect(() => {
@@ -211,9 +218,15 @@ export default function ChatsScreen() {
                 const detail = await apiService.getUserDetailsById(conv.other_user?.id);
                 if(detail?.status==='success'){
                   const realImg = detail.data?.profile?.image || detail.data?.image || null;
+                  console.log('📸 Enrichment: API returned image for', conv.other_user?.id, ':', realImg);
                   if(realImg && !hasDefault(realImg)){
                     conv.other_user.image = realImg;
+                    console.log('📸 Enrichment: Set image for', conv.other_user?.id, 'to', realImg);
+                  } else {
+                    console.log('📸 Enrichment: Image is default or null for', conv.other_user?.id, ':', realImg);
                   }
+                } else {
+                  console.log('📸 Enrichment: API failed for', conv.other_user?.id, ':', detail);
                 }
               }catch(e){ /* ignore individual errors */ }
             }

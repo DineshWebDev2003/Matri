@@ -764,6 +764,75 @@ export class APIService {
   }
 
   // ========================================================================
+  // RAZORPAY PAYMENT ENDPOINTS (MOBILE)
+  // ========================================================================
+  /**
+   * Create Razorpay order for selected package (mobile)
+   * POST /mobile/razorpay/order
+   */
+  async createRazorpayOrder(packageId: number): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/mobile/razorpay/order', { package_id: packageId });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to create Razorpay order');
+    }
+  }
+
+  /**
+   * Verify Razorpay payment (mobile)
+   * POST /mobile/razorpay/verify
+   */
+  async verifyRazorpayPayment(params: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+    package_id: number;
+  }): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/mobile/razorpay/verify', params);
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to verify payment');
+    }
+  }
+
+  
+  // ========================================================================
+  // PROFILE IMAGE ENDPOINTS
+  // ========================================================================
+
+  /**
+   * Upload profile image
+   * POST /mobile/upload-profile-image
+   */
+  async uploadProfileImage(imageData: FormData): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/mobile/upload-profile-image', imageData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to upload profile image');
+    }
+  }
+
+  /**
+   * Complete basic info (welcome upload)
+   * POST /profile/welcome-basic
+   */
+  async completeBasicInfo(basicData: FormData): Promise<ApiResponse> {
+    try {
+      const response = await this.api.post('/profile/welcome-basic', basicData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error, 'Failed to complete basic info');
+    }
+  }
+
+  // ========================================================================
   // UTILITY METHODS
   // ========================================================================
 

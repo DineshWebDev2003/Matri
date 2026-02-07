@@ -4,10 +4,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import RazorpayCheckout from 'react-native-razorpay';
 import { apiService } from '../services/api';
 import UniversalHeader from '../components/UniversalHeader';
+import { useAuth } from '../context/AuthContext';
 
 export default function PaymentScreen() {
   const { planId } = useLocalSearchParams<{ planId: string }>();
   const router = useRouter();
+  const { refreshUser, updateLimitation } = useAuth();
   const [loading, setLoading] = useState(true);
   const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
 
@@ -30,7 +32,7 @@ export default function PaymentScreen() {
         throw new Error(resp.message || 'Order creation failed');
       }
 
-      const { order_id, amount, currency, razorpay_key } = resp.data;
+      const { order_id, amount, currency, razorpay_key, purchase_id } = resp.data;
       const key = razorpay_key || resp.data.key || '';
 
       console.log('🔧 Razorpay Checkout Debug:', {
@@ -59,16 +61,38 @@ export default function PaymentScreen() {
           console.log('✅ Razorpay payment successful:', data);
           // Razorpay returns: razorpay_payment_id, razorpay_order_id, razorpay_signature
           const payload = {
-            order_id: order_id,
-            payment_id: data.razorpay_payment_id,
-            signature: data.razorpay_signature,
+            razorpay_order_id: order_id,
+            razorpay_payment_id: data.razorpay_payment_id,
+            razorpay_signature: data.razorpay_signature,
+            package_id: Number(id),
+            purchase_id,
           };
           try {
             await apiService.verifyRazorpayPayment(payload);
-            Alert.alert('Success', 'Payment completed');
+            // Refresh user data to update package_id
+            await refreshUser();
+            // Refresh limitation data from dashboard
+            try {
+              const dashResp = await apiService.getDashboard();
+              if (dashResp.data?.limitation) {
+                updateLimitation(dashResp.data.limitation);
+              } else {
+                // If dashboard not updated yet, set package_id from paid plan
+                updateLimitation({ package_id: Number(id), ...(auth?.limitation || {}) });
+              }
+            } catch (limErr) {
+              console.warn('Failed to refresh limitation after payment:', limErr);
+              // Set package_id from paid plan
+              updateLimitation({ package_id: Number(id), ...(auth?.limitation || {}) });
+            }
+            Alert.alert('Success', 'Payment completed and account upgraded!');
             router.back();
           } catch (e) {
             console.warn('🔴 Verification error', e);
+            // log backend response body if present
+            if (e?.response?.data) {
+              console.log('🔴 Verification error response:', e.response.data);
+            }
             Alert.alert('Verification failed', 'Payment captured but verification failed');
           }
         })

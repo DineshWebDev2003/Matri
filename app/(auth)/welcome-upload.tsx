@@ -6,12 +6,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { apiService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function WelcomeUploadScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const params = useLocalSearchParams<{ name?: string }>();
   const name = params.name || 'User';
+  const { refreshUser } = useAuth();
 
   // Default to India (id 'IN'); user can change if needed
   const [countryId, setCountryId] = useState<string>('IN');
@@ -83,6 +85,8 @@ export default function WelcomeUploadScreen() {
 
       const res = await apiService.completeBasicInfo(formData as any);
       if (res.status === 'success') {
+        // Refresh user data to update stored profile
+        await refreshUser();
         Alert.alert('Success', 'Profile updated!');
         router.replace('/');
       } else {

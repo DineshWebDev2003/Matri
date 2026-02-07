@@ -36,6 +36,9 @@ export default function SearchScreen() {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const themeStyles = {
     container: theme === 'dark' ? { backgroundColor: '#1A1A1A' } : { backgroundColor: '#FFFFFF' },
@@ -55,6 +58,24 @@ export default function SearchScreen() {
     }catch(e){console.warn('religion fetch err',e);}}
   )();},[]);
 
+  // auto-set user religion and caste for caste filter
+  useEffect(() => {
+    const setupCasteSearch = async () => {
+      if (filterType === 'caste' && auth.user) {
+        if (auth.user.religion && !selectedReligion) {
+          setSelectedReligion(auth.user.religion);
+          await handleReligionChange(auth.user.religion);
+        }
+        if (auth.user.caste && !selectedCaste) {
+          setSelectedCaste(auth.user.caste);
+        }
+        // Auto perform search for caste profiles
+        await performSearch();
+      }
+    };
+    setupCasteSearch();
+  }, [filterType, auth.user]);
+
   const handleReligionChange=async(id:string)=>{
     setSelectedReligion(id);
     setSelectedCaste('');
@@ -72,7 +93,7 @@ export default function SearchScreen() {
   };
 
   const performSearch = async () => {
-    if (!searchQuery.trim()) {
+    if (filterType !== 'caste' && !searchQuery.trim()) {
       Alert.alert('Error', 'Please enter a search query');
       return;
     }
@@ -85,7 +106,7 @@ export default function SearchScreen() {
       // Build search parameters for getProfiles helper which already handles endpoint differences
       const params: any = {
         search: searchQuery,
-        limit: 100,
+        limit: filterType === 'caste' ? 10 : 100,
         page: 1,
       };
 
@@ -96,10 +117,13 @@ export default function SearchScreen() {
         params.filters = { location: searchQuery };
         console.log('📍 Searching by location:', searchQuery);
       } else if (filterType === 'caste') {
-        // use dropdown selection if available else fallback to text
-        if(selectedReligion) params.religion = selectedReligion;
-        if(selectedCaste){ params.caste = selectedCaste; }
-        else { params.caste = searchQuery; }
+        params.filters = {};
+        if(selectedCaste){
+          params.filters.caste = selectedCaste;
+        } else {
+          params.filters.caste = searchQuery;
+        }
+        if(selectedReligion) params.filters.religion = selectedReligion;
         console.log('👥 Searching by caste:', params);
       } else if (filterType === 'age') {
         const age = parseInt(searchQuery);
@@ -125,9 +149,14 @@ export default function SearchScreen() {
         
         if (profiles.length > 0) {
           setSearchResults(profiles);
+          setCurrentPage(1);
+          const limitUsed = filterType === 'caste' ? 10 : 100;
+          setHasMore(profiles.length === limitUsed);
           console.log(`✅ Found ${profiles.length} profiles`);
         } else {
           setSearchResults([]);
+          setCurrentPage(1);
+          setHasMore(false);
           console.log('⚠️ No profiles found');
           Alert.alert('No Results', `No profiles found matching your ${filterType} search`);
         }
@@ -150,6 +179,8 @@ export default function SearchScreen() {
         }
       } else {
         setSearchResults([]);
+        setCurrentPage(1);
+        setHasMore(false);
         console.log('⚠️ Error response:', response);
         Alert.alert('Error', response?.message || 'No profiles found matching your search');
       }
@@ -158,6 +189,54 @@ export default function SearchScreen() {
       Alert.alert('Error', 'Failed to search profiles. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore || !hasSearched) return;
+
+    setLoadingMore(true);
+
+    try {
+      const params: any = {
+        limit: filterType === 'caste' ? 10 : 100,
+        page: currentPage + 1,
+      };
+
+      if (filterType === 'name') {
+        params.search = searchQuery;
+      } else if (filterType === 'location') {
+        params.filters = { location: searchQuery };
+      } else if (filterType === 'caste') {
+        params.filters = {};
+        if(selectedCaste){
+          params.filters.caste = selectedCaste;
+        }
+        if(selectedReligion) params.filters.religion = selectedReligion;
+      } else if (filterType === 'age') {
+        params.filters = { age: parseInt(searchQuery) };
+      }
+
+      const response = await apiService.getProfiles(params);
+      console.log('📊 Load more response:', JSON.stringify(response, null, 2));
+
+      if (response?.status === 'success' && response?.data) {
+        const newProfiles = Array.isArray(response.data) 
+          ? response.data 
+          : response.data.profiles || response.data.users || [];
+
+        setSearchResults(prev => [...prev, ...newProfiles]);
+        setCurrentPage(prev => prev + 1);
+        setHasMore(newProfiles.length === (filterType === 'caste' ? 10 : 100));
+        console.log(`✅ Loaded ${newProfiles.length} more profiles`);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('❌ Load more error:', error);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -186,41 +265,48 @@ export default function SearchScreen() {
       ? item.image.startsWith('http')
         ? item.image
         : `https://90skalyanam.com/assets/images/user/profile/${item.image}`
-      : 'https://via.placeholder.com/60';
+      : null;
 
     return (
-      <LinearGradient
-        colors={['#FCA5A5', '#F87171']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={styles.profileCardGradient}
-      >
-      <TouchableOpacity
-        style={styles.profileCardInner}
-        onPress={() => router.push(`/profile/${item.id}`)}
-      >
-        <Image
-          source={imageUrl ? { uri: imageUrl } : defaultImg}
-          style={styles.profileImage}
-          defaultSource={defaultImg}
-        />
-        <View style={styles.profileInfo}>
-          <Text style={[styles.profileName, themeStyles.text]}>
-            {profileName}, {age || 'N/A'}
-          </Text>
-          <View style={styles.profileDetails}>
-            <Feather name="map-pin" size={14} color={theme === 'dark' ? '#9CA3AF' : '#6B7280'} />
-            <Text style={[styles.profileLocation, themeStyles.secondaryText]}>
-              {location}
+      <View style={[styles.profileCardContainer, themeStyles.container]}>
+        <TouchableOpacity
+          style={styles.profileCard}
+          onPress={() => router.push(`/profile/${item.id}`)}
+        >
+          <Image
+            source={imageUrl ? { uri: imageUrl } : defaultImg}
+            style={styles.profileImage}
+            defaultSource={defaultImg}
+          />
+          <View style={styles.profileInfo}>
+            <Text style={[styles.profileName, themeStyles.text]}>
+              {profileName}, {age || 'N/A'}
             </Text>
+            <View style={styles.profileDetails}>
+              <Feather name="map-pin" size={14} color={theme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+              <Text style={[styles.profileDetailText, themeStyles.secondaryText]}>
+                {location}
+              </Text>
+            </View>
+            {item.caste && (
+              <View style={styles.profileDetails}>
+                <Feather name="users" size={14} color={theme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+                <Text style={[styles.profileDetailText, themeStyles.secondaryText]}>
+                  {item.caste}
+                </Text>
+              </View>
+            )}
+            {item.religion && (
+              <View style={styles.profileDetails}>
+                <Feather name="heart" size={14} color={theme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+                <Text style={[styles.profileDetailText, themeStyles.secondaryText]}>
+                  {item.religion}
+                </Text>
+              </View>
+            )}
           </View>
-          {item.caste && (
-            <Text style={[styles.profileCaste, themeStyles.secondaryText]}>
-              {item.caste}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-      </LinearGradient>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -243,6 +329,8 @@ export default function SearchScreen() {
 
         {/* Search Section */}
         <View style={styles.searchSection}>
+        {filterType !== 'caste' && (
+          <>
         {/* Search Input */}
         <View style={[styles.searchInputContainer, themeStyles.inputBg]}>
           <Feather name="search" size={20} color="#9CA3AF" />
@@ -255,6 +343,8 @@ export default function SearchScreen() {
             onSubmitEditing={performSearch}
           />
         </View>
+        </>
+        )}
 
         {/* Filter Tabs */}
         <View style={styles.filterTabs}>
@@ -279,29 +369,8 @@ export default function SearchScreen() {
           ))}
         </View>
 
-        {/* Religion & Caste pickers (visible only when caste filter chosen) */}
-        {filterType==='caste' && (
-          <View style={{gap:8}}>
-            <Picker
-              selectedValue={selectedReligion}
-              onValueChange={(v)=>handleReligionChange(String(v))}
-              style={[styles.searchInputContainer,{height:48}]}
-            >
-              <Picker.Item label="Select Religion" value="" />
-              {religionOptions.map(r=>(<Picker.Item key={r.value} label={r.label} value={r.value} />))}
-            </Picker>
-            <Picker
-              enabled={selectedReligion!==''}
-              selectedValue={selectedCaste}
-              onValueChange={(v)=>setSelectedCaste(String(v))}
-              style={[styles.searchInputContainer,{height:48}]}
-            >
-              <Picker.Item label="Select Caste" value="" />
-              {casteOptions.map(c=>(<Picker.Item key={c.value} label={c.label} value={c.label} />))}
-            </Picker>
-          </View>
-        )}
-
+        {filterType !== 'caste' && (
+          <>
         {/* Search Button */}
         <TouchableOpacity
           style={styles.searchButton}
@@ -314,6 +383,8 @@ export default function SearchScreen() {
             <Text style={styles.searchButtonText}>Search</Text>
           )}
         </TouchableOpacity>
+        </>
+        )}
         </View>
       </View>
 
@@ -346,6 +417,9 @@ export default function SearchScreen() {
           keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={() => loadingMore ? <ActivityIndicator size="small" color={Colors.light.tint} /> : null}
         />
       )}
     </View>
@@ -441,27 +515,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  profileCardGradient: {
+  profileCardContainer: {
     borderRadius: 12,
-    marginBottom: 10,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  profileCardInner: {
+  profileCard: {
     flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 12,
+    padding: 16,
     alignItems: 'center',
+    gap: 16,
   },
   profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#E5E7EB',
   },
   profileInfo: {
     flex: 1,
-    justifyContent: 'center',
-    gap: 4,
+    gap: 6,
   },
   profileName: {
     fontSize: 15,
@@ -472,10 +549,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  profileLocation: {
+  profileDetailText: {
     fontSize: 12,
-  },
-  profileCaste: {
-    fontSize: 11,
   },
 });

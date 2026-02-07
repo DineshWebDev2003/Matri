@@ -60,7 +60,7 @@ export default function ChatScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { theme } = useTheme();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, limitation } = useAuth();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
@@ -105,6 +105,22 @@ export default function ChatScreen() {
       });
     })();
   }, []);
+
+  useEffect(() => {
+    // Fetch the other user's profile to get the correct image
+    if (params.userId) {
+      apiService.getUserDetailsById(params.userId)
+        .then(detail => {
+          const image = detail?.data?.profile?.image || detail?.data?.image;
+          if (image && !isDefaultAvatar(image)) {
+            setChatImage(resolveProfileImage(image));
+          }
+        })
+        .catch(err => {
+          console.log('Failed to fetch user details for image:', err);
+        });
+    }
+  }, [params.userId]);
 
   useEffect(() => {
     console.log('📋 Chat screen params:', params);
@@ -718,20 +734,14 @@ export default function ChatScreen() {
   const getAvatarSource = (senderImage: string | null, isMyMessage: boolean) => {
     if (isMyMessage) return null;
     
-    // If we have a sender image, use it (construct URL if needed)
+    // If we have a sender image, use resolveProfileImage to fix URL
     if (senderImage) {
-      if (senderImage.startsWith('http')) {
-        console.log('💬 Avatar Source - Full URL:', senderImage);
-        return senderImage;
-      }
-      
-      // If it's just a filename, construct the production URL
-      const productionImageUrl = `${process.env.EXPO_PUBLIC_PRODUCTION_PROFILE_IMAGE_URL}/${senderImage}`;
-      console.log('💬 Avatar Source - Production URL:', {
-        filename: senderImage,
-        productionUrl: productionImageUrl,
+      const resolved = resolveProfileImage(senderImage);
+      console.log('💬 Avatar Source - Resolved:', {
+        original: senderImage,
+        resolved: resolved,
       });
-      return productionImageUrl;
+      return resolved;
     }
     
     // If no image but we have gender info, use appropriate gender avatar

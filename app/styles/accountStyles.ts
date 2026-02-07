@@ -859,8 +859,7 @@ import { Colors } from '../../constants/Colors';
     overflow: 'hidden',
     backgroundColor: '#F3F4F6',
     position: 'relative',
-    borderWidth: 2,
-    borderColor: '#DC2626',
+    borderWidth: 0,
   },
   photoGridImage: {
     width: '100%',

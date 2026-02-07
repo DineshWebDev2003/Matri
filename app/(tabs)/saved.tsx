@@ -527,9 +527,24 @@ export default function InterestedScreen() {
             {activeTab === 'sent' && (
               <TouchableOpacity 
                 style={[styles.cardActionButton, styles.cardActionButtonSmall, styles.removeActionButton]}
-                onPress={() => handleRemoveInterest(item.id)}
+                onPress={() => {
+                  // Block if user is on free package (id 4)
+                  if (hasFreePackage()) {
+                    showPremiumModal();
+                    return;
+                  }
+                  router.push({
+                    pathname: `/chat/${item.id}`,
+                    params: {
+                      image: item.profileImage,
+                      name: item.name,
+                      userId: item.id,
+                      gender: item.gender
+                    }
+                  });
+                }}
               >
-                <Feather name="trash-2" size={20} color="white" />
+                <Feather name="message-circle" size={20} color="white" />
               </TouchableOpacity>
             )}
             

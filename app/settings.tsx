@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Alert, Modal, TextInput, Linking, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -32,6 +32,12 @@ export default function SettingsScreen() {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const logout = auth?.logout;
+
+  useEffect(() => {
+    if (auth?.refreshUser) {
+      auth.refreshUser();
+    }
+  }, []);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);

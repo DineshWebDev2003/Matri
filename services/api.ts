@@ -171,7 +171,7 @@ export const apiService = {
 
   /* Razorpay – use mobile API (/api/mobile/razorpay) */
   async createRazorpayOrder(planId: number) {
-    const payload = { plan_id: planId };
+    const payload = { package_id: planId };
     const token   = await SecureStore.getItemAsync('token');
 
     // Use mobile API endpoint that loads credentials from DB
@@ -183,11 +183,8 @@ export const apiService = {
     return res.data;
   },
 
-  async verifyRazorpayPayment({ order_id, payment_id, signature }: { order_id: string; payment_id: string; signature: string; }) {
-    const payload = { razorpay_order_id: order_id, razorpay_payment_id: payment_id, razorpay_signature: signature, plan_id: /* you may need to pass plan_id from caller */ null };
-    const res = await axiosInstance.post('/razorpay/verify', payload, {
-      timeout: 20000,
-    });
+  async verifyRazorpayPayment(payload: { razorpay_order_id:string; razorpay_payment_id:string; razorpay_signature:string; package_id:number; purchase_id:number; }) {
+    const res = await axiosInstance.post('/razorpay/verify', payload, { timeout: 20000 });
     return res.data;
   },
 
@@ -474,7 +471,7 @@ export const apiService = {
     }
   },
 
-  verifyRazorPayment: async (payload:any) => {
+  verifyRazorPayment: async (payload: { razorpay_order_id:string; razorpay_payment_id:string; razorpay_signature:string; package_id:number; purchase_id:number; }) => {
     try {
       const response = await axiosInstance.post('/razorpay/verify', payload);
       return response.data;

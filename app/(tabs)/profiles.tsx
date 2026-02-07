@@ -738,7 +738,7 @@ export default function ProfilesScreen() {
           resp = await apiService.getProfiles({ type: 'all', page: pageNum, limit: 12 });
         }
       } else {
-        resp = await apiService.getMembers(pageNum, 12);
+        resp = await apiService.getProfiles({ type: 'all', page: pageNum, limit: 12 });
       }
 
       if (resp?.status !== 'success') {
